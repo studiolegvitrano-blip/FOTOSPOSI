@@ -6,6 +6,9 @@ import { getMediaByEvent } from '@fotosposi/media';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ShareButton } from '@fotosposi/ui';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import type { WeddingEvent, SubEvent, EventWindow } from '@fotosposi/events';
 import type { MediaUpload } from '@fotosposi/media';
 
@@ -34,89 +37,87 @@ export default function EventDetailPage() {
     });
   }, [eventId]);
 
-  if (loading) return <p>Caricamento...</p>;
-  if (!event) return <p>Evento non trovato</p>;
+  if (loading) return <p className="text-center mt-8">Caricamento...</p>;
+  if (!event) return <p className="text-center mt-8">Evento non trovato</p>;
 
   return (
-    <main style={{ maxWidth: 800, margin: '2rem auto', padding: '0 1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+    <main className="max-w-4xl mx-auto p-4 space-y-6">
+      <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h1>{event.couple_name}</h1>
-          <p style={{ color: '#555', marginBottom: '1rem' }}>
+          <h1 className="text-2xl font-bold">{event.couple_name}</h1>
+          <p className="text-text-muted">
             {new Date(event.date).toLocaleDateString('it-IT')} — {event.location}
           </p>
-          <p>Piano: <strong>{event.tier}</strong></p>
+          <Badge variant={event.tier === 'premium' ? 'default' : 'secondary'}>{event.tier}</Badge>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <Link href={`/events/${eventId}/upload`}
-            style={{ padding: '0.5rem 1rem', background: '#d4a574', color: '#fff', textDecoration: 'none', borderRadius: 6 }}>
-            Carica foto
-          </Link>
-          <Link href={`/events/${eventId}/games`}
-            style={{ padding: '0.5rem 1rem', background: '#8b5e3c', color: '#fff', textDecoration: 'none', borderRadius: 6 }}>
-            Giochi
-          </Link>
-          <Link href={`/events/${eventId}/shop`}
-            style={{ padding: '0.5rem 1rem', background: '#2e7d32', color: '#fff', textDecoration: 'none', borderRadius: 6 }}>
-            Shop
-          </Link>
-          <Link href={`/events/${eventId}/gift`}
-            style={{ padding: '0.5rem 1rem', background: '#1565c0', color: '#fff', textDecoration: 'none', borderRadius: 6 }}>
-            Lista nozze
-          </Link>
-          <Link href={`/events/${eventId}/qr`}
-            style={{ padding: '0.5rem 1rem', border: '2px solid #d4a574', color: '#d4a574', textDecoration: 'none', borderRadius: 6 }}>
-            QR
-          </Link>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="default" asChild><Link href={`/events/${eventId}/upload`}>Carica foto</Link></Button>
+          <Button variant="secondary" asChild><Link href={`/events/${eventId}/games`}>Giochi</Link></Button>
+          <Button variant="secondary" asChild><Link href={`/events/${eventId}/shop`}>Shop</Link></Button>
+          <Button variant="secondary" asChild><Link href={`/events/${eventId}/gift`}>Lista nozze</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/guestbook`}>Video</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/site-builder`}>Sito evento</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/qr`}>QR</Link></Button>
         </div>
       </div>
 
       {evtWindow && (
-        <div style={{ marginTop: '1rem', padding: '1rem', background: '#f0f4f8', borderRadius: 8 }}>
-          <p>Finestra di accesso: {new Date(evtWindow.opens_at).toLocaleDateString('it-IT')} — {new Date(evtWindow.closes_at).toLocaleDateString('it-IT')}</p>
-        </div>
+        <Card className="bg-muted">
+          <CardContent className="py-3 text-sm">
+            Finestra di accesso: {new Date(evtWindow.opens_at).toLocaleDateString('it-IT')} — {new Date(evtWindow.closes_at).toLocaleDateString('it-IT')}
+          </CardContent>
+        </Card>
       )}
 
-      <div style={{ marginTop: '2rem' }}>
-        <h2>Galleria ({media.length})</h2>
-        {media.length === 0 ? (
-          <p style={{ color: '#666' }}>Nessuna foto ancora</p>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem', marginTop: '0.5rem' }}>
-            {media.slice(0, 12).map((m) => (
-              <div key={m.id} style={{ border: '1px solid #eee', borderRadius: 4, overflow: 'hidden' }}>
-                {m.type === 'photo'
-                  ? <img src={m.url} alt="" style={{ width: '100%', height: 120, objectFit: 'cover' }} />
-                  : <video src={m.url} style={{ width: '100%', height: 120, objectFit: 'cover' }} />}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Galleria ({media.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {media.length === 0 ? (
+            <p className="text-text-muted">Nessuna foto ancora</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {media.slice(0, 12).map((m) => (
+                <div key={m.id} className="rounded-md overflow-hidden border border-border">
+                  {m.type === 'photo'
+                    ? <img src={m.url} alt="" className="w-full h-28 object-cover" />
+                    : <video src={m.url} className="w-full h-28 object-cover" />}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-      <div style={{ marginTop: '2rem' }}>
-        <h2>Sotto-eventi</h2>
-        {subEvents.length === 0 ? (
-          <p style={{ color: '#666' }}>Nessun sotto-evento ancora</p>
-        ) : (
-          <ul>
-            {subEvents.map((s) => (
-              <li key={s.id}>{s.title} — {new Date(s.date).toLocaleDateString('it-IT')}</li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <Card>
+        <CardHeader><CardTitle>Sotto-eventi</CardTitle></CardHeader>
+        <CardContent>
+          {subEvents.length === 0 ? (
+            <p className="text-text-muted">Nessun sotto-evento ancora</p>
+          ) : (
+            <div className="space-y-2">
+              {subEvents.map((s) => (
+                <div key={s.id} className="flex items-center justify-between p-2 rounded-md border border-border">
+                  <div>
+                    <p className="font-medium">{s.title}</p>
+                    <p className="text-sm text-text-muted">{new Date(s.date).toLocaleDateString('it-IT')}</p>
+                  </div>
+                  <Badge variant="outline">{s.type}</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-      <div style={{ marginTop: '2rem' }}>
+      <div className="flex items-center gap-4">
         <ShareButton
           eventUrl={typeof globalThis !== 'undefined' ? globalThis.location?.href ?? '' : ''}
           title={`Evento ${event.couple_name} - FotoSposi`}
         />
+        <Button variant="link" asChild><Link href="/dashboard">← Dashboard</Link></Button>
       </div>
-
-      <p style={{ marginTop: '2rem' }}>
-        <Link href="/dashboard" style={{ color: '#d4a574' }}>← Dashboard</Link>
-      </p>
     </main>
   );
 }

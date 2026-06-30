@@ -4,7 +4,10 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { createJoke, getJokes, deleteJoke } from '@fotosposi/games';
-import { getCurrentUser } from '@fotosposi/core';
+import { createClient, getCurrentUser } from '@fotosposi/core';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import type { JokeEntry } from '@fotosposi/games';
 
 export default function JokesPage() {
@@ -15,9 +18,12 @@ export default function JokesPage() {
   const [content, setContent] = useState('');
   const [revealDate, setRevealDate] = useState('');
   const [revealTime, setRevealTime] = useState('');
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string>('');
   const [revealed, setRevealed] = useState<JokeEntry[]>([]);
   const [pending, setPending] = useState<JokeEntry[]>([]);
   const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     getCurrentUser().then(({ user }) => { if (user) setUserId(user.id); });
@@ -29,28 +35,46 @@ export default function JokesPage() {
     getJokes(eventId, false).then((r) => { if (r.jokes) setPending(r.jokes); });
   };
 
+  const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setMediaFile(file);
+      setMediaPreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return;
     setError('');
+    setUploading(true);
 
     const revealAt = revealDate && revealTime
       ? new Date(`${revealDate}T${revealTime}`).toISOString()
       : new Date(Date.now() + 86400000).toISOString();
 
-    const { error: err } = await createJoke({
-      event_id: eventId,
-      from_user: userId,
-      content,
-      reveal_at: revealAt,
-    });
+    let mediaUrl = '';
+    if (mediaFile) {
+      const supabase = createClient();
+      const fileName = `jokes/${eventId}/${userId}_${Date.now()}_${mediaFile.name}`;
+      const { error: uploadError } = await supabase.storage.from('media').upload(fileName, mediaFile);
+      if (uploadError) { setError('Upload media fallito'); setUploading(false); return; }
+      const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(fileName);
+      mediaUrl = publicUrl;
+    }
+
+    const jokeContent = mediaUrl ? `${content}\n---MEDIA:${mediaUrl}` : content;
+    const { error: err } = await createJoke({ event_id: eventId, from_user: userId, content: jokeContent, reveal_at: revealAt });
 
     if (err) {
       setError(err);
     } else {
       setContent('');
+      setMediaFile(null);
+      setMediaPreview('');
       loadJokes();
     }
+    setUploading(false);
   };
 
   const handleDelete = async (jokeId: string) => {
@@ -58,75 +82,115 @@ export default function JokesPage() {
     loadJokes();
   };
 
-  return (
-    <main style={{ maxWidth: 700, margin: '2rem auto', padding: '0 1rem' }}>
-      <h1 style={{ marginBottom: '1.5rem' }}>Angolo scherzi</h1>
-      <p style={{ color: '#666', marginBottom: '2rem' }}>
-        I contenuti qui inseriti restano nascosti fino al momento del reveal scelto
-      </p>
+  const renderJokeContent = (joke: JokeEntry) => {
+    const mediaMatch = joke.content.match(/---MEDIA:(.+)/);
+    if (mediaMatch) {
+      const parts = joke.content.split('---MEDIA:');
+      const text = parts[0] ?? '';
+      const mediaUrl = parts[1] ?? '';
+      return (
+        <div>
+          {text.trim() && <p className="mb-2">{text.trim()}</p>}
+          {mediaUrl && (
+            mediaUrl.match(/\.(mp4|webm|mov)$/i)
+              ? <video src={mediaUrl} controls className="w-full max-w-sm rounded-md" />
+              : <img src={mediaUrl} alt="" className="w-full max-w-sm rounded-md" />
+          )}
+        </div>
+      );
+    }
+    return <p>{joke.content}</p>;
+  };
 
-      <form onSubmit={handleSubmit} style={{ marginBottom: '2rem', padding: '1rem', border: '1px solid #ddd', borderRadius: 8 }}>
-        <h2 style={{ marginBottom: '1rem' }}>Aggiungi scherzo</h2>
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.25rem' }}>Contenuto</label>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            required
-            rows={3}
-            style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
-            placeholder="Scrivi qui il tuo scherzo (testo, battuta, dedica...)"
-          />
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', marginBottom: '0.25rem' }}>Data reveal</label>
-            <input type="date" value={revealDate} onChange={(e) => setRevealDate(e.target.value)}
-              style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', marginBottom: '0.25rem' }}>Ora reveal</label>
-            <input type="time" value={revealTime} onChange={(e) => setRevealTime(e.target.value)}
-              style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }} />
-          </div>
-        </div>
-        {error && <p style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
-        <button type="submit" style={{ padding: '0.5rem 2rem', background: '#d4a574', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-          Invia scherzo
-        </button>
-      </form>
+  const nextReveal = pending.length > 0
+    ? new Date(Math.min(...pending.map(j => new Date(j.reveal_at).getTime())))
+    : null;
+
+  return (
+    <main className="max-w-3xl mx-auto p-4 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Angolo scherzi</h1>
+        <Button variant="ghost" asChild><Link href={`/events/${eventId}/games`}>← Giochi</Link></Button>
+      </div>
+      <p className="text-text-muted">I contenuti restano nascosti fino al reveal scelto</p>
+
+      {nextReveal && (
+        <Card className="bg-muted">
+          <CardContent className="py-3 text-sm text-center">
+            Prossimo reveal: {nextReveal.toLocaleString('it-IT')}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader><CardTitle>Aggiungi scherzo</CardTitle></CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Contenuto</label>
+              <textarea value={content} onChange={(e) => setContent(e.target.value)} required rows={3}
+                className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm mt-1"
+                placeholder="Scrivi qui il tuo scherzo (testo, battuta, dedica...)" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Media (opzionale)</label>
+              <input type="file" accept="image/*,video/*" onChange={handleMediaSelect} className="mt-1 text-sm" />
+              {mediaPreview && (
+                mediaFile?.type.startsWith('video/')
+                  ? <video src={mediaPreview} className="w-full max-w-xs mt-2 rounded-md" />
+                  : <img src={mediaPreview} alt="" className="w-full max-w-xs mt-2 rounded-md" />
+              )}
+            </div>
+            <div className="flex gap-4">
+              <div className="flex-1 space-y-1">
+                <label className="text-sm font-medium">Data reveal</label>
+                <input type="date" value={revealDate} onChange={(e) => setRevealDate(e.target.value)}
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" />
+              </div>
+              <div className="flex-1 space-y-1">
+                <label className="text-sm font-medium">Ora reveal</label>
+                <input type="time" value={revealTime} onChange={(e) => setRevealTime(e.target.value)}
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" />
+              </div>
+            </div>
+            {error && <p className="text-sm text-error">{error}</p>}
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" disabled={uploading}>{uploading ? 'Caricamento...' : 'Invia scherzo'}</Button>
+          </CardFooter>
+        </form>
+      </Card>
 
       {pending.length > 0 && (
-        <div style={{ marginBottom: '2rem' }}>
-          <h2>In attesa di reveal ({pending.length})</h2>
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold">In attesa di reveal ({pending.length})</h2>
           {pending.map((j) => (
-            <div key={j.id} style={{ padding: '0.75rem', background: '#fff8e1', borderRadius: 6, marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ fontStyle: 'italic', color: '#888' }}>Contenuto nascosto fino al {new Date(j.reveal_at).toLocaleString('it-IT')}</p>
-              </div>
-              <button onClick={() => handleDelete(j.id)} style={{ padding: '0.25rem 0.75rem', background: '#e57373', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem' }}>
-                Elimina
-              </button>
-            </div>
+            <Card key={j.id} className="bg-amber-50">
+              <CardContent className="flex items-center justify-between py-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant="warning">Nascosto</Badge>
+                  <span className="text-sm text-text-muted">Reveal: {new Date(j.reveal_at).toLocaleString('it-IT')}</span>
+                </div>
+                <Button variant="destructive" size="sm" onClick={() => handleDelete(j.id)}>Elimina</Button>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
 
       {revealed.length > 0 && (
-        <div>
-          <h2>Scherzi rivelati</h2>
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold">Scherzi rivelati</h2>
           {revealed.map((j) => (
-            <div key={j.id} style={{ padding: '0.75rem', background: '#f9f9f9', borderRadius: 6, marginBottom: '0.5rem' }}>
-              <p>{j.content}</p>
-              <small style={{ color: '#999' }}>Rivelato il {new Date(j.reveal_at).toLocaleDateString('it-IT')}</small>
-            </div>
+            <Card key={j.id}>
+              <CardContent className="py-3">
+                {renderJokeContent(j)}
+                <p className="text-xs text-text-muted mt-2">Rivelato il {new Date(j.reveal_at).toLocaleDateString('it-IT')}</p>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
-
-      <p style={{ marginTop: '2rem' }}>
-        <Link href={`/events/${eventId}/games`} style={{ color: '#d4a574' }}>← Torna ai giochi</Link>
-      </p>
     </main>
   );
 }

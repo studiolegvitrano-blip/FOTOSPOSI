@@ -25,3 +25,15 @@ export interface AiGeneratedText {
   section: string;
   created_at: string;
 }
+
+export {
+  getTemplates,
+  getTemplateById,
+  createDraft,
+  getDraft,
+  updateDraft,
+  updateDraftTemplate,
+  publishSite,
+  generateText,
+  getGeneratedTexts,
+} from './service';
