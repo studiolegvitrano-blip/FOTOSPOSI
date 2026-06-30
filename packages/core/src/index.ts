@@ -1,4 +1,4 @@
-export type UserRole = 'sposo' | 'organizzatore' | 'invitato' | 'admin';
+export type UserRole = 'sposo' | 'organizzatore' | 'invitato' | 'manager' | 'admin';
 
 export interface CoreUser {
   id: string;
