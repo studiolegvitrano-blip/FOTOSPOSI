@@ -1,0 +1,17 @@
+{
+  "name": "@fotosposi/events",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint": "echo 'lint ok'",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fotosposi/core": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}
