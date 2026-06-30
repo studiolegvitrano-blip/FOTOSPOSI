@@ -1,3 +1,4 @@
+import { SignJWT } from 'jose';
 import { updateDriveSyncStatus } from './service';
 
 interface DriveCredentials {
@@ -35,10 +36,7 @@ export async function syncToDrive(
     const formData = new FormData();
     formData.append('file', blob, fileName);
 
-    const metadata = {
-      name: fileName,
-      parents: folderId ? [folderId] : [],
-    };
+    const metadata = { name: fileName, parents: folderId ? [folderId] : [] };
     formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
 
     const accessToken = await getGoogleAccessToken(creds);
@@ -67,28 +65,19 @@ export async function syncToDrive(
 
 async function getGoogleAccessToken(creds: DriveCredentials): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const claim = {
+  const privateKey = creds.privateKey.includes('\\n')
+    ? creds.privateKey.replace(/\\n/g, '\n')
+    : creds.privateKey;
+
+  const jwt = await new SignJWT({
     iss: creds.clientEmail,
     scope: 'https://www.googleapis.com/auth/drive.file',
     aud: 'https://oauth2.googleapis.com/token',
     exp: now + 3600,
     iat: now,
-  };
-
-  const b64url = (obj: Record<string, unknown>) =>
-    Buffer.from(JSON.stringify(obj)).toString('base64url');
-
-  const signatureInput = `${b64url(header)}.${b64url(claim)}`;
-
-  const { createPrivateKey } = await import('node:crypto');
-  const sign = (await import('node:crypto')).createSign('RSA-SHA256');
-  sign.update(signatureInput);
-  const signature = sign
-    .sign(createPrivateKey(creds.privateKey))
-    .toString('base64url');
-
-  const jwt = `${signatureInput}.${signature}`;
+  })
+    .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
+    .sign(await importKey(privateKey));
 
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -101,4 +90,12 @@ async function getGoogleAccessToken(creds: DriveCredentials): Promise<string> {
 
   const data = await res.json();
   return data.access_token;
+}
+
+async function importKey(pem: string): Promise<any> {
+  const { importPKCS8 } = await import('jose');
+  const pemContents = pem.includes('-----BEGIN PRIVATE KEY-----')
+    ? pem
+    : `-----BEGIN PRIVATE KEY-----\n${pem}\n-----END PRIVATE KEY-----`;
+  return importPKCS8(pemContents, 'RS256');
 }

@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { validateQrToken } from '@fotosposi/core';
 import { getEventById, getSubEvents } from '@fotosposi/events';
 import { getMediaByEvent } from '@fotosposi/media';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import type { WeddingEvent, SubEvent } from '@fotosposi/events';
 import type { MediaUpload } from '@fotosposi/media';
 
@@ -16,80 +18,113 @@ export default function GuestEventPage() {
   const [media, setMedia] = useState<MediaUpload[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<'gallery' | 'live'>('gallery');
+  const [slideIdx, setSlideIdx] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout>(undefined);
+
+  const loadData = async (eventId: string) => {
+    const [e, s, m] = await Promise.all([
+      getEventById(eventId),
+      getSubEvents(eventId),
+      getMediaByEvent(eventId),
+    ]);
+    if (e.event) setEvent(e.event);
+    if (s.subEvents) setSubEvents(s.subEvents);
+    if (m.media) setMedia(m.media);
+    setLoading(false);
+  };
 
   useEffect(() => {
     if (!code) return;
-
     validateQrToken(code).then(async (result) => {
-      if (!result.valid || !result.event_id) {
+      const eid = result.event_id;
+      if (!result.valid || !eid) {
         setError('Link non valido o scaduto');
         setLoading(false);
         return;
       }
-
-      const [e, s, m] = await Promise.all([
-        getEventById(result.event_id),
-        getSubEvents(result.event_id),
-        getMediaByEvent(result.event_id),
-      ]);
-
-      if (e.event) setEvent(e.event);
-      if (s.subEvents) setSubEvents(s.subEvents);
-      if (m.media) setMedia(m.media);
-      setLoading(false);
+      await loadData(eid);
+      const interval = setInterval(() => loadData(eid), 15000);
+      return () => clearInterval(interval);
     });
   }, [code]);
 
-  if (loading) return <p style={{ padding: '2rem', textAlign: 'center' }}>Caricamento...</p>;
-  if (error) return <main style={{ maxWidth: 600, margin: '2rem auto', padding: '1rem', textAlign: 'center' }}><h1>{error}</h1></main>;
+  useEffect(() => {
+    if (mode === 'live' && media.length > 0) {
+      timerRef.current = setInterval(() => {
+        setSlideIdx(prev => (prev + 1) % media.length);
+      }, 5000);
+      return () => clearInterval(timerRef.current);
+    }
+  }, [mode, media.length]);
+
+  const photos = media.filter(m => m.type === 'photo');
+
+  if (loading) return <p className="text-center mt-8">Caricamento...</p>;
+  if (error) return <main className="max-w-lg mx-auto mt-8 p-4 text-center"><h1 className="text-xl font-bold">{error}</h1></main>;
   if (!event) return null;
 
   return (
-    <main style={{ maxWidth: 800, margin: '0 auto', padding: '1rem' }}>
-      <div style={{ textAlign: 'center', padding: '2rem 0' }}>
-        <h1 style={{ fontSize: '2rem' }}>{event.couple_name}</h1>
-        <p style={{ color: '#555', fontSize: '1.1rem' }}>
-          {new Date(event.date).toLocaleDateString('it-IT')} — {event.location}
-        </p>
-      </div>
-
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Galleria</h2>
-          <a href={`/events/${event.id}/upload`} style={{ padding: '0.5rem 1rem', background: '#d4a574', color: '#fff', textDecoration: 'none', borderRadius: 6 }}>
-            Carica foto/video
-          </a>
+    <main className="max-w-4xl mx-auto">
+      {mode === 'live' && photos.length > 0 && (
+        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+          <button onClick={() => setMode('gallery')} className="absolute top-4 right-4 text-white/60 hover:text-white z-10 text-sm bg-white/10 px-3 py-1 rounded-full">
+            Esci live
+          </button>
+          <div className="text-white/40 absolute bottom-4 text-sm">{slideIdx + 1} / {photos.length}</div>
+          {photos[slideIdx] && <img src={photos[slideIdx].url} alt="" className="max-w-full max-h-full object-contain" />}
         </div>
-        {media.length === 0 ? (
-          <p style={{ color: '#666' }}>Ancora nessuna foto. Sei il primo a caricare!</p>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
-            {media.map((m) => (
-              <div key={m.id} style={{ border: '1px solid #eee', borderRadius: 8, overflow: 'hidden' }}>
-                {m.type === 'photo' ? (
-                  <img src={m.url} alt="" style={{ width: '100%', height: 200, objectFit: 'cover' }} />
-                ) : (
-                  <video src={m.url} style={{ width: '100%', height: 200, objectFit: 'cover' }} controls />
-                )}
-              </div>
+      )}
+
+      <div className="p-4 space-y-6">
+        <div className="text-center py-4">
+          <h1 className="text-3xl font-bold">{event.couple_name}</h1>
+          <p className="text-text-muted">{new Date(event.date).toLocaleDateString('it-IT')} — {event.location}</p>
+        </div>
+
+        <div className="flex gap-2 justify-center">
+          <Button variant={mode === 'gallery' ? 'default' : 'outline'} onClick={() => setMode('gallery')}>Galleria</Button>
+          {photos.length > 0 && (
+            <Button variant={mode === 'live' ? 'default' : 'outline'} onClick={() => { setMode('live'); setSlideIdx(0); }}>
+              Live ({photos.length})
+            </Button>
+          )}
+          <Button variant="outline" asChild><a href={`/events/${event.id}/upload`}>Carica</a></Button>
+          <Button variant="outline" asChild><a href={`/events/${event.id}/games/jokes`}>Scherzi</a></Button>
+          <Button variant="outline" asChild><a href={`/events/${event.id}/guestbook`}>Video</a></Button>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+          {media.map((m) => (
+            <Card key={m.id} className="overflow-hidden">
+              <CardContent className="p-1">
+                {m.type === 'photo'
+                  ? <img src={m.url} alt="" className="w-full h-36 object-cover rounded" />
+                  : <video src={m.url} className="w-full h-36 object-cover rounded" controls />}
+              </CardContent>
+            </Card>
+          ))}
+          {media.length === 0 && (
+            <p className="col-span-full text-center text-text-muted py-8">Ancora nessuna foto. Carica la prima!</p>
+          )}
+        </div>
+
+        {subEvents.length > 0 && (
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold">Programma</h2>
+            {subEvents.map((s) => (
+              <Card key={s.id}>
+                <CardContent className="py-3 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{s.title}</p>
+                    <p className="text-sm text-text-muted">{new Date(s.date).toLocaleDateString('it-IT')}{s.location ? ` — ${s.location}` : ''}</p>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}
       </div>
-
-      {subEvents.length > 0 && (
-        <div>
-          <h2>Sotto-eventi</h2>
-          <ul>
-            {subEvents.map((s) => (
-              <li key={s.id} style={{ marginBottom: '0.5rem' }}>
-                <strong>{s.title}</strong> — {new Date(s.date).toLocaleDateString('it-IT')}
-                {s.location && <span> — {s.location}</span>}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </main>
   );
 }
