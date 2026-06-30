@@ -43,3 +43,13 @@ export async function compressImage(file: File, maxWidth = 2048): Promise<Blob> 
     img.src = url;
   });
 }
+
+export {
+  createMediaRecord,
+  getMediaByEvent,
+  getMediaBySubEvent,
+  uploadToStorage,
+  createVideoMessage,
+  getVideoMessages,
+  updateDriveSyncStatus,
+} from './service';
