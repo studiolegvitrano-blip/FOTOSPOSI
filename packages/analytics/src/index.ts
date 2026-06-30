@@ -9,3 +9,7 @@ export interface B2BReport {
   period_end: string;
   created_at: string;
 }
+
+export type { AnalyticsSnapshot } from './service';
+
+export { getEventAnalytics, getB2BAnalytics } from './service';

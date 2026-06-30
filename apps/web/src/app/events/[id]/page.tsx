@@ -56,6 +56,9 @@ export default function EventDetailPage() {
           <Button variant="secondary" asChild><Link href={`/events/${eventId}/shop`}>Shop</Link></Button>
           <Button variant="secondary" asChild><Link href={`/events/${eventId}/gift`}>Lista nozze</Link></Button>
           <Button variant="outline" asChild><Link href={`/events/${eventId}/guestbook`}>Video</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/notifications`}>Notifiche</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/concierge`}>Concierge</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/privacy`}>Privacy</Link></Button>
           <Button variant="outline" asChild><Link href={`/events/${eventId}/drive`}>Drive</Link></Button>
           <Button variant="outline" asChild><Link href={`/events/${eventId}/site-builder`}>Sito evento</Link></Button>
           <Button variant="outline" asChild><Link href={`/events/${eventId}/qr`}>QR</Link></Button>
