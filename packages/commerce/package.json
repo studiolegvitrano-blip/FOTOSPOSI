@@ -8,9 +8,10 @@
     "lint": "echo 'lint ok'",
     "check-types": "tsc --noEmit"
   },
-  "dependencies": {
+"dependencies": {
     "@fotosposi/core": "*",
-    "@fotosposi/events": "*"
+    "@fotosposi/events": "*",
+    "stripe": "^17.0.0"
   },
   "devDependencies": {
     "typescript": "^5.8.0"

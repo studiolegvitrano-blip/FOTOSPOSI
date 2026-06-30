@@ -56,6 +56,14 @@ export default function EventDetailPage() {
             style={{ padding: '0.5rem 1rem', background: '#8b5e3c', color: '#fff', textDecoration: 'none', borderRadius: 6 }}>
             Giochi
           </Link>
+          <Link href={`/events/${eventId}/shop`}
+            style={{ padding: '0.5rem 1rem', background: '#2e7d32', color: '#fff', textDecoration: 'none', borderRadius: 6 }}>
+            Shop
+          </Link>
+          <Link href={`/events/${eventId}/gift`}
+            style={{ padding: '0.5rem 1rem', background: '#1565c0', color: '#fff', textDecoration: 'none', borderRadius: 6 }}>
+            Lista nozze
+          </Link>
           <Link href={`/events/${eventId}/qr`}
             style={{ padding: '0.5rem 1rem', border: '2px solid #d4a574', color: '#d4a574', textDecoration: 'none', borderRadius: 6 }}>
             QR
