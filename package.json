@@ -5,6 +5,8 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "check-types": "turbo check-types",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
   },
   "devDependencies": {
