@@ -1,6 +1,6 @@
 # PROJECT STATUS — FotoSposi / WeddingMoments
 
-## Stato attuale: FASE 3 — Core + Events + Media + Games + Social + Commerce (completato ✓)
+## Stato attuale: FASE 5 — Tutte le fasi completate (1-5) ✓
 
 ### Checklist Fase 1 (Core + Events)
 - [x] Modulo core: Supabase SSR client, auth helpers (signUp, signIn, signOut, QR token)
@@ -38,17 +38,37 @@
 - [x] 22 test: auth (9), events service (7), calculateWindow (3), Button (3)
 - [x] Ruolo manager + admin panel + tabella event_managers
 
+### Checklist Fase 4 (Site-builder + Guestbook + Scherzi)
+- [x] Modulo site-builder: 6 template seed, CRUD draft, pubblicazione, generazione AI
+- [x] Web: editor sito evento (3 tab: template, contenuti con 5 sezioni, anteprima live)
+- [x] Web: video guestbook (registrazione 30s + griglia messaggi)
+- [x] Web: angolo scherzi (upload foto/video, countdown reveal, shadcn refactor)
+
+### Checklist Fase 5 (Advanced)
+- [x] Modulo face-recognition: consenso GDPR + tagging
+- [x] Modulo notifications: preferenze + invio (Resend/Evolution) + log
+- [x] Modulo analytics: statistiche evento + dashboard B2B admin
+- [x] Modulo marketplace: fornitori + recensioni
+- [x] Modulo concierge: chat AI (struttura + Claude API)
+- [x] Drive OAuth: Google OAuth per Drive personale sposo + sync
+- [x] Galleria live: fullscreen slideshow invitati con auto-refresh
+- [x] Navbar aggiornata: link a Marketplace, Analytics, Notifiche, Concierge, Privacy
+
 ### Bloccato (chiavi mancanti)
-- Google Drive: GOOGLE_DRIVE_CLIENT_EMAIL / GOOGLE_DRIVE_PRIVATE_KEY
-- Stripe: STRIPE_SECRET_KEY / NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+- Google Drive (admin backup): GOOGLE_DRIVE_CLIENT_EMAIL / GOOGLE_DRIVE_PRIVATE_KEY
+- Google OAuth (Drive sposi): GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET (redirect URI configurato)
+- Stripe: STRIPE_SECRET_KEY / NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY / STRIPE_WEBHOOK_SECRET
 - Gelato: GELATO_API_KEY
 - Resend: RESEND_API_KEY
 - Claude: ANTHROPIC_API_KEY
 - Evolution API: EVOLUTION_API_URL / EVOLUTION_API_KEY
 
-### Prossime fasi
-- **Fase 4** (site-builder AI, video guestbook, angolo scherzi): pronta per iniziare
-- **Fase 5** (face-recognition, concierge, marketplace, B2B): non iniziata
+### Prossime attività
+- **Test**: aggiungere test Vitest per moduli Fase 5 (analytics, notifications, marketplace, concierge, face-recognition)
+- **Admin marketplace**: UI per approvazione fornitori
+- **Drive sync automatico**: collegare syncToDrive al trigger upload
+- **Deploy edge functions**: via Dashboard Supabase (supabase link fallisce da questo PC)
+- **Configurare chiavi API**: fornire token per Stripe, Claude, Resend, ecc.
 
 ## Log cronologico
 | Data | Modulo | Commit |
@@ -62,3 +82,5 @@
 | 30/06/2026 | admin | 0b4076a — Admin panel + ruolo manager |
 | 30/06/2026 | ui | b24a958 — Tailwind + shadcn/ui + refactor login/signup/dashboard/admin |
 | 30/06/2026 | test | 702557c — Vitest + 22 test (core/auth, events, calculateWindow, Button) |
+| 30/06/2026 | drive | a9902f0 — Drive OAuth per evento + galleria live invitati |
+| 30/06/2026 | fase5 | 67b1e19 — Analytics B2B, Notifiche, Privacy/Face, Marketplace, Concierge |
