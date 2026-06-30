@@ -27,7 +27,17 @@ export interface Tenant {
   created_at: string;
 }
 
-export function createSupabaseClient(supabaseUrl: string, supabaseAnonKey: string) {
-  const { createClient } = require('@supabase/supabase-js');
-  return createClient(supabaseUrl, supabaseAnonKey);
-}
+export {
+  createClient,
+  createServerSideClient,
+  createServiceClient,
+} from './supabase';
+
+export {
+  signUp,
+  signIn,
+  signOut,
+  getCurrentUser,
+  validateQrToken,
+  createQrToken,
+} from './auth';
