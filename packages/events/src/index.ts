@@ -41,3 +41,12 @@ export function calculateWindow(eventDate: string): { opens_at: string; closes_a
     closes_at: closes.toISOString(),
   };
 }
+
+export {
+  createEvent,
+  getEventById,
+  getEventsByUser,
+  createSubEvent,
+  getSubEvents,
+  getEventWindow,
+} from './service';
