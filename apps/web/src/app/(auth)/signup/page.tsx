@@ -3,6 +3,10 @@
 import { useState } from 'react';
 import { signUp } from '@fotosposi/core';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -10,7 +14,6 @@ export default function SignupPage() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,57 +28,52 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <main style={{ maxWidth: 400, margin: '4rem auto', padding: '0 1rem' }}>
-        <h1>Registrazione completata</h1>
-        <p>Controlla la tua email per confermare l'account.</p>
-        <a href="/login">Vai al login</a>
+      <main className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm text-center">
+          <CardHeader>
+            <CardTitle className="text-xl">Registrazione completata</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-text-muted">Controlla la tua email per confermare l'account.</p>
+          </CardContent>
+          <CardFooter className="justify-center">
+            <a href="/login" className="text-brand hover:underline text-sm">Vai al login</a>
+          </CardFooter>
+        </Card>
       </main>
     );
   }
 
   return (
-    <main style={{ maxWidth: 400, margin: '4rem auto', padding: '0 1rem' }}>
-      <h1 style={{ marginBottom: '1.5rem' }}>Registrati su FotoSposi</h1>
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.25rem' }}>Nome</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
-          />
-        </div>
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.25rem' }}>Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
-          />
-        </div>
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.25rem' }}>Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
-          />
-        </div>
-        {error && <p style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
-        <button type="submit" style={{ padding: '0.5rem 2rem', fontSize: '1rem', cursor: 'pointer' }}>
-          Registrati
-        </button>
-      </form>
-      <p style={{ marginTop: '1rem' }}>
-        Hai già un account? <a href="/login">Accedi</a>
-      </p>
+    <main className="min-h-screen flex items-center justify-center p-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle className="text-xl text-center">Registrati su FotoSposi</CardTitle>
+        </CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome</Label>
+              <Input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+            </div>
+            {error && <p className="text-sm text-error">{error}</p>}
+          </CardContent>
+          <CardFooter className="flex flex-col gap-3">
+            <Button type="submit" className="w-full">Registrati</Button>
+            <p className="text-sm text-text-muted text-center">
+              Hai già un account? <a href="/login" className="text-brand hover:underline">Accedi</a>
+            </p>
+          </CardFooter>
+        </form>
+      </Card>
     </main>
   );
 }

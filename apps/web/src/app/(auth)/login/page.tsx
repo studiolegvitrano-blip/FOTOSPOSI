@@ -3,6 +3,10 @@
 import { useState } from 'react';
 import { signIn } from '@fotosposi/core';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -22,37 +26,31 @@ export default function LoginPage() {
   };
 
   return (
-    <main style={{ maxWidth: 400, margin: '4rem auto', padding: '0 1rem' }}>
-      <h1 style={{ marginBottom: '1.5rem' }}>Accedi a FotoSposi</h1>
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.25rem' }}>Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
-          />
-        </div>
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.25rem' }}>Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
-          />
-        </div>
-        {error && <p style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
-        <button type="submit" style={{ padding: '0.5rem 2rem', fontSize: '1rem', cursor: 'pointer' }}>
-          Accedi
-        </button>
-      </form>
-      <p style={{ marginTop: '1rem' }}>
-        Non hai un account? <a href="/signup">Registrati</a>
-      </p>
+    <main className="min-h-screen flex items-center justify-center p-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle className="text-xl text-center">Accedi a FotoSposi</CardTitle>
+        </CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </div>
+            {error && <p className="text-sm text-error">{error}</p>}
+          </CardContent>
+          <CardFooter className="flex flex-col gap-3">
+            <Button type="submit" className="w-full">Accedi</Button>
+            <p className="text-sm text-text-muted text-center">
+              Non hai un account? <a href="/signup" className="text-brand hover:underline">Registrati</a>
+            </p>
+          </CardFooter>
+        </form>
+      </Card>
     </main>
   );
 }
