@@ -22,3 +22,13 @@ export interface JokeEntry {
   reveal_at: string;
   created_at: string;
 }
+
+export {
+  createCategory,
+  getCategories,
+  castVote,
+  getLeaderboard,
+  createJoke,
+  getJokes,
+  deleteJoke,
+} from './service';

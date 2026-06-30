@@ -19,3 +19,5 @@ export const brandColors = {
 } as const;
 
 export type Brand = keyof typeof brandColors;
+
+export { ShareButton } from './share-button';
