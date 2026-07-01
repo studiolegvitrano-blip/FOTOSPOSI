@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { compressImage, uploadToStorage, createMediaRecord, getDriveToken, syncToDrive } from '@fotosposi/media';
+import { compressImage, uploadToStorage, deleteFromStorage, createMediaRecord, updateDriveSyncStatus, getDriveToken } from '@fotosposi/media';
 import { getCurrentUser } from '@fotosposi/core';
 import { getEventById, getEventWindow } from '@fotosposi/events';
 
@@ -13,7 +13,7 @@ export default function UploadPage() {
   const [files, setFiles] = useState<FileList | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState('');
-  const [result, setResult] = useState<{ success: number; failed: number }>({ success: 0, failed: 0 });
+  const [result, setResult] = useState<{ success: number; failed: number; drive: number }>({ success: 0, failed: 0, drive: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,9 +42,13 @@ export default function UploadPage() {
       }
     }
 
+    const { token } = await getDriveToken(eventId);
+    const hasDrive = !!token?.access_token;
+
     setUploading(true);
     let success = 0;
     let failed = 0;
+    let drive = 0;
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -52,38 +56,67 @@ export default function UploadPage() {
       setProgress(`Elaborazione ${i + 1}/${files.length}: ${file.name}`);
 
       try {
-        const compressed = file.type.startsWith('video/') ? file : await compressImage(file);
-        const ext = file.type.startsWith('video/') ? file.name.split('.').pop() : 'jpg';
-        const path = `${eventId}/${Date.now()}_${i}.${ext}`;
+        const isVideo = file.type.startsWith('video/');
+        const ext = isVideo ? (file.name.split('.').pop() || 'mp4') : 'jpg';
+        const ts = Date.now();
+        const origPath = `${eventId}/orig_${ts}_${i}.${ext}`;
+        const thumbPath = `${eventId}/thumb_${ts}_${i}.${ext}`;
 
-        const { url, error: uploadError } = await uploadToStorage('media', path, compressed);
-        if (uploadError || !url) { failed++; continue; }
+        // 1. Upload ORIGINALE (qualità piena) a Supabase Storage (buffer temporaneo)
+        const { url: origUrl, error: origError } = await uploadToStorage('media', origPath, file);
+        if (origError || !origUrl) { failed++; continue; }
 
+        // 2. Upload COMPRESSO (per galleria web, anteprima rapida)
+        const compressed = isVideo ? file : await compressImage(file);
+        await uploadToStorage('media', thumbPath, compressed);
+
+        // 3. Crea record media con URL compresso (per galleria)
         const { media, error: recordError } = await createMediaRecord({
           event_id: eventId,
           uploaded_by: user.id,
-          type: file.type.startsWith('video/') ? 'video' : 'photo',
-          url,
+          type: isVideo ? 'video' : 'photo',
+          url: thumbPath,
         });
         if (recordError || !media) { failed++; continue; }
 
-        // Sync to Google Drive (se OAuth personale configurato)
-        try {
-          const { token } = await getDriveToken(eventId);
-          if (token?.access_token) {
-            const fileRes = await fetch(url);
+        // 4. Sync ORIGINALE a Google Drive (se OAuth configurato)
+        let driveFileId: string | null = null;
+        if (hasDrive) {
+          try {
+            const fileRes = await fetch(origUrl);
             const fileBlob = await fileRes.blob();
+
+            // Verifica qualità: il blob deve avere dimensioni credibili
+            if (fileBlob.size < 1024) throw new Error('File troppo piccolo, possibilmente corrotto');
+
             const formData = new FormData();
             formData.append('file', fileBlob, file.name);
             const metadata = { name: file.name };
             formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-            await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+
+            const driveRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id%2Csize', {
               method: 'POST',
               headers: { Authorization: `Bearer ${token.access_token}` },
               body: formData,
             });
+            const driveData = await driveRes.json();
+
+            if (driveRes.ok && driveData.id) {
+              driveFileId = driveData.id;
+              // 5. Verifica: Drive API ha confermato upload, aggiorniamo status
+              await updateDriveSyncStatus(media.id, 'synced', driveFileId);
+
+              // 6. Cancella ORIGINALE da Supabase Storage (solo buffer temporaneo)
+              await deleteFromStorage('media', origPath);
+
+              drive++;
+            } else {
+              await updateDriveSyncStatus(media.id, 'failed');
+            }
+          } catch {
+            await updateDriveSyncStatus(media.id, 'failed');
           }
-        } catch { /* Drive non configurato, rimane pending */ }
+        }
 
         success++;
       } catch {
@@ -91,9 +124,10 @@ export default function UploadPage() {
       }
     }
 
-    setResult({ success, failed });
+    setResult({ success, failed, drive });
     setUploading(false);
-    setProgress(`Completato: ${success} caricati, ${failed} falliti`);
+    const driveMsg = hasDrive ? `, ${drive} sincronizzati su Drive` : '';
+    setProgress(`Completato: ${success} caricati, ${failed} falliti${driveMsg}`);
     if (inputRef.current) inputRef.current.value = '';
   };
 

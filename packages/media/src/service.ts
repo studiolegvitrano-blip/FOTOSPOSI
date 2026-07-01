@@ -70,6 +70,16 @@ export async function uploadToStorage(
   return { url: urlData.publicUrl };
 }
 
+export async function deleteFromStorage(
+  bucket: string,
+  path: string,
+): Promise<{ error?: string }> {
+  const supabase = createServiceClient();
+  const { error } = await supabase.storage.from(bucket).remove([path]);
+  if (error) return { error: error.message };
+  return {};
+}
+
 export async function createVideoMessage(params: {
   event_id: string;
   from_user: string;
