@@ -202,6 +202,32 @@ Vogliamo essere il **punto di riferimento globale** per:
 | Recensioni reali su Trustpilot, Google Reviews | Social proof indicizzata |
 | Backlink da .edu / .gov (università, enti) | Partnership con corsi di wedding planning |
 
+## LOCALIZZAZIONE (L10n) — lingua locale, tono professionale
+
+Ogni paese parla la **propria lingua**, con **tono professionale** (mai slang, mai colloquiale).
+
+| Paese | Lingua | Tono | Brand |
+|:-----:|:------:|:----:|-------|
+| 🇮🇹 Italia | Italiano | Professionale, elegante | **FotoSposi** |
+| 🇪🇸 Spagna | Spagnolo (castigliano) | Profesional, cálido | **WeddingMoments ES** |
+| 🇫🇷 Francia | Francese | Professionnel, raffiné | **WeddingMoments FR** |
+| 🇩🇪 Germania | Tedesco | Professionell, klar | **WeddingMoments DE** |
+| 🇬🇧 UK | Inglese UK | Professional, warm | **WeddingMoments** |
+| 🇺🇸 USA | Inglese US | Professional, friendly | **WeddingMoments** |
+| 🇨🇭 Svizzera | Tedesco/Francese/Italiano | Professionale | **WeddingMoments CH** |
+| 🇦🇺 Australia | Inglese AU | Professional, casual | **WeddingMoments** |
+
+> **Regola**: mai "slang" o "frasi da ragazzi". Il matrimonio è un evento formale/
+> elegante. Il tono deve ispirare fiducia, non sembrare una startup hipster.
+> Localizzazione affidata a traduttori madrelingua (non AI), almeno per revisione.
+
+### Implementazione tecnica
+- Tutti i testi in file JSON `/packages/core/src/i18n/{locale}.json`
+- Rilevamento automatico: `Accept-Language` header + URL path (`/it/`, `/es/`, ecc.)
+- Fallback: Inglese UK (default)
+- Brand name "WeddingMoments" rimane invariato in tutti i paesi (brand globale)
+- Solo Italia ha nome locale "FotoSposi" (brand duale)
+
 ## GEO-PRICING (prezzo commisurato allo stipendio medio)
 
 Il prezzo Italia è il **minimo**. Ogni paese ha prezzo proporzionale al potere d'acquisto.
