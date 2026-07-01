@@ -16,10 +16,14 @@ export default function QrPage() {
     getCurrentUser().then(async ({ user }) => {
       if (!user) return;
 
+      const { getEventWindow } = await import('@fotosposi/events');
+      const { window: evtWindow } = await getEventWindow(eventId);
+      const expiresAt = evtWindow?.closes_at ? new Date(evtWindow.closes_at) : new Date(Date.now() + 86400000 * 365);
+
       const res = await fetch('/api/auth/qr-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId }),
+        body: JSON.stringify({ eventId, expiresAt: expiresAt.toISOString() }),
       });
       const data = await res.json();
       if (!res.ok || !data.token) {
@@ -48,7 +52,7 @@ export default function QrPage() {
             />
           </div>
           <p style={{ marginTop: '1rem', color: '#666', fontSize: '0.9rem' }}>
-            QR valido 30 giorni. Condividilo con gli invitati.
+            QR valido fino al giorno dopo l'evento. Condividilo con gli invitati.
           </p>
         </div>
       )}

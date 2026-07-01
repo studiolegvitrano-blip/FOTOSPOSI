@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
-  const { eventId } = await req.json();
+  const { eventId, expiresAt: clientExpires } = await req.json();
   if (!eventId) {
     return NextResponse.json({ error: 'eventId mancante' }, { status: 400 });
   }
@@ -12,8 +12,8 @@ export async function POST(req: NextRequest) {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   const rawToken = crypto.randomUUID();
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 30);
+  const expiresAt = clientExpires ? new Date(clientExpires) : new Date();
+  if (!clientExpires) expiresAt.setDate(expiresAt.getDate() + 30);
 
   const { data, error } = await supabase
     .from('core_auth_tokens')
