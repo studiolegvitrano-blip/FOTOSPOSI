@@ -241,7 +241,8 @@ Il prezzo Italia è il **minimo**. Ogni paese ha prezzo proporzionale al potere 
 | 🇬🇧 UK | 2.500£ (~2.900€) | 1.93× | £190 | £290 | £480 |
 | 🇺🇸 USA | 4.000$ (~3.700€) | 2.47× | $245 | $370 | $620 |
 | 🇨🇭 Svizzera | 5.000CHF (~5.100€) | 3.4× | 340CHF | 510CHF | 850CHF |
-| 🇦🇺 Australia | 5.000AUD (~3.000€) | 2.0× | A$200 | A$300 | A$500 |
+| 🇦🇺 Australia | 5.000AUD (~3.000€) | 2.0× | **A$200** | **A$300** | **A$500** |
+| 🇨🇦 Canada | 4.500CAD (~3.000€) | 2.0× | **C$200** | **C$300** | **C$500** |
 
 > **Esempio**: Un sito Premium in UK costa £190, in USA $245, in Italia 99€.
 > Il rapporto qualità-prezzo è identico (stessa % dello stipendio medio).
