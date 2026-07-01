@@ -83,18 +83,26 @@
 - [x] Pagina pubblica sito-evento `/sito/[id]` renderizzata server-side
 - [x] Link Maps navigazione per Cerimonia e Ricevimento nel sito pubblico
 
+### Completato (feature virali)
+- [x] Frame overlay brandizzato (sharp, square+story, cache Storage, pulsanti galleria)
+- [x] Wedding Wrapped (packages/wrapped/, ImageResponse card 1080×1920, pagina pubblica /e/[id]/wrapped/[guestId])
+- [x] Live Curation Fase 1 (colonna wall_priority_score, funzione recalculate_wall_scores, trigger INSERT, query curata con rotazione)
+- [x] Drive sync automatico — cartelle Foto/Video/Ricevimento/Cerimonia create su OAuth, upload queue usa folder corretto per tipo file, getEventDriveFolders()
+- [x] Video guestbook con teleprompter AI (Gemini) e review prima dell'invio
+- [x] Time Capsule — migration + packages/time-capsule/ + API routes + pagine pubbliche/gestione + sync Drive + naming YYYY_MM_DD_EV_IT001
+- [x] Work Diary — migration + packages/work-diary/ + API routes + pagina task con fasi e link redditività
+- [x] Event Codes — tabella event_codes, formato EV_IT001 auto-generato in createEvent, getEventByCode()
+
 ### Prossime attività
 - **Admin marketplace**: UI per approvazione fornitori
-- **Drive sync automatico**: collegare syncToDrive al trigger upload
-- ~~**Deploy edge functions**: via CLI con nuovo PAT `sbp_d12...` — auth deployata ✅~~
 - **Configurare chiavi API mancanti**: Stripe, Resend, Claude, Gelato, Evolution
+- **Quiz sugli Sposi** (prima priorità backlog)
 
-### Idee backlog (Fase 6 in attesa)
+### Nuove idee backlog
 - **Sfide Addio al Celibato/Nubilato** (modulo `games`): testimoni creano/selezionano missioni per sposi, gadget shop collegati, completamento via WhatsApp
 - **Caccia alla Foto in Chiesa** (modulo `games`): ospiti si registrano con ruolo (amico/parente/collega/altro), amici ricevono compiti fotografici (foto con zia, padre sposa, single, pelato, ecc.), classifica punti
 - **Prima Notte di Sposi** (modulo `commerce`): amici possono regalare scherzi o "cose hot" dal nostro shop, integrato con lista nozze
 - **Quiz sugli Sposi** (modulo `games`): domande tipo "chi ha detto ti amo per primo?", "quanti anni ha la sposa?" — punti e podio in tempo reale
-- **Time Capsule** (modulo `commerce/games`): ospiti lasciano messaggi rivelati al 1° anniversario. **Pricing**: 3 mesi 20€, 6 mesi 30€, 12 mesi 40€, 18 mesi 50€
 - **Reel Riassunto** (modulo `commerce`): video AI (Claude + FFmpeg) con foto/giochi. Incluso in Deluxe per sposi. Anche invitati acquistano reel personalizzato (max 4 persone: loro + accompagnatore + citazione sposi). 49€
 - **Hashtag Generator** (modulo `site-builder`): AI (Claude) suggerisce hashtag basati su nomi sposi, tema, location — integrato nel sito-evento
 - **App & Sito** contenitore di tutte le funzionalità sopra (web app responsive + sito-evento pubblico)
@@ -119,10 +127,10 @@
 - [x] Pagina pubblica `/e/[id]/wrapped/[guestId]` — riepilogo dati + anteprima card + Condividi
 - [ ] Job schedulato generazione card (post-finestra evento) — rimandato
 
-### ⏳ Live Curation Fase 1 (Settimana 4)
-- [ ] Colonna `wall_priority_score` su foto
-- [ ] Trigger ricalcolo a ogni voto/upload
-- [ ] Query wall pesata con rotazione
+### ✔ Live Curation Fase 1 (Settimana 4)
+- [x] Colonna `wall_priority_score` su foto
+- [x] Trigger ricalcolo a ogni voto/upload
+- [x] Query wall pesata con rotazione
 
 ## Log cronologico
 | Data | Modulo | Commit |
@@ -155,3 +163,7 @@
 | 01/07/2026 | docs | — `SPEC_VIRAL_MARKETPLACE.md`: roadmap virale (frame, wrapped, curation) + marketplace 2 binari (white-label planner/fotografi + fornitori pay-to-play) |
 | 01/07/2026 | feat | — Frame overlay brandizzato: `packages/photo-overlay/` (sharp), `event_branding` table, API route `/api/photos/[id]/share`, bottone Scarica/IG-TT galleria |
 | 01/07/2026 | feat | — Wedding Wrapped: `packages/wrapped/`, API route `/api/wrapped/[guestId]/card`, pagina `/e/[id]/wrapped/[guestId]`, condivisione Web Share |
+| 01/07/2026 | feat | — Live Curation Fase 1: colonna `wall_priority_score`, trigger, query pesata |
+| 01/07/2026 | feat | — Drive sync: cartelle Foto/Video/Ricevimento/Cerimonia create su OAuth, `getEventDriveFolders()`, upload usa cartelle corrette |
+| 01/07/2026 | feat | — Video guestbook con teleprompter AI (Gemini API route + review prima invio) |
+| 01/07/2026 | feat | 15eebae — Time Capsule + Work Diary + Event Codes: migration 00011, packages/time-capsule, packages/work-diary, API routes, pagine pubbliche/gestione, file naming YYYY_MM_DD_EV_IT001 |
