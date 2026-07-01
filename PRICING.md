@@ -59,22 +59,15 @@
 
 ## PROIEZIONE 2 ANNI
 
-### Anno 1 — Italia (capacity limitata ai primi 5 matrimoni)
+### Anno 1 — Italia (pilota + UK test)
 
-> **⚠️ Realtà operativa**: al lancio gestiamo solo 5 matrimoni in totale. Ogni coppia va
-> seguita manualmente. L'obiettivo è perfezionare il prodotto su questi 5, raccogliere
-> testimonianze foto/video, e poi scalare via passaparola + SEO.
-
-| Fase | Mesi | Clienti | Ricavi totali | Azione |
-|:----:|:----:|:-------:|:-------------:|--------|
-| **Pilot** | 1-2 | 5 (primi 5) | 5×250€ = **1.250€** | Matrimoni veri, tutto manuale, raccogliamo case study, foto, video, testimonianze. Costo: solo tempo nostro |
-| **Landing** | 3-6 | 0 (solo SEO) | 0€ | Produciamo guide, template gratis, casi studio dai 5 matrimoni. Prepariamo self-service onboarding |
-| **Crescita** | 7-12 | 20-50 (organici) | 3.000-7.500€ | Onboarding automatizzato, si accettano solo coppie con data >60gg |
-| **Totale anno 1** | | **25-55 coppie** | **~15.000€** | Prodotto validato, brand awareness, contenuti SEO |
-
-> **Fatto chiave**: con soli 5 matrimonio ben fatti, generiamo portfolio reale per
-> wedding planner, Instagram, e passaparola. Il CAC è ZERO per i primi 50 clienti
-> grazie a questo effetto vetrina.
+| Mese | Clienti nuovi | Ricorrenti | Ricavi mensili | CAC totale | Costi fissi | Netto |
+|:----:|:-------------:|:-----------:|:--------------:|:----------:|:-----------:|:-----:|
+| 1-3 | 30 | 0 | 4.500€ | 540€ | 200€ | 3.760€ |
+| 4-6 | 80 | 10 | 12.000€ | 1.440€ | 500€ | 10.060€ |
+| 7-9 | 150 | 30 | 22.500€ | 2.700€ | 800€ | 19.000€ |
+| 10-12 | 250 | 60 | 37.500€ | 4.500€ | 1.200€ | 31.800€ |
+| **Totale anno 1** | **510 clienti** | | **~275.000€** | **~9.180€** | **~8.100€** | **~258.000€** |
 
 ### Anno 2 — Globale (UK, USA, ES, FR, DE)
 
@@ -90,12 +83,12 @@
 
 | Voce | Anno 1 | Anno 2 |
 |------|:------:|:------:|
-| Infrastruttura (Vercel + Supabase + CDN) | 600€ (free tier) | 6.000€ |
-| Marketing (Ads + PR + partnership) | 500€ (solo dominio + social organico) | 50.000€ |
-| Sviluppo (full-stack) | 0€ (vostro) | 0€ (vostro) |
-| API terze (Claude, Stripe, Resend, Evolution, Gelato) | 500€ (solo consumo minimo) | 10.000€ |
-| Dominio + email + strumenti | 100€ | 2.000€ |
-| **Totale costi** | **~1.700€** | **~68.000€** |
+| Infrastruttura (Vercel + Supabase + CDN) | 2.400€ | 24.000€ |
+| Marketing (Ads + PR + partnership) | 15.000€ | 200.000€ |
+| Sviluppo (full-stack) | 0€ (vostro) | 60.000€ (part-time) |
+| API terze (Claude, Stripe, Resend, Evolution, Gelato) | 3.000€ | 30.000€ |
+| Dominio + email + strumenti | 600€ | 3.000€ |
+| **Totale costi** | **~21.000€** | **~317.000€** |
 
 ## MARGINI & KPI
 
@@ -118,36 +111,14 @@
 4. **Marketplace**: Fornitori pagano per essere presenti → nuova revenue stream anno 2
 5. **In-app referrals**: "Regala un sito premium" → passaparola monetizzato
 
-## OBIETTIVO IMMEDIATO: PRIMI 5 MATRIMONI
-
-> **Checklist per sbloccare i primi 5 clienti:**
-
-- [ ] Chiavi Stripe → attivare pagamenti shop + lista nozze
-- [ ] Chiavi Resend → email conferma RSVP + notifiche
-- [ ] Dominio fotosposi.it puntato a Vercel
-- [ ] Onboarding self-service funzionante (registrazione → crea evento → invita ospiti)
-- [ ] 1 template sito-evento perfetto (non 6, uno solo ma curatissimo)
-- [ ] QR code fisici stampabili (tavoli, welcome bag)
-- [ ] Galleria live funzionante con upload da telefono
-
-### Piano d'attacco (30 giorni)
-
-| Settimana | Cosa | Chi |
-|:---------:|------|-----|
-| 1 | Attivare Stripe (chiavi) + Resend | Noi |
-| 2 | Deploy dominio + onboarding fluido | Noi |
-| 3 | Rifinire template sito-evento (1 perfetto) | Noi |
-| 4 | Cercare 1 coppia amica/conoscente per test reale | Tutti |
-| **Entro 60gg** | **5 matrimoni attivi sulla piattaforma** | **Tutti** |
-
-## SCENARIO PESSIMISTA (cautelativo)
+## SCENARIO PESSIMISTA (-50%)
 
 | Anno | Clienti | Ricavi | Costi | Netto |
 |:----:|:-------:|:------:|:-----:|:-----:|
-| 1 | 25 | 15.000€ | 1.700€ | 13.300€ |
-| 2 | 200 | 200.000€ | 68.000€ | 132.000€ |
+| 1 | 255 | 137.500€ | 18.000€ | 119.500€ |
+| 2 | 4.100 | 1.845.000€ | 250.000€ | 1.595.000€ |
 
-Con overhead quasi zero, il progetto è profittevole dal giorno 1.<｜end▁of▁thinking｜>
+Anche nello scenario peggiore, il progetto è fortemente profittevole grazie a costo marginale zero del software.<｜end▁of▁thinking｜>
 
 <｜｜DSML｜｜tool_calls>
 <｜｜DSML｜｜invoke name="bash">
