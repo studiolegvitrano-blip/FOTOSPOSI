@@ -26,6 +26,47 @@ export async function createMediaRecord(params: {
   return { media: data };
 }
 
+export async function getCuratedMediaByEvent(eventId: string): Promise<{ media?: MediaUpload[]; error?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('media_uploads')
+    .select('*')
+    .eq('event_id', eventId)
+    .order('wall_priority_score', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (error) return { error: error.message };
+
+  if (!data) return { media: [] };
+
+  const result: MediaUpload[] = [];
+  const used = new Set<string>();
+  const remaining = [...data];
+
+  while (remaining.length > 0) {
+    const idx = remaining.findIndex(m => !used.has(m.id));
+    if (idx === -1) break;
+    const item = remaining[idx];
+    remaining.splice(idx, 1);
+    result.push(item);
+    used.add(item.id);
+
+    const lastUploader = item.uploaded_by;
+    const sameUserIdx = remaining.findIndex(m => m.uploaded_by === lastUploader);
+    if (sameUserIdx !== -1) {
+      const skip = remaining[sameUserIdx];
+      if (skip) {
+        result.push(skip);
+        remaining.splice(sameUserIdx, 1);
+        used.add(skip.id);
+      }
+    }
+  }
+
+  result.push(...remaining);
+  return { media: result };
+}
+
 export async function getMediaByEvent(eventId: string): Promise<{ media?: MediaUpload[]; error?: string }> {
   const supabase = createServiceClient();
   const { data, error } = await supabase
@@ -121,5 +162,5 @@ export async function updateDriveSyncStatus(
   return {};
 }
 
-export { saveDriveToken, getDriveToken, deleteDriveToken, refreshDriveAccessToken } from './tokens';
+export { saveDriveToken, getDriveToken, deleteDriveToken, refreshDriveAccessToken, getEventDriveFolders } from './tokens';
 export type { EventDriveToken } from './tokens';

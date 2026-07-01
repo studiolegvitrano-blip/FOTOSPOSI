@@ -12,6 +12,7 @@ export interface WeddingEvent {
   brand: 'fotosposi' | 'weddingmoments';
   tier: 'base' | 'premium' | 'destination';
   created_at: string;
+  code?: string;
 }
 
 export interface SubEvent {
@@ -47,6 +48,7 @@ export function calculateWindow(eventDate: string): { opens_at: string; closes_a
 export {
   createEvent,
   getEventById,
+  getEventByCode,
   getEventsByUser,
   createSubEvent,
   getSubEvents,

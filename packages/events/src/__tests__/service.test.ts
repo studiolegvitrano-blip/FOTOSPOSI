@@ -2,21 +2,29 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockFrom = vi.fn();
 
-function buildChain(val: any) {
-  return {
-    select: () => ({
-      eq: () => ({
-        order: () => Promise.resolve({ data: val, error: null }),
-        single: vi.fn().mockResolvedValue({ data: val, error: null }),
+function buildChain(val: any, maybeVal: any = null) {
+  const resolve = (v: any) => Promise.resolve({ data: v, error: null });
+  const mkSingle = (v: any) => vi.fn().mockResolvedValue({ data: v, error: null });
+
+  function makeHandler() {
+    return {
+      select: () => makeHandler(),
+      eq: () => makeHandler(),
+      order: () => makeHandler(),
+      limit: () => makeHandler(),
+      maybeSingle: mkSingle(maybeVal),
+      single: mkSingle(val),
+      rpc: () => makeHandler(),
+      insert: () => ({
+        select: () => makeHandler(),
+        single: mkSingle(val),
       }),
-      order: () => Promise.resolve({ data: val, error: null }),
-    }),
-    insert: () => ({
-      select: () => ({
-        single: vi.fn().mockResolvedValue({ data: val, error: null }),
-      }),
-    }),
-  };
+      delete: () => makeHandler(),
+      update: () => makeHandler(),
+      then: (onfulfilled?: any) => resolve(val).then(onfulfilled),
+    };
+  }
+  return makeHandler();
 }
 
 function buildFailChain(errorMsg: string) {

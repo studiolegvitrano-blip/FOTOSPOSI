@@ -16,6 +16,8 @@
     "@fotosposi/games": "*",
     "@fotosposi/media": "*",
     "@fotosposi/notifications": "*",
+    "@fotosposi/photo-overlay": "*",
+    "@fotosposi/wrapped": "*",
     "@fotosposi/site-builder": "*",
     "@fotosposi/social-sharing": "*",
     "@fotosposi/ui": "*",

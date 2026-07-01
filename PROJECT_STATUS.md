@@ -102,6 +102,28 @@
 - **Vota il Vestito** (modulo `games`): durante ricevimento, ospiti votano vestito sposo e sposa — gioco veloce
 - **Tavolo Selfie** (modulo `media`): pagina web per chiosco selfie con filtri/logo WeddingMoments, upload diretto su Drive
 
+## Nuove feature virali — Settimana 1
+
+### ✔ Frame/Overlay brandizzato automatico
+- [x] `packages/photo-overlay/` — sharp: `applyOverlay(imageBuffer, options)` genera overlay con banda nomi sposi + data + wordmark
+- [x] Due formati: `square` (download foto) e `story` (9:16 per IG/TikTok Stories)
+- [x] Tabella `event_branding`: colore, font, logo — seeded da template sito esistente
+- [x] API route `GET /api/photos/[id]/share?eventId=X&format=square|story`
+- [x] Cache su Storage (sovrascrive a ogni richiesta, non rigenera se già presente)
+- [x] Bottone "Scarica" + "IG/TT" con overlay hover nella galleria invitato
+- [x] Colore tema e font ereditati dal template sito scelto dalla coppia
+
+### ✔ Wedding Wrapped (Settimana 2-3)
+- [x] `packages/wrapped/` — query aggregazione dati invitato (foto, voti, tag, badge, regali)
+- [x] API route `GET /api/wrapped/[guestId]/card?eventId=X` — genera card 1080×1920 via `@vercel/og` (ImageResponse)
+- [x] Pagina pubblica `/e/[id]/wrapped/[guestId]` — riepilogo dati + anteprima card + Condividi
+- [ ] Job schedulato generazione card (post-finestra evento) — rimandato
+
+### ⏳ Live Curation Fase 1 (Settimana 4)
+- [ ] Colonna `wall_priority_score` su foto
+- [ ] Trigger ricalcolo a ogni voto/upload
+- [ ] Query wall pesata con rotazione
+
 ## Log cronologico
 | Data | Modulo | Commit |
 |------|--------|--------|
@@ -129,3 +151,7 @@
 | 01/07/2026 | feat | dee7bfb — Site-builder riscritto: invito moderno, sezioni toggle, ICS, Maps |
 | 01/07/2026 | feat | 92096fc — RSVP telefono/WhatsApp, allergeni, lucide icons |
 | 01/07/2026 | infra | (no commit) — Deploy edge function `auth` via Supabase CLI + nuovo PAT `sbp_d12...` |
+| 01/07/2026 | media | — Upload queue system (`upload_queue` table + queue processor + pause/resume + persistenza) |
+| 01/07/2026 | docs | — `SPEC_VIRAL_MARKETPLACE.md`: roadmap virale (frame, wrapped, curation) + marketplace 2 binari (white-label planner/fotografi + fornitori pay-to-play) |
+| 01/07/2026 | feat | — Frame overlay brandizzato: `packages/photo-overlay/` (sharp), `event_branding` table, API route `/api/photos/[id]/share`, bottone Scarica/IG-TT galleria |
+| 01/07/2026 | feat | — Wedding Wrapped: `packages/wrapped/`, API route `/api/wrapped/[guestId]/card`, pagina `/e/[id]/wrapped/[guestId]`, condivisione Web Share |

@@ -40,7 +40,30 @@ export async function createEvent(params: {
     closes_at: window.closes_at,
   });
 
+  const country = (event.location || 'IT').length === 2 ? event.location : 'IT';
+  await generateEventCode(supabase, event.id, country);
+
+  const { data: codeRow } = await supabase
+    .from('event_codes')
+    .select('code')
+    .eq('event_id', event.id)
+    .single();
+  if (codeRow) event.code = codeRow.code;
+
   return { event };
+}
+
+async function generateEventCode(supabase: any, eventId: string, country: string): Promise<void> {
+  const { data: maxRow } = await supabase
+    .from('event_codes')
+    .select('sequence')
+    .eq('country', country)
+    .order('sequence', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextSeq = (maxRow?.sequence ?? 0) + 1;
+  const code = `EV_${country}${String(nextSeq).padStart(3, '0')}`;
+  await supabase.from('event_codes').insert({ event_id: eventId, code, country, sequence: nextSeq });
 }
 
 export async function getEventById(eventId: string): Promise<{ event?: WeddingEvent; error?: string }> {
@@ -91,6 +114,24 @@ export async function getSubEvents(eventId: string): Promise<{ subEvents?: SubEv
     .order('date', { ascending: true });
   if (error) return { error: error.message };
   return { subEvents: data ?? [] };
+}
+
+export async function getEventByCode(code: string): Promise<{ event?: WeddingEvent; error?: string }> {
+  const supabase = createClient();
+  const { data: codeRow, error: codeErr } = await supabase
+    .from('event_codes')
+    .select('event_id')
+    .eq('code', code)
+    .single();
+  if (codeErr || !codeRow) return { error: codeErr?.message || 'Code not found' };
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .eq('id', codeRow.event_id)
+    .single();
+  if (error) return { error: error.message };
+  if (data) data.code = code;
+  return { event: data };
 }
 
 export async function getEventWindow(eventId: string): Promise<{ window?: EventWindow; error?: string }> {

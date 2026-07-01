@@ -44,21 +44,35 @@ export async function compressImage(file: File, maxWidth = 2048): Promise<Blob> 
   });
 }
 
-export type { EventDriveToken } from './tokens';
+export type { EventDriveToken, DriveFolderMap } from './tokens';
 
 export {
   createMediaRecord,
   getMediaByEvent,
+  getCuratedMediaByEvent,
   getMediaBySubEvent,
   uploadToStorage,
   deleteFromStorage,
   createVideoMessage,
   getVideoMessages,
   updateDriveSyncStatus,
+} from './service';
+
+export {
   saveDriveToken,
   getDriveToken,
   deleteDriveToken,
   refreshDriveAccessToken,
-} from './service';
+  ensureDriveFolders,
+  getEventDriveFolders,
+} from './tokens';
 
 export { syncToDrive } from './drive';
+export {
+  enqueueUpload,
+  getPendingQueue,
+  updateQueueItem,
+  getQueueStats,
+  clearCompletedQueue,
+} from './queue';
+export type { QueueItem, QueueStatus } from './queue';
