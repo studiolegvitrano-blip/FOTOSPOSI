@@ -37,12 +37,14 @@ export interface SiteContent {
   rsvpEnabled?: boolean;
   rsvpEmail?: string;
   rsvpPhone?: string;
+  rsvpWhatsapp?: string;
   rsvpDeadline?: string;
   rsvpMessage?: string;
   dressCodeEnabled?: boolean;
   dressCodeText?: string;
   menuEnabled?: boolean;
   menuText?: string;
+  menuAllergens?: string;
   hotelsEnabled?: boolean;
   hotelsText?: string;
   playlistEnabled?: boolean;

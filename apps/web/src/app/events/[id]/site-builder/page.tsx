@@ -9,23 +9,39 @@ import { SUGGESTED_PHRASES, generateIcsLink } from '@fotosposi/site-builder';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Heart, Church, GlassWater, Image, Gift, Mail, Shirt, Utensils, Hotel, Music, Hash, Clock, MapPin, Calendar, Bell, Sparkles, Save, Eye, Edit, Layout, Check, Settings, Phone } from 'lucide-react';
 
 type SectionKey = keyof typeof SUGGESTED_PHRASES;
 
-const SECTION_META: { key: string; label: string; icon: string; desc: string }[] = [
-  { key: 'ceremonyEnabled', label: 'Cerimonia', icon: '⛪', desc: 'Luogo, orario, note della cerimonia' },
-  { key: 'receptionEnabled', label: 'Ricevimento', icon: '🍽️', desc: 'Dove si festeggia dopo' },
-  { key: 'storyEnabled', label: 'La nostra storia', icon: '💕', desc: 'Come vi siete conosciuti' },
-  { key: 'galleryEnabled', label: 'Galleria foto', icon: '📸', desc: 'Foto degli sposi' },
-  { key: 'registryEnabled', label: 'Lista nozze', icon: '🎁', desc: 'IBAN, link, suggerimenti' },
-  { key: 'rsvpEnabled', label: 'RSVP / Conferma', icon: '💌', desc: 'Conferma presenza invitati' },
-  { key: 'dressCodeEnabled', label: 'Codice abbigliamento', icon: '👔', desc: 'Dress code suggerito' },
-  { key: 'menuEnabled', label: 'Menu', icon: '🥂', desc: 'Info sul menu o allergie' },
-  { key: 'hotelsEnabled', label: 'Hotel', icon: '🏨', desc: 'Dove dormire consigliati' },
-  { key: 'playlistEnabled', label: 'Playlist', icon: '🎵', desc: 'Link Spotify o richieste' },
-  { key: 'hashtagEnabled', label: 'Hashtag', icon: '#️⃣', desc: 'Hashtag social dell\'evento' },
-  { key: 'countdownEnabled', label: 'Countdown', icon: '⏳', desc: 'Quanto manca al grande giorno' },
+const SECTION_META: { key: string; label: string; desc: string }[] = [
+  { key: 'ceremonyEnabled', label: 'Cerimonia', desc: 'Luogo, orario, note della cerimonia' },
+  { key: 'receptionEnabled', label: 'Ricevimento', desc: 'Dove si festeggia dopo' },
+  { key: 'storyEnabled', label: 'La nostra storia', desc: 'Come vi siete conosciuti' },
+  { key: 'galleryEnabled', label: 'Galleria foto', desc: 'Foto degli sposi' },
+  { key: 'registryEnabled', label: 'Lista nozze', desc: 'IBAN, link, suggerimenti' },
+  { key: 'rsvpEnabled', label: 'RSVP / Conferma', desc: 'Conferma presenza invitati' },
+  { key: 'dressCodeEnabled', label: 'Codice abbigliamento', desc: 'Dress code suggerito' },
+  { key: 'menuEnabled', label: 'Menu', desc: 'Info sul menu o allergie' },
+  { key: 'hotelsEnabled', label: 'Hotel', desc: 'Dove dormire consigliati' },
+  { key: 'playlistEnabled', label: 'Playlist', desc: 'Link Spotify o richieste' },
+  { key: 'hashtagEnabled', label: 'Hashtag', desc: 'Hashtag social dell\'evento' },
+  { key: 'countdownEnabled', label: 'Countdown', desc: 'Quanto manca al grande giorno' },
 ];
+
+const SECTION_ICONS: Record<string, React.ReactNode> = {
+  ceremonyEnabled: <Church className="w-5 h-5" />,
+  receptionEnabled: <GlassWater className="w-5 h-5" />,
+  storyEnabled: <Heart className="w-5 h-5" />,
+  galleryEnabled: <Image className="w-5 h-5" />,
+  registryEnabled: <Gift className="w-5 h-5" />,
+  rsvpEnabled: <Mail className="w-5 h-5" />,
+  dressCodeEnabled: <Shirt className="w-5 h-5" />,
+  menuEnabled: <Utensils className="w-5 h-5" />,
+  hotelsEnabled: <Hotel className="w-5 h-5" />,
+  playlistEnabled: <Music className="w-5 h-5" />,
+  hashtagEnabled: <Hash className="w-5 h-5" />,
+  countdownEnabled: <Clock className="w-5 h-5" />,
+};
 
 export default function SiteBuilderPage() {
   const { id } = useParams<{ id: string }>();
@@ -110,7 +126,7 @@ export default function SiteBuilderPage() {
     const enabled = !!(c as any)[section.key];
     return (
       <div className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer" onClick={() => toggleSection(section.key)}>
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${enabled ? 'bg-brand text-white' : 'bg-muted text-text-muted'}`}>{section.icon}</div>
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${enabled ? 'bg-brand text-white' : 'bg-muted text-text-muted'}`}>{SECTION_ICONS[section.key]}</div>
         <div className="flex-1">
           <p className="font-medium text-sm">{section.label}</p>
           <p className="text-xs text-text-muted">{section.desc}</p>
@@ -135,7 +151,7 @@ export default function SiteBuilderPage() {
       <div className="flex gap-2 border-b border-border pb-2">
         {(['templates', 'content', 'preview'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-t-md text-sm font-medium transition-colors ${tab === t ? 'bg-brand text-white' : 'hover:bg-muted text-text-muted'}`}>
-            {t === 'templates' ? '🎨 Template' : t === 'content' ? '📝 Contenuti' : '👁️ Anteprima'}
+            {t === 'templates' ? <><Layout className="w-4 h-4 inline" /> Template</> : t === 'content' ? <><Edit className="w-4 h-4 inline" /> Contenuti</> : <><Eye className="w-4 h-4 inline" /> Anteprima</>}
           </button>
         ))}
       </div>
@@ -149,7 +165,7 @@ export default function SiteBuilderPage() {
                 <CardHeader>
                   <CardTitle className="text-base flex items-center justify-between">
                     {t.name}
-                    {isSelected && <Badge>✓</Badge>}
+                    {isSelected && <Badge><Check className="w-3 h-3" /></Badge>}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -183,7 +199,7 @@ export default function SiteBuilderPage() {
           {draft && (
             <>
               <Card>
-                <CardHeader><CardTitle className="text-base">📢 Invito principale</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-base"><Bell className="w-4 h-4 inline" /> Invito principale</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div>
                     <label className="text-xs font-medium text-text-muted">Nomi degli sposi</label>
@@ -210,14 +226,14 @@ export default function SiteBuilderPage() {
                   </div>
                   {c.date && c.time && (
                     <a href={generateIcsLink(c.date, c.time || '12:00', `Matrimonio ${c.coupleNames || ''}`, '', '')} download="matrimonio.ics" className="inline-flex items-center gap-2 text-xs px-3 py-2 rounded-md bg-muted hover:bg-brand hover:text-white transition-colors">
-                      📅 Scarica promemoria calendario
+                      <Calendar className="w-4 h-4 inline" /> Scarica promemoria calendario
                     </a>
                   )}
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader><CardTitle className="text-base">⚙️ Sezioni</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-base"><Settings className="w-4 h-4 inline" /> Sezioni</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
                   {SECTION_META.map(s => <SectionToggle key={s.key} section={s} />)}
                 </CardContent>
@@ -225,7 +241,7 @@ export default function SiteBuilderPage() {
 
               {c.ceremonyEnabled && (
                 <Card>
-                  <CardHeader><CardTitle className="text-base">⛪ Cerimonia</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-base"><Church className="w-4 h-4 inline" /> Cerimonia</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
                     <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.ceremonyTitle || ''} onChange={e => updateC('ceremonyTitle', e.target.value)} placeholder="Titolo (es. Chiesa SS Mediatrice)" />
                     <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.ceremonyAddress || ''} onChange={e => updateC('ceremonyAddress', e.target.value)} placeholder="Indirizzo completo" />
@@ -242,7 +258,7 @@ export default function SiteBuilderPage() {
 
               {c.receptionEnabled && (
                 <Card>
-                  <CardHeader><CardTitle className="text-base">🍽️ Ricevimento</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-base"><GlassWater className="w-4 h-4 inline" /> Ricevimento</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
                     <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.receptionTitle || ''} onChange={e => updateC('receptionTitle', e.target.value)} placeholder="Nome location" />
                     <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.receptionAddress || ''} onChange={e => updateC('receptionAddress', e.target.value)} placeholder="Indirizzo" />
@@ -259,7 +275,7 @@ export default function SiteBuilderPage() {
 
               {c.storyEnabled && (
                 <Card>
-                  <CardHeader><CardTitle className="text-base">💕 La nostra storia</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-base"><Heart className="w-4 h-4 inline" /> La nostra storia</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
                     <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.storyTitle || ''} onChange={e => updateC('storyTitle', e.target.value)} placeholder="Titolo (es. Come tutto è iniziato)" />
                     <div className="flex flex-wrap gap-1">
@@ -274,7 +290,7 @@ export default function SiteBuilderPage() {
 
               {c.registryEnabled && (
                 <Card>
-                  <CardHeader><CardTitle className="text-base">🎁 Lista nozze</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-base"><Gift className="w-4 h-4 inline" /> Lista nozze</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
                     <textarea className="w-full min-h-[60px] rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.registryText || ''} onChange={e => updateC('registryText', e.target.value)} placeholder="Testo di ringraziamento..." />
                     <div className="flex flex-wrap gap-1">
@@ -291,7 +307,7 @@ export default function SiteBuilderPage() {
 
               {c.rsvpEnabled && (
                 <Card>
-                  <CardHeader><CardTitle className="text-base">💌 RSVP</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-base"><Mail className="w-4 h-4 inline" /> RSVP</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
                     <textarea className="w-full min-h-[60px] rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.rsvpMessage || ''} onChange={e => updateC('rsvpMessage', e.target.value)} placeholder="Messaggio di conferma..." />
                     <div className="flex flex-wrap gap-1">
@@ -300,6 +316,7 @@ export default function SiteBuilderPage() {
                       ))}
                     </div>
                     <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.rsvpEmail || ''} onChange={e => updateC('rsvpEmail', e.target.value)} placeholder="Email per conferme" />
+                    <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.rsvpWhatsapp || ''} onChange={e => updateC('rsvpWhatsapp', e.target.value)} placeholder="Numero WhatsApp per conferme" />
                     <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.rsvpDeadline || ''} onChange={e => updateC('rsvpDeadline', e.target.value)} type="date" placeholder="Data limite conferma" />
                   </CardContent>
                 </Card>
@@ -307,7 +324,7 @@ export default function SiteBuilderPage() {
 
               {c.dressCodeEnabled && (
                 <Card>
-                  <CardHeader><CardTitle className="text-base">👔 Codice abbigliamento</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-base"><Shirt className="w-4 h-4 inline" /> Codice abbigliamento</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
                     <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.dressCodeText || ''} onChange={e => updateC('dressCodeText', e.target.value)} placeholder="Es. Elegante, Formal, Casual chic..." />
                     <div className="flex flex-wrap gap-1">
@@ -321,16 +338,17 @@ export default function SiteBuilderPage() {
 
               {c.menuEnabled && (
                 <Card>
-                  <CardHeader><CardTitle className="text-base">🥂 Menu</CardTitle></CardHeader>
-                  <CardContent>
-                    <textarea className="w-full min-h-[80px] rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.menuText || ''} onChange={e => updateC('menuText', e.target.value)} placeholder="Descrizione del menu, allergie o preferenze..." />
+                  <CardHeader><CardTitle className="text-base"><Utensils className="w-4 h-4 inline" /> Menu</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    <textarea className="w-full min-h-[80px] rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.menuText || ''} onChange={e => updateC('menuText', e.target.value)} placeholder="Descrizione del menu..." />
+                    <textarea className="w-full min-h-[60px] rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.menuAllergens || ''} onChange={e => updateC('menuAllergens', e.target.value)} placeholder="Allergeni e intolleranze..." />
                   </CardContent>
                 </Card>
               )}
 
               {c.hotelsEnabled && (
                 <Card>
-                  <CardHeader><CardTitle className="text-base">🏨 Hotel</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-base"><Hotel className="w-4 h-4 inline" /> Hotel</CardTitle></CardHeader>
                   <CardContent>
                     <textarea className="w-full min-h-[80px] rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.hotelsText || ''} onChange={e => updateC('hotelsText', e.target.value)} placeholder="Suggerimenti hotel, convenzioni, codici sconto..." />
                   </CardContent>
@@ -339,7 +357,7 @@ export default function SiteBuilderPage() {
 
               {c.playlistEnabled && (
                 <Card>
-                  <CardHeader><CardTitle className="text-base">🎵 Playlist</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-base"><Music className="w-4 h-4 inline" /> Playlist</CardTitle></CardHeader>
                   <CardContent>
                     <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.playlistLink || ''} onChange={e => updateC('playlistLink', e.target.value)} placeholder="Link Spotify / Apple Music" />
                   </CardContent>
@@ -348,7 +366,7 @@ export default function SiteBuilderPage() {
 
               {c.hashtagEnabled && (
                 <Card>
-                  <CardHeader><CardTitle className="text-base">#️⃣ Hashtag</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-base"><Hash className="w-4 h-4 inline" /> Hashtag</CardTitle></CardHeader>
                   <CardContent>
                     <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={c.hashtag || ''} onChange={e => updateC('hashtag', e.target.value)} placeholder="#NostroHashtag" />
                   </CardContent>
@@ -356,7 +374,7 @@ export default function SiteBuilderPage() {
               )}
 
               <div className="flex gap-2">
-                <Button onClick={handleSaveContent} disabled={saving}>{saving ? 'Salvataggio...' : '💾 Salva contenuti'}</Button>
+                <Button onClick={handleSaveContent} disabled={saving}>{saving ? 'Salvataggio...' : <><Save className="w-4 h-4 inline" /> Salva contenuti</>}</Button>
               </div>
             </>
           )}
@@ -366,7 +384,7 @@ export default function SiteBuilderPage() {
       {tab === 'preview' && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>👁️ Anteprima sito invito</CardTitle>
+            <CardTitle><Eye className="w-4 h-4 inline" /> Anteprima sito invito</CardTitle>
             {draft && <Button onClick={handlePublish}>{draft.published ? 'Ripubblica' : 'Pubblica sito'}</Button>}
           </CardHeader>
           <CardContent>
@@ -378,14 +396,14 @@ export default function SiteBuilderPage() {
                 <p className="text-lg">{c.date ? new Date(c.date).toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '28 Agosto 2026'}{c.time ? ` · ${c.time}` : ''}</p>
                 {c.date && c.time && (
                   <a href={generateIcsLink(c.date, c.time || '12:00', `Matrimonio ${c.coupleNames || ''}`, '', '')} download="matrimonio.ics" className="inline-flex items-center gap-2 mt-4 text-sm px-4 py-2 rounded-full transition-colors" style={{ background: palette[0], color: '#fff' }}>
-                    📅 Aggiungi al calendario
+                    <Calendar className="w-4 h-4 inline" /> Aggiungi al calendario
                   </a>
                 )}
               </div>
 
               {c.ceremonyEnabled && (
                 <div className="p-8" style={{ background: palette[3], color: palette[2] }}>
-                  <h3 className="text-xl font-semibold mb-4" style={{ color: palette[0] }}>⛪ {c.ceremonyTitle || 'Cerimonia'}</h3>
+                  <h3 className="text-xl font-semibold mb-4 flex items-center gap-2" style={{ color: palette[0] }}><Church className="w-5 h-5" /> {c.ceremonyTitle || 'Cerimonia'}</h3>
                   {c.ceremonyAddress && <p className="mb-1">{c.ceremonyAddress}</p>}
                   {c.ceremonyTime && <p className="text-sm opacity-70 mb-2">Ore {c.ceremonyTime}</p>}
                   {c.ceremonyNote && <p className="text-sm opacity-80">{c.ceremonyNote}</p>}
@@ -394,7 +412,7 @@ export default function SiteBuilderPage() {
 
               {c.receptionEnabled && (
                 <div className="p-8" style={{ background: palette[1], color: palette[2] }}>
-                  <h3 className="text-xl font-semibold mb-4" style={{ color: palette[0] }}>🍽️ {c.receptionTitle || 'Ricevimento'}</h3>
+                  <h3 className="text-xl font-semibold mb-4 flex items-center gap-2" style={{ color: palette[0] }}><GlassWater className="w-5 h-5" /> {c.receptionTitle || 'Ricevimento'}</h3>
                   {c.receptionAddress && <p className="mb-1">{c.receptionAddress}</p>}
                   {c.receptionTime && <p className="text-sm opacity-70 mb-2">Ore {c.receptionTime}</p>}
                   {c.receptionNote && <p className="text-sm opacity-80">{c.receptionNote}</p>}
@@ -403,14 +421,14 @@ export default function SiteBuilderPage() {
 
               {c.storyEnabled && (
                 <div className="p-8" style={{ background: palette[3], color: palette[2] }}>
-                  <h3 className="text-xl font-semibold mb-4" style={{ color: palette[0] }}>💕 {c.storyTitle || 'La nostra storia'}</h3>
+                  <h3 className="text-xl font-semibold mb-4 flex items-center gap-2" style={{ color: palette[0] }}><Heart className="w-5 h-5" /> {c.storyTitle || 'La nostra storia'}</h3>
                   <p className="text-sm leading-relaxed">{c.storyBody || 'Racconta la vostra storia...'}</p>
                 </div>
               )}
 
               {c.registryEnabled && (
                 <div className="p-8 text-center" style={{ background: palette[1], color: palette[2] }}>
-                  <h3 className="text-xl font-semibold mb-4" style={{ color: palette[0] }}>🎁 Lista nozze</h3>
+                  <h3 className="text-xl font-semibold mb-4 flex items-center gap-2" style={{ color: palette[0] }}><Gift className="w-5 h-5" /> Lista nozze</h3>
                   <p className="text-sm mb-3">{c.registryText || ''}</p>
                   {c.registryIban && <p className="text-xs opacity-70 font-mono">IBAN: {c.registryIban}</p>}
                   {c.registryLink && <a href={c.registryLink} target="_blank" className="text-sm underline mt-2 inline-block">Vai alla lista nozze ↗</a>}
@@ -419,37 +437,41 @@ export default function SiteBuilderPage() {
 
               {c.dressCodeEnabled && c.dressCodeText && (
                 <div className="p-8 text-center" style={{ background: palette[3], color: palette[2] }}>
-                  <p className="text-sm">👔 <strong>Codice abbigliamento:</strong> {c.dressCodeText}</p>
+                  <p className="text-sm"><Shirt className="w-4 h-4 inline" /> <strong>Codice abbigliamento:</strong> {c.dressCodeText}</p>
                 </div>
               )}
 
               {c.menuEnabled && c.menuText && (
                 <div className="p-8" style={{ background: palette[1], color: palette[2] }}>
-                  <h3 className="text-lg font-semibold mb-2" style={{ color: palette[0] }}>🥂 Menu</h3>
+                  <h3 className="text-lg font-semibold mb-2 flex items-center gap-2" style={{ color: palette[0] }}><Utensils className="w-4 h-4" /> Menu</h3>
                   <p className="text-sm">{c.menuText}</p>
+                  {c.menuAllergens && <p className="text-xs mt-2 opacity-70">Allergeni: {c.menuAllergens}</p>}
                 </div>
               )}
 
               {c.hotelsEnabled && c.hotelsText && (
                 <div className="p-8" style={{ background: palette[3], color: palette[2] }}>
-                  <h3 className="text-lg font-semibold mb-2" style={{ color: palette[0] }}>🏨 Hotel</h3>
+                  <h3 className="text-lg font-semibold mb-2 flex items-center gap-2" style={{ color: palette[0] }}><Hotel className="w-4 h-4" /> Hotel</h3>
                   <p className="text-sm">{c.hotelsText}</p>
                 </div>
               )}
 
               {c.playlistEnabled && c.playlistLink && (
                 <div className="p-8 text-center" style={{ background: palette[1], color: palette[2] }}>
-                  <h3 className="text-lg font-semibold mb-2" style={{ color: palette[0] }}>🎵 Playlist</h3>
+                  <h3 className="text-lg font-semibold mb-2 flex items-center gap-2" style={{ color: palette[0] }}><Music className="w-4 h-4" /> Playlist</h3>
                   <a href={c.playlistLink} target="_blank" className="text-sm underline">Ascolta la playlist ↗</a>
                 </div>
               )}
 
               {c.rsvpEnabled && (
                 <div className="p-8 text-center" style={{ background: palette[3], color: palette[2] }}>
-                  <h3 className="text-xl font-semibold mb-4" style={{ color: palette[0] }}>💌 RSVP</h3>
+                  <h3 className="text-xl font-semibold mb-4 flex items-center gap-2" style={{ color: palette[0] }}><Mail className="w-5 h-5" /> RSVP</h3>
                   <p className="text-sm mb-3">{c.rsvpMessage || 'Conferma la tua presenza'}</p>
                   {c.rsvpDeadline && <p className="text-xs opacity-70">Entro il {new Date(c.rsvpDeadline).toLocaleDateString('it-IT')}</p>}
-                  {c.rsvpEmail && <a href={`mailto:${c.rsvpEmail}`} className="inline-block mt-3 text-sm px-6 py-2 rounded-full transition-colors" style={{ background: palette[0], color: '#fff' }}>Conferma ora</a>}
+                  <div className="flex flex-wrap items-center justify-center gap-3 mt-3">
+                    {c.rsvpEmail && <a href={`mailto:${c.rsvpEmail}`} className="inline-block text-sm px-6 py-2 rounded-full transition-colors" style={{ background: palette[0], color: '#fff' }}>Conferma via email</a>}
+                    {c.rsvpWhatsapp && <a href={`https://wa.me/${c.rsvpWhatsapp.replace(/[^0-9]/g, '')}`} target="_blank" className="inline-block text-sm px-6 py-2 rounded-full transition-colors" style={{ background: palette[0], color: '#fff' }}>Conferma via WhatsApp</a>}
+                  </div>
                 </div>
               )}
 

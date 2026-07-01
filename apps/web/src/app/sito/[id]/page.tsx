@@ -22,7 +22,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
     return (
       <html lang="it"><body style={{ margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', fontFamily: 'system-ui, sans-serif', background: '#f8f8f8', color: '#666' }}>
         <div style={{ textAlign: 'center' }}>
-          <h1 style={{ fontSize: 48, margin: 0 }}>💕</h1>
+          <h1 style={{ fontSize: 48, margin: 0 }}>&#x2665;</h1>
           <p>Sito non ancora pubblicato.</p>
         </div>
       </body></html>
@@ -62,14 +62,14 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
             {c.time && <p style={{ fontSize: 14, color: p0, marginBottom: 24 }}>Ore {c.time}</p>}
             {c.date && c.time && (
               <a href={generateIcsLink(c.date, c.time, `Matrimonio ${c.coupleNames || ''}`, '', '')} download="matrimonio.ics" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 24px', borderRadius: 999, fontSize: 14, background: p0, color: '#fff', textDecoration: 'none' }}>
-                📅 Aggiungi al calendario
+                + Calendario
               </a>
             )}
           </div>
 
           {c.ceremonyEnabled && (
             <div className="section" style={{ padding: '48px 32px', background: p3, color: p2 }}>
-              <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>⛪ {c.ceremonyTitle || 'Cerimonia'}</h2>
+              <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>{c.ceremonyTitle || 'Cerimonia'}</h2>
               <p style={{ fontSize: 15, lineHeight: 1.7, marginBottom: 4 }}>{c.ceremonyAddress || ''}</p>
               {c.ceremonyTime && <p style={{ fontSize: 14, color: p0, marginBottom: 12 }}>Ore {c.ceremonyTime}</p>}
               {c.ceremonyNote && <p style={{ fontSize: 14, opacity: 0.7, lineHeight: 1.6 }}>{c.ceremonyNote}</p>}
@@ -79,7 +79,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
 
           {c.receptionEnabled && (
             <div className="section" style={{ padding: '48px 32px', background: p1, color: p2 }}>
-              <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>🍽️ {c.receptionTitle || 'Ricevimento'}</h2>
+              <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>{c.receptionTitle || 'Ricevimento'}</h2>
               <p style={{ fontSize: 15, lineHeight: 1.7, marginBottom: 4 }}>{c.receptionAddress || ''}</p>
               {c.receptionTime && <p style={{ fontSize: 14, color: p0, marginBottom: 12 }}>Ore {c.receptionTime}</p>}
               {c.receptionNote && <p style={{ fontSize: 14, opacity: 0.7, lineHeight: 1.6 }}>{c.receptionNote}</p>}
@@ -89,14 +89,14 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
 
           {c.storyEnabled && (
             <div className="section" style={{ padding: '48px 32px', background: p3, color: p2 }}>
-              <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>💕 {c.storyTitle || 'La nostra storia'}</h2>
+              <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>{c.storyTitle || 'La nostra storia'}</h2>
               <p style={{ fontSize: 14, lineHeight: 1.8, opacity: 0.8 }}>{c.storyBody || ''}</p>
             </div>
           )}
 
           {c.registryEnabled && (
             <div className="section" style={{ padding: '48px 32px', textAlign: 'center', background: p1, color: p2 }}>
-              <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>🎁 Lista nozze</h2>
+              <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>Lista nozze</h2>
               {c.registryText && <p style={{ fontSize: 14, lineHeight: 1.7, opacity: 0.8, marginBottom: 16 }}>{c.registryText}</p>}
               {c.registryIban && <p style={{ fontSize: 12, fontFamily: 'monospace', background: p3, padding: '8px 16px', borderRadius: 8, display: 'inline-block', marginBottom: 8 }}>IBAN: {c.registryIban}</p>}
               {c.registryIntestatario && <p style={{ fontSize: 12, opacity: 0.6 }}>Intestato a: {c.registryIntestatario}</p>}
@@ -106,37 +106,41 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
 
           {c.dressCodeEnabled && c.dressCodeText && (
             <div className="section" style={{ padding: '32px', textAlign: 'center', background: p3, color: p2 }}>
-              <p style={{ fontSize: 14 }}>👔 <strong>Codice abbigliamento:</strong> {c.dressCodeText}</p>
+              <p style={{ fontSize: 14 }}><strong>Codice abbigliamento:</strong> {c.dressCodeText}</p>
             </div>
           )}
 
           {c.menuEnabled && c.menuText && (
             <div className="section" style={{ padding: '32px', background: p1, color: p2 }}>
-              <h2 style={{ fontSize: 18, color: p0, marginBottom: 12 }}>🥂 Menu</h2>
+              <h2 style={{ fontSize: 18, color: p0, marginBottom: 12 }}>Menu</h2>
               <p style={{ fontSize: 14, lineHeight: 1.7, opacity: 0.8 }}>{c.menuText}</p>
+              {c.menuAllergens && <p style={{ fontSize: 13, opacity: 0.6, marginTop: 8 }}>Allergeni: {c.menuAllergens}</p>}
             </div>
           )}
 
           {c.hotelsEnabled && c.hotelsText && (
             <div className="section" style={{ padding: '32px', background: p3, color: p2 }}>
-              <h2 style={{ fontSize: 18, color: p0, marginBottom: 12 }}>🏨 Hotel consigliati</h2>
+              <h2 style={{ fontSize: 18, color: p0, marginBottom: 12 }}>Hotel consigliati</h2>
               <p style={{ fontSize: 14, lineHeight: 1.7, opacity: 0.8 }}>{c.hotelsText}</p>
             </div>
           )}
 
           {c.playlistEnabled && c.playlistLink && (
             <div className="section" style={{ padding: '32px', textAlign: 'center', background: p1, color: p2 }}>
-              <h2 style={{ fontSize: 18, color: p0, marginBottom: 12 }}>🎵 Playlist</h2>
+              <h2 style={{ fontSize: 18, color: p0, marginBottom: 12 }}>Playlist</h2>
               <a href={c.playlistLink} target="_blank" style={{ fontSize: 14, color: p0, textDecoration: 'underline' }}>Ascolta la playlist ↗</a>
             </div>
           )}
 
           {c.rsvpEnabled && (
             <div className="section" style={{ padding: '48px 32px', textAlign: 'center', background: p3, color: p2 }}>
-              <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>💌 RSVP</h2>
+              <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>RSVP</h2>
               <p style={{ fontSize: 14, lineHeight: 1.7, opacity: 0.8, marginBottom: 12 }}>{c.rsvpMessage || 'Conferma la tua presenza'}</p>
               {c.rsvpDeadline && <p style={{ fontSize: 12, opacity: 0.5, marginBottom: 16 }}>Entro il {new Date(c.rsvpDeadline).toLocaleDateString('it-IT')}</p>}
-              {c.rsvpEmail && <a href={`mailto:${c.rsvpEmail}`} style={{ display: 'inline-block', padding: '12px 32px', borderRadius: 999, fontSize: 15, background: p0, color: '#fff', textDecoration: 'none', fontWeight: 600 }}>Conferma presenza</a>}
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 16 }}>
+                {c.rsvpEmail && <a href={`mailto:${c.rsvpEmail}`} style={{ padding: '12px 32px', borderRadius: 999, fontSize: 15, background: p0, color: '#fff', textDecoration: 'none', fontWeight: 600 }}>Conferma presenza</a>}
+                {c.rsvpWhatsapp && <a href={`https://wa.me/${c.rsvpWhatsapp.replace(/[^0-9]/g, '')}`} target="_blank" style={{ padding: '12px 32px', borderRadius: 999, fontSize: 15, background: p0, color: '#fff', textDecoration: 'none', fontWeight: 600 }}>Conferma via WhatsApp</a>}
+              </div>
             </div>
           )}
 
