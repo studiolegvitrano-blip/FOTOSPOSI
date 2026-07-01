@@ -76,6 +76,12 @@
 - [x] Hydration mismatch fix (`suppressHydrationWarning`)
 - [x] `.env.local` in `apps/web/` per Next.js
 - [x] `FOTO AGO/` escluso da git (secrets)
+- [x] Site-builder riscritto: invito moderno con 12 sezioni toggle, frasi suggerite, ICS calendario
+- [x] RSVP multi-canale (email, telefono, WhatsApp)
+- [x] Menu + allergeni nel sito-evento
+- [x] Lucide icons al posto delle emoji
+- [x] Pagina pubblica sito-evento `/sito/[id]` renderizzata server-side
+- [x] Link Maps navigazione per Cerimonia e Ricevimento nel sito pubblico
 
 ### Prossime attività
 - **Admin marketplace**: UI per approvazione fornitori
@@ -106,3 +112,6 @@
 | 01/07/2026 | fix | 165fb9c — QR valido fino al giorno dopo evento |
 | 01/07/2026 | feat | 947da8f — Finestra upload 18gg+2gg |
 | 01/07/2026 | feat | 066c940 — Sposi upload illimitato, invitati solo finestra |
+| 01/07/2026 | docs | a53eb25 — Aggiornato PROJECT_STATUS.md |
+| 01/07/2026 | feat | dee7bfb — Site-builder riscritto: invito moderno, sezioni toggle, ICS, Maps |
+| 01/07/2026 | feat | 92096fc — RSVP telefono/WhatsApp, allergeni, lucide icons |
