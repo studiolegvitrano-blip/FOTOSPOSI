@@ -95,6 +95,7 @@
 - **Prima Notte di Sposi** (modulo `commerce`): amici possono regalare scherzi o "cose hot" dal nostro shop, integrato con lista nozze
 - **Quiz sugli Sposi** (modulo `games`): domande tipo "chi ha detto ti amo per primo?", "quanti anni ha la sposa?" — punti e podio in tempo reale
 - **Time Capsule** (modulo `commerce/games`): ospiti lasciano messaggi rivelati al 1° anniversario. **Pricing**: 3 mesi 20€, 6 mesi 30€, 12 mesi 40€, 18 mesi 50€
+- **Reel Riassunto** (modulo `commerce`): video AI (Claude + FFmpeg) con foto/giochi. Incluso in Deluxe per sposi. Anche invitati acquistano reel personalizzato (max 4 persone: loro + accompagnatore + citazione sposi). 49€
 
 ## Log cronologico
 | Data | Modulo | Commit |
