@@ -48,9 +48,9 @@ CREATE POLICY "Users can insert AI texts for their events" ON ai_generated_texts
   FOR INSERT WITH CHECK (event_id IN (SELECT id FROM events WHERE created_by = auth.uid()));
 
 INSERT INTO site_templates (name, palette, font_family) VALUES
-  ('Classico Elegante', ARRAY['#d4a574','#f5f0eb','#1a1a2e','#ffffff'], 'geist'),
-  ('Moderno Minimal', ARRAY['#2d2d2d','#f8f8f8','#b8860b','#ffffff'], 'inter'),
-  ('Rustico Shabby', ARRAY['#8b7355','#fdf5e6','#2f4f4f','#ffffff'], 'playfair-display'),
-  ('Giardino Fiorito', ARRAY['#7ebd7e','#fff8dc','#8b4513','#ffffff'], 'lora'),
-  ('Spiaggia Tropical', ARRAY['#00b4d8','#fff5e6','#e07a5f','#ffffff'], 'poppins'),
-  ('Notte Stellata', ARRAY['#1a1a2e','#16213e','#e94560','#ffffff'], 'montserrat');
+  ('Elegante', ARRAY['#d4a574','#f5f0eb','#1a1a2e','#ffffff'], 'Georgia, serif'),
+  ('Minimal', ARRAY['#2d2d2d','#f8f8f8','#b8860b','#ffffff'], 'Inter, sans-serif'),
+  ('Romantico', ARRAY['#e8a0b4','#fff5f7','#4a2c3a','#ffffff'], 'Georgia, serif'),
+  ('Giardino', ARRAY['#7ebd7e','#fff8dc','#8b4513','#ffffff'], 'Lora, serif'),
+  ('Spiaggia', ARRAY['#00b4d8','#fff5e6','#e07a5f','#ffffff'], 'Poppins, sans-serif'),
+  ('Notte Stellata', ARRAY['#1a1a2e','#16213e','#e94560','#ffffff'], 'Montserrat, sans-serif');
