@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { compressImage, uploadToStorage, createMediaRecord } from '@fotosposi/media';
+import { compressImage, uploadToStorage, createMediaRecord, getDriveToken, syncToDrive } from '@fotosposi/media';
 import { getCurrentUser } from '@fotosposi/core';
 import { getEventById, getEventWindow } from '@fotosposi/events';
 
@@ -59,13 +59,31 @@ export default function UploadPage() {
         const { url, error: uploadError } = await uploadToStorage('media', path, compressed);
         if (uploadError || !url) { failed++; continue; }
 
-        const { error: recordError } = await createMediaRecord({
+        const { media, error: recordError } = await createMediaRecord({
           event_id: eventId,
           uploaded_by: user.id,
           type: file.type.startsWith('video/') ? 'video' : 'photo',
           url,
         });
-        if (recordError) { failed++; continue; }
+        if (recordError || !media) { failed++; continue; }
+
+        // Sync to Google Drive (se OAuth personale configurato)
+        try {
+          const { token } = await getDriveToken(eventId);
+          if (token?.access_token) {
+            const fileRes = await fetch(url);
+            const fileBlob = await fileRes.blob();
+            const formData = new FormData();
+            formData.append('file', fileBlob, file.name);
+            const metadata = { name: file.name };
+            formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token.access_token}` },
+              body: formData,
+            });
+          }
+        } catch { /* Drive non configurato, rimane pending */ }
 
         success++;
       } catch {

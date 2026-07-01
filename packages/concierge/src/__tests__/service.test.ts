@@ -93,31 +93,31 @@ describe('sendMessage', () => {
 
 describe('getAiResponse', () => {
   beforeEach(() => {
-    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.GEMINI_API_KEY;
     global.fetch = vi.fn();
   });
 
-  it('returns fallback when ANTHROPIC_API_KEY is missing', async () => {
+  it('returns fallback when GEMINI_API_KEY is missing', async () => {
     const result = await getAiResponse([{ role: 'user', content: 'Ciao' }]);
     expect(result.content).toContain('non disponibile');
   });
 
   it('returns AI response on success', async () => {
-    process.env.ANTHROPIC_API_KEY = 'test-key';
+    process.env.GEMINI_API_KEY = 'test-key';
     (global.fetch as any).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ content: [{ text: 'Ecco i migliori fornitori a Firenze.' }] }),
+      json: () => Promise.resolve({ candidates: [{ content: { parts: [{ text: 'Ecco i migliori fornitori a Firenze.' }] } }] }),
     });
     const result = await getAiResponse([{ role: 'user', content: 'Fornitori a Firenze?' }]);
     expect(result.content).toBe('Ecco i migliori fornitori a Firenze.');
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.anthropic.com/v1/messages',
+      expect.stringContaining('generativelanguage.googleapis.com'),
       expect.objectContaining({ method: 'POST' }),
     );
   });
 
-  it('returns error when Claude API fails', async () => {
-    process.env.ANTHROPIC_API_KEY = 'test-key';
+  it('returns error when Gemini API fails', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
     (global.fetch as any).mockResolvedValue({
       ok: false,
       json: () => Promise.resolve({ error: { message: 'Rate limit exceeded' } }),
@@ -127,7 +127,7 @@ describe('getAiResponse', () => {
   });
 
   it('handles network error', async () => {
-    process.env.ANTHROPIC_API_KEY = 'test-key';
+    process.env.GEMINI_API_KEY = 'test-key';
     (global.fetch as any).mockRejectedValue(new Error('Network error'));
     const result = await getAiResponse([{ role: 'user', content: 'Ciao' }]);
     expect(result.error).toBe('Network error');

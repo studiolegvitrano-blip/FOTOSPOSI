@@ -1,5 +1,7 @@
 import { createServiceClient } from '@fotosposi/core';
 
+const SYSTEM_PROMPT = 'Sei un wedding planner AI. Aiuti gli sposi con consigli su matrimonio: organizzazione, tempistiche, fornitori, tradizioni. Rispondi in italiano, tono professionale ed elegante.';
+
 export interface ConciergeMessage {
   id: string;
   event_id: string;
@@ -27,25 +29,37 @@ export async function sendMessage(params: {
   const supabase = createServiceClient();
   const { data, error } = await supabase.from('concierge_messages').insert(params).select().single();
   if (error) return { error: error.message };
-
-  const anonKey = process.env.ANTHROPIC_API_KEY;
-
   return { message: data };
 }
 
 export async function getAiResponse(messages: { role: string; content: string }[]): Promise<{ content?: string; error?: string }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { content: 'Chat AI non disponibile. Configura ANTHROPIC_API_KEY per abilitare il concierge AI.' };
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return { content: 'Chat AI non disponibile. Configura GEMINI_API_KEY per abilitare il concierge AI.' };
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const history = messages.slice(0, -1).map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }));
+    const lastMsg = messages[messages.length - 1];
+
+    const contents = [
+      ...history,
+      { role: 'user', parts: [{ text: lastMsg.content }] },
+    ];
+
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-3-haiku-20240307', max_tokens: 500, system: 'Sei un wedding planner AI. Aiuti gli sposi con consigli su matrimonio: organizzazione, tempistiche, fornitori, tradizioni italiane.', messages }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents,
+        generationConfig: { maxOutputTokens: 500, temperature: 0.7 },
+      }),
     });
     const data = await res.json();
-    if (!res.ok) return { error: data.error?.message || 'Errore Claude API' };
-    return { content: data.content?.[0]?.text || '' };
+    if (!res.ok) return { error: data.error?.message || 'Errore Gemini API' };
+    return { content: data.candidates?.[0]?.content?.parts?.[0]?.text || '' };
   } catch (e: any) {
     return { error: e.message };
   }

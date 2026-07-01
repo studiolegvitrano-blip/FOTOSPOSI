@@ -15,6 +15,8 @@ export default function NewEventPage() {
   const [venue, setVenue] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showDriveStep, setShowDriveStep] = useState(false);
+  const [createdEventId, setCreatedEventId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -45,8 +47,17 @@ export default function NewEventPage() {
     if (err) {
       setError(err);
     } else if (event) {
-      router.push(`/events/${event.id}`);
+      setCreatedEventId(event.id);
+      setShowDriveStep(true);
     }
+  };
+
+  const handleSkipDrive = () => {
+    if (createdEventId) router.push(`/events/${createdEventId}`);
+  };
+
+  const handleConnectDrive = () => {
+    if (createdEventId) router.push(`/events/${createdEventId}/drive`);
   };
 
   return (
@@ -106,6 +117,24 @@ export default function NewEventPage() {
           {loading ? 'Creazione...' : 'Crea evento'}
         </button>
       </form>
+
+      {showDriveStep && (
+        <div style={{ marginTop: '2rem', padding: '1.5rem', border: '2px solid #d4a574', borderRadius: '8px', textAlign: 'center' }}>
+          <h2 style={{ marginBottom: '1rem' }}>Evento creato! ✅</h2>
+          <p style={{ marginBottom: '1.5rem', color: '#555' }}>
+            Ora collega Google Drive per il backup automatico delle foto.
+            Così non perderai mai i ricordi del tuo matrimonio.
+          </p>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <button onClick={handleConnectDrive} style={{ padding: '0.75rem 2rem', fontSize: '1rem', cursor: 'pointer', background: '#d4a574', color: 'white', border: 'none', borderRadius: '4px' }}>
+              Connetti Google Drive
+            </button>
+            <button onClick={handleSkipDrive} style={{ padding: '0.75rem 2rem', fontSize: '1rem', cursor: 'pointer', background: 'transparent', border: '1px solid #ccc', borderRadius: '4px' }}>
+              Salta (lo farò dopo)
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

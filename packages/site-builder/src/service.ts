@@ -57,7 +57,28 @@ export async function publishSite(draftId: string): Promise<{ draft?: SiteDraft;
 
 export async function generateText(eventId: string, prompt: string, section: string = 'home'): Promise<{ text?: AiGeneratedText; error?: string }> {
   const supabase = createClient();
-  const generated = `[${section.toUpperCase()}] ${prompt} — generato da AI (demo). Attiva ANTHROPIC_API_KEY per testi reali.`;
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  let generated: string;
+  if (apiKey) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: `Genera testo per sezione "${section}" di un sito di matrimonio. Prompt: ${prompt}. Tono professionale ed elegante.` }] }],
+          generationConfig: { maxOutputTokens: 300, temperature: 0.7 },
+        }),
+      });
+      const data = await res.json();
+      generated = data.candidates?.[0]?.content?.parts?.[0]?.text || `[${section.toUpperCase()}] ${prompt}`;
+    } catch {
+      generated = `[${section.toUpperCase()}] ${prompt}`;
+    }
+  } else {
+    generated = `[${section.toUpperCase()}] ${prompt} — demo. Aggiungi GEMINI_API_KEY per testi reali.`;
+  }
+
   const { data, error } = await supabase.from('ai_generated_texts').insert({
     event_id: eventId, prompt, generated, section,
   }).select().single();
