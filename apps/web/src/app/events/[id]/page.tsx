@@ -48,9 +48,17 @@ export default function EventDetailPage() {
           <p className="text-text-muted">
             {new Date(event.date).toLocaleDateString('it-IT')} — {event.location}
           </p>
-          <div className="flex gap-4 text-sm text-text-muted mt-1">
-            {event.church && <span>⛪ {event.church}</span>}
-            {event.venue && <span>🏛️ {event.venue}</span>}
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-text-muted mt-1">
+            {event.church && (
+              <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.church + (event.location ? ', ' + event.location : ''))}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-brand transition-colors no-underline text-text-muted">
+                ⛪ {event.church} <span className="text-xs opacity-60">↗</span>
+              </a>
+            )}
+            {event.venue && (
+              <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue + (event.location ? ', ' + event.location : ''))}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-brand transition-colors no-underline text-text-muted">
+                🏛️ {event.venue} <span className="text-xs opacity-60">↗</span>
+              </a>
+            )}
           </div>
           <Badge variant={event.tier === 'premium' ? 'default' : 'secondary'}>{event.tier}</Badge>
         </div>
