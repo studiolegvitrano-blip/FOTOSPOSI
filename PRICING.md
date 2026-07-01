@@ -15,6 +15,22 @@
 | Stampa foto (Gelato) | ❌ | Prezzo pieno | -20% |
 | Concierge AI | ❌ | ❌ | ✅ |
 
+## GIFT: Regala agli sposi
+
+Amici, parenti, testimoni possono **acquistare il servizio in regalo** per la coppia.
+
+| GIFT | Prezzo | Cosa riceve la coppia |
+|------|--------|-----------------------|
+| **Gift Sito Premium** | 99€ | Sito invito digitale completo |
+| **Gift Servizio Premium** | 149€ | Tutto il pacchetto Premium |
+| **Gift Deluxe** | 250€ | Esperienza completa |
+| **Gift personalizzato** | Importo libero | La coppia sceglie il tier |
+
+**Flusso**: amico acquista → inserisce email sposi → sposi ricevono email con codice gift → lo riscattano in fase di registrazione -> noi guadagniamo subito.
+
+> **Vantaggio**: il gift trasforma un "vorrei ma non so cosa regalare" in una vendita certa.
+> Ottimo per wedding planner che consigliano il servizio agli invitati.
+
 ## Extras
 
 | Extra | Prezzo |
