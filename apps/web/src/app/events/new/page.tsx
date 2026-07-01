@@ -11,6 +11,8 @@ export default function NewEventPage() {
   const [coupleName, setCoupleName] = useState('');
   const [date, setDate] = useState('');
   const [location, setLocation] = useState('');
+  const [church, setChurch] = useState('');
+  const [venue, setVenue] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -34,6 +36,8 @@ export default function NewEventPage() {
       couple_name: coupleName,
       date,
       location,
+      church: church || undefined,
+      venue: venue || undefined,
       brand: 'fotosposi',
     });
 
@@ -70,12 +74,30 @@ export default function NewEventPage() {
           />
         </div>
         <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.25rem' }}>Luogo</label>
+          <label style={{ display: 'block', marginBottom: '0.25rem' }}>Luogo (città)</label>
           <input
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             required
+            style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
+          />
+        </div>
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.25rem' }}>Cerimonia</label>
+          <input
+            type="text"
+            value={church}
+            onChange={(e) => setChurch(e.target.value)}
+            style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
+          />
+        </div>
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.25rem' }}>Ricevimento</label>
+          <input
+            type="text"
+            value={venue}
+            onChange={(e) => setVenue(e.target.value)}
             style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
           />
         </div>

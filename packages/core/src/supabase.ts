@@ -17,5 +17,6 @@ export function createServerSideClient(getAll: () => Promise<{ name: string; val
 
 export function createServiceClient() {
   const { createClient } = require('@supabase/supabase-js');
-  return createClient(supabaseUrl, supabaseServiceKey);
+  const key = supabaseServiceKey || supabaseAnonKey;
+  return createClient(supabaseUrl, key);
 }

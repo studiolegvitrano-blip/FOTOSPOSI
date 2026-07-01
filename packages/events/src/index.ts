@@ -7,6 +7,8 @@ export interface WeddingEvent {
   couple_name: string;
   date: string;
   location: string;
+  church?: string;
+  venue?: string;
   brand: 'fotosposi' | 'weddingmoments';
   tier: 'base' | 'premium' | 'destination';
   created_at: string;

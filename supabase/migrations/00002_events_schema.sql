@@ -43,6 +43,9 @@ CREATE POLICY "Users can read own event" ON events
     OR created_by = auth.uid()
   );
 
+CREATE POLICY "Users can create their own events" ON events
+  FOR INSERT WITH CHECK (created_by = auth.uid());
+
 CREATE POLICY "Users can read sub_events of their event" ON sub_events
   FOR SELECT USING (
     event_id IN (SELECT event_id FROM core_users WHERE id = auth.uid())

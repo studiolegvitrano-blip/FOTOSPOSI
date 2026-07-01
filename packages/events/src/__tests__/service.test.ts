@@ -44,6 +44,7 @@ function buildFailChain(errorMsg: string) {
 
 vi.mock('@fotosposi/core', () => ({
   createServiceClient: () => ({ from: mockFrom }),
+  createClient: () => ({ from: mockFrom }),
   calculateWindow: (date: string) => {
     const event = new Date(date);
     const opens = new Date(event);
