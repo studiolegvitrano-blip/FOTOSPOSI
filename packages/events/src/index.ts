@@ -35,9 +35,9 @@ export interface EventWindow {
 export function calculateWindow(eventDate: string): { opens_at: string; closes_at: string } {
   const event = new Date(eventDate);
   const opens = new Date(event);
-  opens.setDate(opens.getDate() - 9);
+  opens.setDate(opens.getDate() - 18);
   const closes = new Date(event);
-  closes.setDate(closes.getDate() + 1);
+  closes.setDate(closes.getDate() + 2);
   return {
     opens_at: opens.toISOString(),
     closes_at: closes.toISOString(),
