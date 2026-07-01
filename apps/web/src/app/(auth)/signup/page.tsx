@@ -18,9 +18,16 @@ export default function SignupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const { error: err } = await signUp(email, password, name);
+    const { data, error: err } = await signUp(email, password, name);
     if (err) {
       setError(err.message);
+    } else if (data?.user) {
+      await fetch('/api/auth/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: data.user.id, email, name }),
+      });
+      setSuccess(true);
     } else {
       setSuccess(true);
     }

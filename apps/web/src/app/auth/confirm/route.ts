@@ -22,12 +22,19 @@ export async function GET(request: NextRequest) {
       },
     );
 
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       type: type as any,
       token_hash: tokenHash,
     });
 
-    if (!error) {
+    if (!error && data?.user) {
+      const { createClient } = await import('@supabase/supabase-js');
+      const s = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+      await s.from('core_tenants').upsert({ id: data.user.id, brand: 'fotosposi', locale: 'it', name: 'Utente' }, { onConflict: 'id' });
+      const { data: existing } = await s.from('core_users').select('id').eq('id', data.user.id).maybeSingle();
+      if (!existing) {
+        await s.from('core_users').insert({ id: data.user.id, email: data.user.email!, name: data.user.user_metadata?.name || 'Utente', role: 'sposo', tenant_id: data.user.id });
+      }
       return NextResponse.redirect(new URL(next, request.url));
     }
   }
