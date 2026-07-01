@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { createQrToken, getCurrentUser } from '@fotosposi/core';
+import { getCurrentUser } from '@fotosposi/core';
 
 export default function QrPage() {
   const params = useParams();
@@ -16,17 +16,19 @@ export default function QrPage() {
     getCurrentUser().then(async ({ user }) => {
       if (!user) return;
 
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30);
-
-      const { token, error: err } = await createQrToken(eventId, 'invitato', expiresAt);
-      if (err || !token) {
-        setError(err ?? 'Errore generazione QR');
+      const res = await fetch('/api/auth/qr-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.token) {
+        setError(data.error ?? 'Errore generazione QR');
         return;
       }
 
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-      setQrUrl(`${baseUrl}/event/${token.token}`);
+      setQrUrl(`${baseUrl}/event/${data.token.token}`);
     });
   }, [eventId]);
 
