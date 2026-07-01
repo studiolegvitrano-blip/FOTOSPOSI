@@ -98,6 +98,9 @@
 - **Reel Riassunto** (modulo `commerce`): video AI (Claude + FFmpeg) con foto/giochi. Incluso in Deluxe per sposi. Anche invitati acquistano reel personalizzato (max 4 persone: loro + accompagnatore + citazione sposi). 49€
 - **Hashtag Generator** (modulo `site-builder`): AI (Claude) suggerisce hashtag basati su nomi sposi, tema, location — integrato nel sito-evento
 - **App & Sito** contenitore di tutte le funzionalità sopra (web app responsive + sito-evento pubblico)
+- **Navetta Ospiti** (modulo `site-builder`): sezione sito-evento con orari navetta, mappa parcheggi, contatti tassisti, matchmaking chi cerca/dà passaggio
+- **Vota il Vestito** (modulo `games`): durante ricevimento, ospiti votano vestito sposo e sposa — gioco veloce
+- **Tavolo Selfie** (modulo `media`): pagina web per chiosco selfie con filtri/logo WeddingMoments, upload diretto su Drive
 
 ## Log cronologico
 | Data | Modulo | Commit |
