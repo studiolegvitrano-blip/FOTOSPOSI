@@ -89,6 +89,11 @@
 - ~~**Deploy edge functions**: via CLI con nuovo PAT `sbp_d12...` — auth deployata ✅~~
 - **Configurare chiavi API mancanti**: Stripe, Resend, Claude, Gelato, Evolution
 
+### Idee backlog (Fase 6 in attesa)
+- **Sfide Addio al Celibato/Nubilato** (modulo `games`): testimoni creano/selezionano missioni per sposi, gadget shop collegati, completamento via WhatsApp
+- **Caccia alla Foto in Chiesa** (modulo `games`): ospiti si registrano con ruolo (amico/parente/collega/altro), amici ricevono compiti fotografici (foto con zia, padre sposa, single, pelato, ecc.), classifica punti
+- **Prima Notte di Sposi** (modulo `commerce`): amici possono regalare scherzi o "cose hot" dal nostro shop, integrato con lista nozze
+
 ## Log cronologico
 | Data | Modulo | Commit |
 |------|--------|--------|
