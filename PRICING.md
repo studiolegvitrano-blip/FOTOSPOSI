@@ -73,27 +73,70 @@ Amici, parenti, testimoni possono **acquistare il servizio in regalo** per la co
 | **PR / influencer micro** | 30-50€ | 5% | 50 clienti | 500 clienti |
 | **CAC medio ponderato** | **~12-18€** | | | |
 
-## PROIEZIONE 2 ANNI
+## PROIEZIONE 2 ANNI — MESE PER MESE
 
-### Anno 1 — Italia (pilota + UK test)
+> **Assunzioni**:
+> - **Geo mix anno 1**: 100% Italia (poi UK da mese 10)
+> - **Geo mix anno 2**: 30% IT, 25% UK, 20% US, 15% ES, 10% FR+DE
+> - **Tier mix**: 50% Sito Premium, 30% Servizio Premium, 20% Deluxe
+> - **Gift sales**: 10-15% dei clienti totali
+> - **ARPU medio**: 170€ anno 1, 220€ anno 2 (con extra + geo-pricing)
+> - **Stagionalità**: picco Mag-Set (matrimoni), calo Nov-Feb
 
-| Mese | Clienti nuovi | Ricorrenti | Ricavi mensili | CAC totale | Costi fissi | Netto |
-|:----:|:-------------:|:-----------:|:--------------:|:----------:|:-----------:|:-----:|
-| 1-3 | 30 | 0 | 4.500€ | 540€ | 200€ | 3.760€ |
-| 4-6 | 80 | 10 | 12.000€ | 1.440€ | 500€ | 10.060€ |
-| 7-9 | 150 | 30 | 22.500€ | 2.700€ | 800€ | 19.000€ |
-| 10-12 | 250 | 60 | 37.500€ | 4.500€ | 1.200€ | 31.800€ |
-| **Totale anno 1** | **510 clienti** | | **~275.000€** | **~9.180€** | **~8.100€** | **~258.000€** |
+### Anno 1 — Italia + UK pilot
 
-### Anno 2 — Globale (UK, USA, ES, FR, DE)
+| Mese | Clienti nuovi | Di cui GIFT | Ricavi diretti | Extra (domini/stampe/commissioni) | CAC | Costi fissi | **Netto mese** | Note |
+|:----:|:-------------:|:-----------:|:--------------:|:---------------------------------:|:---:|:-----------:|:--------------:|------|
+| **Gen** | 5 | 1 | 850€ | 50€ | 90€ | 100€ | **710€** | Lancio ufficiale, primi 5 clienti da passaparola |
+| **Feb** | 8 | 2 | 1.360€ | 100€ | 144€ | 100€ | **1.216€** | SEO inizia a portare, guide pubblicate |
+| **Mar** | 12 | 2 | 2.040€ | 150€ | 216€ | 150€ | **1.824€** | Picco prenotazioni matrimoniali |
+| **Apr** | 18 | 3 | 3.060€ | 200€ | 324€ | 200€ | **2.736€** | Wedding planner partnership parte |
+| **Mag** | 25 | 4 | 4.250€ | 300€ | 450€ | 300€ | **3.800€** | Primo picco matrimoni, casi studio reali |
+| **Giu** | 30 | 5 | 5.100€ | 400€ | 540€ | 400€ | **4.560€** | Passaparola + Instagram |
+| **Lug** | 35 | 5 | 5.950€ | 450€ | 630€ | 400€ | **5.370€** | Stagione alta |
+| **Ago** | 20 | 3 | 3.400€ | 250€ | 360€ | 300€ | **2.990€** | Caldo, meno ricerche |
+| **Set** | 40 | 6 | 6.800€ | 500€ | 720€ | 500€ | **6.080€** | Picco autunnale, UK test con 5 clienti |
+| **Ott** | 35 | 5 | 5.950€ | 500€ | 630€ | 500€ | **5.320€** | UK si aggiunge, ARPU sale |
+| **Nov** | 15 | 2 | 2.550€ | 200€ | 270€ | 300€ | **2.180€** | Bassa stagione, prepariamo US |
+| **Dic** | 10 | 2 | 1.700€ | 150€ | 180€ | 200€ | **1.470€** | Regali Natale, GIFT sales |
+| **Tot** | **253** | **40** | **~43.010€** | **~3.250€** | **~4.554€** | **~3.450€** | **~38.256€** | **Crescita organica** |
 
-| Mese | Clienti nuovi | Ricorrenti | Ricavi mensili | CAC totale | Costi fissi | Netto |
-|:----:|:-------------:|:-----------:|:--------------:|:----------:|:-----------:|:-----:|
-| 1-3 | 500 | 100 | 75.000€ | 9.000€ | 3.000€ | 63.000€ |
-| 4-6 | 1.200 | 300 | 180.000€ | 21.600€ | 5.000€ | 153.400€ |
-| 7-9 | 2.500 | 600 | 375.000€ | 45.000€ | 8.000€ | 322.000€ |
-| 10-12 | 4.000 | 1.200 | 600.000€ | 72.000€ | 12.000€ | 516.000€ |
-| **Totale anno 2** | **8.200 clienti** | | **~3.690.000€** | **~147.600€** | **~84.000€** | **~3.458.000€** |
+> **Nota**: Anno 1 volutamente contenuto (253 clienti). L'obiettivo non è il fatturato ma
+> **costruire autorità SEO, raccogliere casi studio, e perfezionare prodotto + onboarding**
+> prima di scalare. Ogni cliente è curato manualmente.
+
+### Anno 2 — Globale (UK, USA, ES, FR, DE + Italia)
+
+| Mese | Clienti | Di cui GIFT | Ricavi diretti | Extra | CAC | Costi fissi | **Netto mese** | Note |
+|:----:|:-------:|:-----------:|:--------------:|:-----:|:---:|:-----------:|:--------------:|------|
+| **Gen** | 100 | 15 | 22.000€ | 3.000€ | 1.800€ | 1.500€ | **21.700€** | USA parte, ARPU sale a 220€ |
+| **Feb** | 150 | 22 | 33.000€ | 4.500€ | 2.700€ | 2.000€ | **32.800€** | SEO globale inizia a posizionare |
+| **Mar** | 250 | 35 | 55.000€ | 7.000€ | 4.500€ | 3.000€ | **54.500€** | Picco prenotazioni UK+US |
+| **Apr** | 400 | 55 | 88.000€ | 10.000€ | 7.200€ | 4.000€ | **86.800€** | Spagna e Francia si aggiungono |
+| **Mag** | 600 | 80 | 132.000€ | 15.000€ | 10.800€ | 5.000€ | **131.200€** | Stagione alta globale |
+| **Giu** | 800 | 110 | 176.000€ | 20.000€ | 14.400€ | 6.000€ | **175.600€** | Picco, onboarding automatico al 90% |
+| **Lug** | 900 | 125 | 198.000€ | 22.000€ | 16.200€ | 7.000€ | **196.800€** | Germany si aggiunge |
+| **Ago** | 500 | 70 | 110.000€ | 12.000€ | 9.000€ | 5.000€ | **108.000€** | Calo estivo |
+| **Set** | 1.000 | 140 | 220.000€ | 25.000€ | 18.000€ | 8.000€ | **219.000€** | Picco autunnale mondiale |
+| **Ott** | 800 | 110 | 176.000€ | 20.000€ | 14.400€ | 7.000€ | **174.600€** | |
+| **Nov** | 400 | 55 | 88.000€ | 10.000€ | 7.200€ | 5.000€ | **85.800€** | |
+| **Dic** | 300 | 80 | 66.000€ | 8.000€ | 5.400€ | 4.000€ | **64.600€** | GIFT natalizi esplodono |
+| **Tot** | **6.200** | **897** | **~1.364.000€** | **~156.500€** | **~111.600€** | **~57.500€** | **~1.351.400€** | **Crescita esponenziale** |
+
+### Riepilogo annuale
+
+| KPI | Anno 1 | Anno 2 |
+|-----|:------:|:------:|
+| Clienti totali | 253 | 6.200 |
+| Ricavi diretti | 43.010€ | 1.364.000€ |
+| Extra (domini, stampe, commissioni) | 3.250€ | 156.500€ |
+| **Ricavi totali** | **~46.260€** | **~1.520.500€** |
+| CAC totale | 4.554€ | 111.600€ |
+| Costi fissi | 3.450€ | 57.500€ |
+| **Netto** | **~38.256€** | **~1.351.400€** |
+| ARPU medio | 183€ | 245€ |
+| Margine netto | 83% | 89% |
+| Run-rate (dicembre) | ~66.000€/anno | ~1.820.000€/anno |
 
 ## STRUTTURA COSTI
 
