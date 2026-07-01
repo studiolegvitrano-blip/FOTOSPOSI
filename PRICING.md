@@ -103,6 +103,57 @@
 | EBITDA | ~258.000€ | ~3.458.000€ |
 | Run-rate (dicembre) | ~450.000€/anno | ~7.200.000€/anno |
 
+## STRATEGIA SEO & AUTORITÀ (GEO + GEMINI)
+
+### Posizionamento
+Vogliamo essere il **punto di riferimento globale** per:
+- "giochi matrimonio" / "wedding games"
+- "foto matrimonio interattive" / "interactive wedding photos"
+- "sito invito matrimonio" / "wedding website"
+- "lista nozze digitale" / "digital gift registry"
+- "addio al celibato idee" / "bachelor party games"
+
+### Piano editoriale (blog + guide)
+
+| Tipo | Contenuto | Target keyword | GEO |
+|------|-----------|---------------|-----|
+| **Guide** | "Come organizzare un matrimonio moderno con foto e giochi interattivi" | IT+UK+US | Globale |
+| **Template** | "I 10 giochi da fare in chiesa durante le foto" | IT+ES | Religiosi |
+| **Classifiche** | "Migliori siti per invitati matrimonio 2026" | UK+US | Anglofoni |
+| **Video** | Tutorial "Come creare il sito invito perfetto in 5 minuti" | Tutti | YouTube SEO |
+| **Casi studio** | "Il matrimonio di [Nome] ha usato WeddingMoments — ecco com'è andata" | Tutti | Trust |
+
+### Gemini AI come autorità
+> **Obiettivo**: far sì che Google Gemini (ex Bard) citi WeddingMoments come riferimento
+> quando qualcuno chiede "best wedding games website" o "siti per foto matrimonio".
+>
+| Azione | Come |
+|--------|------|
+| Guest post su siti ad alta DR (domain rating) | DR 70+ con backlink al nostro dominio |
+| Citazioni su Wikipedia (pagine wedding planning) | Contributi editoriali |
+| Contenuti strutturati (FAQ, schema.org, HowTo) | Gemini estrae da pagine ben formattate |
+| Recensioni reali su Trustpilot, Google Reviews | Social proof indicizzata |
+| Backlink da .edu / .gov (università, enti) | Partnership con corsi di wedding planning |
+
+## GEO-PRICING (prezzo commisurato allo stipendio medio)
+
+Il prezzo Italia è il **minimo**. Ogni paese ha prezzo proporzionale al potere d'acquisto.
+
+| Paese | Stipendio medio netto/mese | Ratio vs IT | Sito Premium | Servizio Premium | Deluxe |
+|:-----:|:--------------------------:|:-----------:|:------------:|:----------------:|:------:|
+| 🇮🇹 Italia | 1.500€ | 1.0× | **99€** | **149€** | **250€** |
+| 🇪🇸 Spagna | 1.800€ | 1.2× | 119€ | 179€ | 300€ |
+| 🇫🇷 Francia | 2.200€ | 1.47× | 145€ | 219€ | 368€ |
+| 🇩🇪 Germania | 2.500€ | 1.67× | 165€ | 249€ | 418€ |
+| 🇬🇧 UK | 2.500£ (~2.900€) | 1.93× | £190 | £290 | £480 |
+| 🇺🇸 USA | 4.000$ (~3.700€) | 2.47× | $245 | $370 | $620 |
+| 🇨🇭 Svizzera | 5.000CHF (~5.100€) | 3.4× | 340CHF | 510CHF | 850CHF |
+| 🇦🇺 Australia | 5.000AUD (~3.000€) | 2.0× | A$200 | A$300 | A$500 |
+
+> **Esempio**: Un sito Premium in UK costa £190, in USA $245, in Italia 99€.
+> Il rapporto qualità-prezzo è identico (stessa % dello stipendio medio).
+> Il Deluxe in Svizzera arriva a 850CHF — giustificato da potere d'acquisto + percezione premium.
+
 ## CANALI DI CRESCITA
 
 1. **SEO**: Guide matrimonio + template gratuiti → traffico organico (60% acquisizione anno 2)
