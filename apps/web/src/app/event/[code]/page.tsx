@@ -5,9 +5,10 @@ import { useParams } from 'next/navigation';
 import { validateQrToken } from '@fotosposi/core';
 import { getEventById, getSubEvents } from '@fotosposi/events';
 import { getMediaByEvent } from '@fotosposi/media';
+import { getEventWindow } from '@fotosposi/events';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import type { WeddingEvent, SubEvent } from '@fotosposi/events';
+import type { WeddingEvent, SubEvent, EventWindow } from '@fotosposi/events';
 import type { MediaUpload } from '@fotosposi/media';
 
 export default function GuestEventPage() {
@@ -18,19 +19,22 @@ export default function GuestEventPage() {
   const [media, setMedia] = useState<MediaUpload[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [window, setWindow] = useState<EventWindow | null>(null);
   const [mode, setMode] = useState<'gallery' | 'live'>('gallery');
   const [slideIdx, setSlideIdx] = useState(0);
   const timerRef = useRef<NodeJS.Timeout>(undefined);
 
   const loadData = async (eventId: string) => {
-    const [e, s, m] = await Promise.all([
+    const [e, s, m, w] = await Promise.all([
       getEventById(eventId),
       getSubEvents(eventId),
       getMediaByEvent(eventId),
+      getEventWindow(eventId),
     ]);
     if (e.event) setEvent(e.event);
     if (s.subEvents) setSubEvents(s.subEvents);
     if (m.media) setMedia(m.media);
+    if (w.window) setWindow(w.window);
     setLoading(false);
   };
 
@@ -59,6 +63,8 @@ export default function GuestEventPage() {
   }, [mode, media.length]);
 
   const photos = media.filter(m => m.type === 'photo');
+  const now = new Date();
+  const canUpload = !window || (now >= new Date(window.opens_at) && now <= new Date(window.closes_at));
 
   if (loading) return <p className="text-center mt-8">Caricamento...</p>;
   if (error) return <main className="max-w-lg mx-auto mt-8 p-4 text-center"><h1 className="text-xl font-bold">{error}</h1></main>;
@@ -89,7 +95,9 @@ export default function GuestEventPage() {
               Live ({photos.length})
             </Button>
           )}
-          <Button variant="outline" asChild><a href={`/events/${event.id}/upload`}>Carica</a></Button>
+          {canUpload
+            ? <Button variant="outline" asChild><a href={`/events/${event.id}/upload`}>Carica</a></Button>
+            : <Button variant="outline" disabled>Carica (finestra chiusa)</Button>}
           <Button variant="outline" asChild><a href={`/events/${event.id}/games/jokes`}>Scherzi</a></Button>
           <Button variant="outline" asChild><a href={`/events/${event.id}/guestbook`}>Video</a></Button>
         </div>

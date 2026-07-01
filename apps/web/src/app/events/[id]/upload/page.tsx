@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { compressImage, uploadToStorage, createMediaRecord } from '@fotosposi/media';
 import { getCurrentUser } from '@fotosposi/core';
+import { getEventById, getEventWindow } from '@fotosposi/events';
 
 export default function UploadPage() {
   const params = useParams();
@@ -21,6 +22,25 @@ export default function UploadPage() {
 
     const { user } = await getCurrentUser();
     if (!user) { router.push('/login'); return; }
+
+    const { event } = await getEventById(eventId);
+    if (!event) { setProgress('Evento non trovato'); return; }
+
+    const isCreator = event.created_by === user.id;
+    if (!isCreator) {
+      const { window } = await getEventWindow(eventId);
+      if (window) {
+        const now = new Date();
+        if (now < new Date(window.opens_at)) {
+          setProgress('Il caricamento non è ancora disponibile. La finestra si apre ' + new Date(window.opens_at).toLocaleDateString('it-IT'));
+          return;
+        }
+        if (now > new Date(window.closes_at)) {
+          setProgress('Il periodo di caricamento è terminato (chiuso il ' + new Date(window.closes_at).toLocaleDateString('it-IT') + ')');
+          return;
+        }
+      }
+    }
 
     setUploading(true);
     let success = 0;
