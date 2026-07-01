@@ -86,7 +86,7 @@
 ### Prossime attività
 - **Admin marketplace**: UI per approvazione fornitori
 - **Drive sync automatico**: collegare syncToDrive al trigger upload
-- **Deploy edge functions**: via Dashboard Supabase (supabase link fallisce da questo PC)
+- ~~**Deploy edge functions**: via CLI con nuovo PAT `sbp_d12...` — auth deployata ✅~~
 - **Configurare chiavi API mancanti**: Stripe, Resend, Claude, Gelato, Evolution
 
 ## Log cronologico
@@ -115,3 +115,4 @@
 | 01/07/2026 | docs | a53eb25 — Aggiornato PROJECT_STATUS.md |
 | 01/07/2026 | feat | dee7bfb — Site-builder riscritto: invito moderno, sezioni toggle, ICS, Maps |
 | 01/07/2026 | feat | 92096fc — RSVP telefono/WhatsApp, allergeni, lucide icons |
+| 01/07/2026 | infra | (no commit) — Deploy edge function `auth` via Supabase CLI + nuovo PAT `sbp_d12...` |
