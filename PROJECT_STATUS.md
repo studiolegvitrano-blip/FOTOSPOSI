@@ -93,6 +93,8 @@
 - **Sfide Addio al Celibato/Nubilato** (modulo `games`): testimoni creano/selezionano missioni per sposi, gadget shop collegati, completamento via WhatsApp
 - **Caccia alla Foto in Chiesa** (modulo `games`): ospiti si registrano con ruolo (amico/parente/collega/altro), amici ricevono compiti fotografici (foto con zia, padre sposa, single, pelato, ecc.), classifica punti
 - **Prima Notte di Sposi** (modulo `commerce`): amici possono regalare scherzi o "cose hot" dal nostro shop, integrato con lista nozze
+- **Quiz sugli Sposi** (modulo `games`): domande tipo "chi ha detto ti amo per primo?", "quanti anni ha la sposa?" — punti e podio in tempo reale
+- **Time Capsule** (modulo `commerce/games`): ospiti lasciano messaggi rivelati al 1° anniversario. **Pricing**: 3 mesi 20€, 6 mesi 30€, 12 mesi 40€, 18 mesi 50€
 
 ## Log cronologico
 | Data | Modulo | Commit |
