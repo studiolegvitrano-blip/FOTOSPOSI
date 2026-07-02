@@ -1,4 +1,5 @@
 import { createClient } from '@fotosposi/core';
+import type { Tier } from '@fotosposi/core';
 import { calculateWindow } from './index';
 import type { WeddingEvent, SubEvent, EventWindow } from './index';
 
@@ -11,7 +12,7 @@ export async function createEvent(params: {
   church?: string;
   venue?: string;
   brand: 'fotosposi' | 'weddingmoments';
-  tier?: 'base' | 'premium' | 'destination';
+  tier?: Tier;
 }): Promise<{ event?: WeddingEvent; error?: string }> {
   const supabase = createClient();
 
@@ -26,7 +27,7 @@ export async function createEvent(params: {
       church: params.church,
       venue: params.venue,
       brand: params.brand,
-      tier: params.tier ?? 'base',
+      tier: params.tier ?? 'free',
     })
     .select()
     .single();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@fotosposi/core';
+import { ensureDriveFolders } from '@fotosposi/media';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -40,6 +41,20 @@ export async function GET(req: NextRequest) {
     drive_email: tokens.email || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'event_id' });
+
+  const { folders } = await ensureDriveFolders(tokens.access_token);
+  if (folders) {
+    for (const [name, folderId] of Object.entries(folders)) {
+      if (folderId) {
+        await supabase.from('event_drive_folders').upsert({
+          event_id: eventId,
+          folder_name: name,
+          folder_id: folderId,
+        }, { onConflict: 'event_id, folder_name' });
+      }
+    }
+    await supabase.from('event_drive_tokens').update({ drive_folder_id: folders.root || null }).eq('event_id', eventId);
+  }
 
   return NextResponse.redirect(new URL(`/events/${eventId}/drive?success=true`, req.url));
 }

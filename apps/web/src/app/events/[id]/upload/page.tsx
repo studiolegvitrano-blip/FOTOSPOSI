@@ -2,13 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { uploadToStorage, deleteFromStorage, createMediaRecord, updateDriveSyncStatus, getDriveToken, getEventDriveFolders, enqueueUpload, getPendingQueue, updateQueueItem, getQueueStats, compressImage, type QueueItem } from '@fotosposi/media';
+import { createMediaRecord, enqueueUpload, getPendingQueue, updateQueueItem, getQueueStats, type QueueItem } from '@fotosposi/media';
 import { getCurrentUser } from '@fotosposi/core';
 import { getEventById, getEventWindow } from '@fotosposi/events';
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://krgqyluuiltckmhbeuue.supabase.co';
-const QUEUE_DELAY_MS = 2000;
-const ADAPTIVE_DELAY = true;
 
 export default function UploadPage() {
   const params = useParams();
@@ -23,7 +19,7 @@ export default function UploadPage() {
   const [eventReady, setEventReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const pausedRef = useRef(false);
-  const processingRef = useRef(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   const loadQueue = useCallback(async () => {
     const { items } = await getPendingQueue(eventId);
@@ -33,9 +29,22 @@ export default function UploadPage() {
       setStats(s);
       if (items.some(i => i.status === 'pending' || i.status === 'failed')) {
         setPhase('processing');
+        return true;
+      }
+      if (s.synced + s.failed === s.pending + s.processing + s.synced + s.failed && s.synced + s.failed > 0) {
+        setPhase('idle');
       }
     }
+    return false;
   }, [eventId]);
+
+  const triggerServerProcessing = async () => {
+    await fetch('/api/r2/process-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId }),
+    });
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -55,129 +64,31 @@ export default function UploadPage() {
         }
       }
       setEventReady(true);
-      loadQueue();
+      const hasPending = await loadQueue();
+      if (hasPending) {
+        triggerServerProcessing();
+        pollRef.current = setInterval(async () => {
+          const stillPending = await loadQueue();
+          if (!stillPending) {
+            clearInterval(pollRef.current);
+          }
+        }, 3000);
+      }
     };
     init();
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [eventId, router, loadQueue]);
 
-  const processItem = useCallback(async (item: QueueItem) => {
-    await updateQueueItem(item.id, { status: 'processing' });
-    setQueue(prev => prev.map(i => i.id === item.id ? { ...i, status: 'processing' } : i));
-
-    const [{ token }, { folders }] = await Promise.all([
-      getDriveToken(eventId),
-      getEventDriveFolders(eventId),
-    ]);
-    const hasDrive = !!token?.access_token;
-
-    try {
-      const isVideo = item.file_type.startsWith('video/');
-      const ext = isVideo ? (item.file_name.split('.').pop() || 'mp4') : 'jpg';
-      const ts = Date.now();
-      const origPath = `${eventId}/orig_q_${item.id}_${ts}.${ext}`;
-      const thumbPath = `${eventId}/thumb_q_${item.id}_${ts}.${ext}`;
-
-      const fileUrl = `${SUPABASE_URL}/storage/v1/object/public/queue_buffer/${item.id}`;
-      const resp = await fetch(fileUrl);
-      if (!resp.ok) throw new Error('File temporaneo non trovato');
-      const fileBlob = await resp.blob();
-      const file = new File([fileBlob], item.file_name, { type: item.file_type });
-
-      const { url: origUrl, error: origError } = await uploadToStorage('media', origPath, file);
-      if (origError || !origUrl) throw new Error(origError || 'Upload su storage fallito');
-
-      const compressed = isVideo ? file : await compressImage(file);
-      await uploadToStorage('media', thumbPath, compressed);
-
-      const { media, error: recordError } = await createMediaRecord({
-        event_id: eventId,
-        uploaded_by: item.uploaded_by,
-        type: isVideo ? 'video' : 'photo',
-        url: thumbPath,
-      });
-      if (recordError || !media) throw new Error(recordError || 'Record media non creato');
-
-      await updateQueueItem(item.id, { storage_path: origPath, compressed_path: thumbPath });
-
-      if (hasDrive && folders) {
-        try {
-          const driveFolderId = isVideo ? (folders['Video'] || folders['root']) : (folders['Foto'] || folders['root']);
-
-          const fileRes = await fetch(origUrl);
-          const origBlob = await fileRes.blob();
-          if (origBlob.size < 1024) throw new Error('File corrotto');
-          const formData = new FormData();
-          formData.append('file', origBlob, item.file_name);
-          const metadata: Record<string, unknown> = { name: item.file_name };
-          if (driveFolderId) metadata.parents = [driveFolderId];
-          formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-
-          const driveRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id%2Csize', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token.access_token}` },
-            body: formData,
-          });
-          const driveData = await driveRes.json();
-          if (driveRes.ok && driveData.id) {
-            await updateDriveSyncStatus(media.id, 'synced', driveData.id);
-            await deleteFromStorage('media', origPath);
-            await updateQueueItem(item.id, { status: 'synced', drive_file_id: driveData.id, processed_at: new Date().toISOString() });
-          } else {
-            await updateDriveSyncStatus(media.id, 'failed');
-            await updateQueueItem(item.id, { status: 'synced', error: 'Drive sync fallito' });
-          }
-        } catch {
-          await updateDriveSyncStatus(media.id, 'failed');
-          await updateQueueItem(item.id, { status: 'synced', error: 'Drive sync fallito' });
-        }
-      } else {
-        await updateQueueItem(item.id, { status: 'synced', processed_at: new Date().toISOString() });
+  const startPolling = () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      const stillPending = await loadQueue();
+      if (!stillPending) {
+        clearInterval(pollRef.current);
+        pollRef.current = undefined;
       }
-
-      await deleteFromStorage('queue_buffer', item.id);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Errore';
-      await updateQueueItem(item.id, { status: 'failed', error: msg, retry_count: item.retry_count + 1 });
-    }
-
-    const s = await getQueueStats(eventId);
-    setStats(s);
-    setQueue(prev => prev.map(i => i.id === item.id ? { ...i, status: s.synced > 0 ? 'synced' : 'failed' } : i));
-  }, [eventId]);
-
-  const processQueueLoop = useCallback(async () => {
-    if (pausedRef.current || processingRef.current) return;
-    processingRef.current = true;
-
-    const { items } = await getPendingQueue(eventId);
-    const next = items?.find(i => i.status === 'pending' || i.status === 'failed');
-    if (!next) {
-      const s = await getQueueStats(eventId);
-      setStats(s);
-      setPhase(s.pending + s.processing > 0 ? 'processing' : 'idle');
-      processingRef.current = false;
-      return;
-    }
-
-    await processItem(next);
-    processingRef.current = false;
-
-    if (!pausedRef.current) {
-      const remaining = (await getPendingQueue(eventId)).items?.filter(i => i.status === 'pending' || i.status === 'failed') || [];
-      if (remaining.length > 0) {
-        const delay = ADAPTIVE_DELAY && next.file_size > 50 * 1024 * 1024 ? QUEUE_DELAY_MS * 2 : QUEUE_DELAY_MS;
-        setTimeout(() => processQueueLoop(), delay);
-      } else {
-        setPhase('idle');
-      }
-    }
-  }, [eventId, processItem]);
-
-  useEffect(() => {
-    if (phase === 'processing' && !paused && !pausedRef.current && !processingRef.current) {
-      processQueueLoop();
-    }
-  }, [phase, paused, processQueueLoop]);
+    }, 3000);
+  };
 
   const handleSelectFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files;
@@ -204,11 +115,29 @@ export default function UploadPage() {
       });
       if (error || !id) continue;
 
-      const { error: uploadError } = await uploadToStorage('queue_buffer', id, file);
-      if (uploadError) {
-        await updateQueueItem(id, { status: 'failed', error: uploadError });
+      const prefix = `events/${eventId}`;
+      const r2Resp = await fetch('/api/r2/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, contentType: file.type, prefix }),
+      });
+      const r2Data = await r2Resp.json();
+      if (!r2Resp.ok || !r2Data.presignedUrl) {
+        await updateQueueItem(id, { status: 'failed', error: r2Data.error || 'Presigned URL fallita' });
         continue;
       }
+
+      const uploadResp = await fetch(r2Data.presignedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      });
+      if (!uploadResp.ok) {
+        await updateQueueItem(id, { status: 'failed', error: 'Upload R2 fallito' });
+        continue;
+      }
+
+      await updateQueueItem(id, { r2_key: r2Data.key });
 
       queued++;
       setQueue(prev => [...prev, {
@@ -216,35 +145,27 @@ export default function UploadPage() {
         file_name: file.name, file_type: file.type, file_size: file.size,
         status: 'pending' as const,
         storage_path: null, compressed_path: null, drive_file_id: null,
-        error: null, retry_count: 0, created_at: new Date().toISOString(), processed_at: null,
+        error: null, retry_count: 0, created_at: new Date().toISOString(), processed_at: null, r2_key: r2Data.key,
       }]);
     }
 
     setStats(prev => ({ ...prev, pending: prev.pending + queued }));
     setPhase('processing');
     if (inputRef.current) inputRef.current.value = '';
-  };
 
-  const handlePause = () => {
-    pausedRef.current = true;
-    setPaused(true);
-  };
-
-  const handleResume = () => {
-    pausedRef.current = false;
-    setPaused(false);
-    if (phase === 'processing') processQueueLoop();
-    else setPhase('processing');
+    triggerServerProcessing();
+    startPolling();
   };
 
   if (!eventReady) return <main style={{ maxWidth: 600, margin: '2rem auto', padding: '0 1rem' }}><p>Caricamento...</p></main>;
+
+  const allDone = phase === 'idle' && (stats.synced + stats.failed) > 0 && stats.pending + stats.processing === 0;
 
   return (
     <main style={{ maxWidth: 700, margin: '2rem auto', padding: '0 1rem' }}>
       <h1 style={{ marginBottom: '0.5rem' }}>Carica foto e video</h1>
       <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '1.5rem' }}>
-        Seleziona tutti i file che vuoi. Verranno accodati ed elaborati uno alla volta.
-        Puoi chiudere la pagina e tornare più tardi — i file non andranno persi.
+        Seleziona tutti i file che vuoi. L'elaborazione continua anche se chiudi la pagina.
       </p>
 
       <div style={{ marginBottom: '1rem' }}>
@@ -254,7 +175,7 @@ export default function UploadPage() {
           multiple
           accept="image/*,video/*"
           onChange={handleSelectFiles}
-          disabled={phase === 'queueing' || (phase === 'processing' && !paused)}
+          disabled={phase === 'queueing' || phase === 'processing'}
           style={{ width: '100%', padding: '0.5rem' }}
         />
       </div>
@@ -291,30 +212,15 @@ export default function UploadPage() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-        {(phase === 'processing' || paused) && queue.some(i => i.status === 'pending' || i.status === 'failed') && (
-          paused
-            ? <button onClick={handleResume} style={{ padding: '0.5rem 1.5rem', cursor: 'pointer' }}>Riprendi</button>
-            : <button onClick={handlePause} style={{ padding: '0.5rem 1.5rem', cursor: 'pointer' }}>Metti in pausa</button>
-        )}
-      </div>
-
-      {paused && (
-        <p style={{ marginTop: '0.5rem', color: '#f90', fontSize: '0.9rem' }}>
-          ⏸ In pausa. I file rimanenti sono al sicuro nella coda: torna quando vuoi e premi "Riprendi".
-        </p>
-      )}
-
-      {phase === 'processing' && !paused && queue.some(i => i.status === 'processing') && (
+      {phase === 'processing' && (
         <p style={{ marginTop: '0.5rem', color: '#555', fontSize: '0.9rem' }}>
-          Elaborazione in corso... un file ogni {QUEUE_DELAY_MS / 1000} secondi per non sovraccaricare.{' '}
-          {ADAPTIVE_DELAY && 'I file più grandi vengono elaborati più lentamente.'}
+          Elaborazione lato server in corso... puoi chiudere la pagina e tornare dopo.
         </p>
       )}
 
-      {phase === 'idle' && stats.synced > 0 && (
+      {allDone && (
         <p style={{ marginTop: '0.5rem', color: '#090', fontSize: '0.9rem' }}>
-          Tutti i file sono stati elaborati! {stats.synced} completati{stats.failed > 0 ? `, ${stats.failed} con errori. Premi "Riprendi" per riprovare.` : '.'}
+          Tutti i file sono stati elaborati! {stats.synced} completati{stats.failed > 0 ? `, ${stats.failed} con errori.` : '.'}
         </p>
       )}
 

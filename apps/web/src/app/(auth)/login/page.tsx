@@ -3,12 +3,16 @@
 import { useState } from 'react';
 import { signIn } from '@fotosposi/core';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import LanguageSwitcher from '@/components/language-switcher';
 
 export default function LoginPage() {
+  const t = useTranslations('auth');
+  const c = useTranslations('common');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,35 +22,33 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     const { error: err } = await signIn(email, password);
-    if (err) {
-      setError(err.message);
-    } else {
-      router.push('/dashboard');
-    }
+    if (err) setError(t('error_invalid_credentials'));
+    else router.push('/dashboard');
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4">
+    <main className="min-h-screen flex items-center justify-center p-4 relative">
+      <div className="absolute top-4 right-4"><LanguageSwitcher /></div>
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl text-center">Accedi a FotoSposi</CardTitle>
+          <CardTitle className="text-xl text-center">{t('login_title')}</CardTitle>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Label htmlFor="email">{t('login_email_label')}</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('login_email_placeholder')} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Label htmlFor="password">{t('login_password_label')}</Label>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('login_password_placeholder')} required />
             </div>
             {error && <p className="text-sm text-error">{error}</p>}
           </CardContent>
           <CardFooter className="flex flex-col gap-3">
-            <Button type="submit" className="w-full">Accedi</Button>
+            <Button type="submit" className="w-full">{t('login_submit')}</Button>
             <p className="text-sm text-text-muted text-center">
-              Non hai un account? <a href="/signup" className="text-brand hover:underline">Registrati</a>
+              {t('login_no_account')} <a href="/signup" className="text-brand hover:underline">{t('login_signup_link')}</a>
             </p>
           </CardFooter>
         </form>

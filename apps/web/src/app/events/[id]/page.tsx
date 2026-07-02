@@ -5,6 +5,7 @@ import { getEventById, getSubEvents, getEventWindow } from '@fotosposi/events';
 import { getMediaByEvent } from '@fotosposi/media';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ShareButton } from '@fotosposi/ui';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -15,6 +16,8 @@ import type { MediaUpload } from '@fotosposi/media';
 export default function EventDetailPage() {
   const params = useParams();
   const eventId = params.id as string;
+  const t = useTranslations('events');
+  const c = useTranslations('common');
   const [event, setEvent] = useState<WeddingEvent | null>(null);
   const [subEvents, setSubEvents] = useState<SubEvent[]>([]);
   const [media, setMedia] = useState<MediaUpload[]>([]);
@@ -37,8 +40,8 @@ export default function EventDetailPage() {
     });
   }, [eventId]);
 
-  if (loading) return <p className="text-center mt-8">Caricamento...</p>;
-  if (!event) return <p className="text-center mt-8">Evento non trovato</p>;
+  if (loading) return <p className="text-center mt-8">{c('loading')}</p>;
+  if (!event) return <p className="text-center mt-8">{c('no_results')}</p>;
 
   return (
     <main className="max-w-4xl mx-auto p-4 space-y-6">
@@ -46,7 +49,7 @@ export default function EventDetailPage() {
         <div>
           <h1 className="text-2xl font-bold">{event.couple_name}</h1>
           <p className="text-text-muted">
-            {new Date(event.date).toLocaleDateString('it-IT')} — {event.location}
+            {new Date(event.date).toLocaleDateString()} — {event.location}
           </p>
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-text-muted mt-1">
             {event.church && (
@@ -63,37 +66,39 @@ export default function EventDetailPage() {
           <Badge variant={event.tier === 'premium' ? 'default' : 'secondary'}>{event.tier}</Badge>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="default" asChild><Link href={`/events/${eventId}/upload`}>Carica foto</Link></Button>
-          <Button variant="secondary" asChild><Link href={`/events/${eventId}/games`}>Giochi</Link></Button>
-          <Button variant="secondary" asChild><Link href={`/events/${eventId}/shop`}>Shop</Link></Button>
-          <Button variant="secondary" asChild><Link href={`/events/${eventId}/gift`}>Lista nozze</Link></Button>
-          <Button variant="outline" asChild><Link href={`/events/${eventId}/guestbook`}>Video</Link></Button>
-          <Button variant="outline" asChild><Link href={`/events/${eventId}/notifications`}>Notifiche</Link></Button>
-          <Button variant="outline" asChild><Link href={`/events/${eventId}/concierge`}>Concierge</Link></Button>
-          <Button variant="outline" asChild><Link href={`/events/${eventId}/privacy`}>Privacy</Link></Button>
-          <Button variant="outline" asChild><Link href={`/events/${eventId}/drive`}>Drive</Link></Button>
-          <Button variant="outline" asChild><Link href={`/events/${eventId}/site-builder`}>Sito evento</Link></Button>
-          <Button variant="outline" asChild><Link href={`/events/${eventId}/capsule`}>Capsula</Link></Button>
-          <Button variant="outline" asChild><Link href={`/events/${eventId}/diary`}>Diario</Link></Button>
-          <Button variant="outline" asChild><Link href={`/events/${eventId}/qr`}>QR</Link></Button>
+          <Button variant="default" asChild><Link href={`/events/${eventId}/upload`}>{c('upload')}</Link></Button>
+          <Button variant="secondary" asChild><Link href={`/events/${eventId}/games`}>{t('games')}</Link></Button>
+          <Button variant="secondary" asChild><Link href={`/events/${eventId}/shop`}>{t('shop')}</Link></Button>
+          <Button variant="secondary" asChild><Link href={`/events/${eventId}/gift`}>{t('gift_registry')}</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/guestbook`}>{t('guestbook')}</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/notifications`}>{t('notifications')}</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/concierge`}>{t('concierge')}</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/privacy`}>{t('privacy')}</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/drive`}>{t('drive')}</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/site-builder`}>{t('site_builder')}</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/wall`}>{t('wall')}</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/video-challenges`}>{t('video_challenges')}</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/wow-walk`}>{t('wow_walk')}</Link></Button>
+          <Button variant="outline" asChild><Link href={`/kiosk/${event.code || eventId}`}>{t('kiosk')}</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/qr`}>{t('qr_code')}</Link></Button>
         </div>
       </div>
 
       {evtWindow && (
         <Card className="bg-muted">
           <CardContent className="py-3 text-sm">
-            Finestra di accesso: {new Date(evtWindow.opens_at).toLocaleDateString('it-IT')} — {new Date(evtWindow.closes_at).toLocaleDateString('it-IT')}
+            {new Date(evtWindow.opens_at).toLocaleDateString()} — {new Date(evtWindow.closes_at).toLocaleDateString()}
           </CardContent>
         </Card>
       )}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Galleria ({media.length})</CardTitle>
+          <CardTitle>{c('gallery')} ({media.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {media.length === 0 ? (
-            <p className="text-text-muted">Nessuna foto ancora</p>
+            <p className="text-text-muted">{c('no_results')}</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
               {media.slice(0, 12).map((m) => (
@@ -109,17 +114,17 @@ export default function EventDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Sotto-eventi</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t('subtitle')}</CardTitle></CardHeader>
         <CardContent>
           {subEvents.length === 0 ? (
-            <p className="text-text-muted">Nessun sotto-evento ancora</p>
+            <p className="text-text-muted">{c('no_results')}</p>
           ) : (
             <div className="space-y-2">
               {subEvents.map((s) => (
                 <div key={s.id} className="flex items-center justify-between p-2 rounded-md border border-border">
                   <div>
                     <p className="font-medium">{s.title}</p>
-                    <p className="text-sm text-text-muted">{new Date(s.date).toLocaleDateString('it-IT')}</p>
+                    <p className="text-sm text-text-muted">{new Date(s.date).toLocaleDateString()}</p>
                   </div>
                   <Badge variant="outline">{s.type}</Badge>
                 </div>
@@ -132,9 +137,9 @@ export default function EventDetailPage() {
       <div className="flex items-center gap-4">
         <ShareButton
           eventUrl={typeof globalThis !== 'undefined' ? globalThis.location?.href ?? '' : ''}
-          title={`Evento ${event.couple_name} - FotoSposi`}
+          title={event.couple_name}
         />
-        <Button variant="link" asChild><Link href="/dashboard">← Dashboard</Link></Button>
+        <Button variant="link" asChild><Link href="/dashboard">{c('back')}</Link></Button>
       </div>
     </main>
   );

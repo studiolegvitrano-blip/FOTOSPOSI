@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { validateQrToken } from '@fotosposi/core';
 import { getEventById, getSubEvents } from '@fotosposi/events';
@@ -10,6 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { WeddingEvent, SubEvent, EventWindow } from '@fotosposi/events';
 import type { MediaUpload } from '@fotosposi/media';
+
+function makeHashtag(name: string): string {
+  return '#' + name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() + 'sposi';
+}
 
 export default function GuestEventPage() {
   const params = useParams();
@@ -62,6 +66,37 @@ export default function GuestEventPage() {
     }
   }, [mode, media.length]);
 
+  const [shareLoading, setShareLoading] = useState<string | null>(null);
+
+  const handleShare = useCallback(async (mediaId: string, coupleName: string, brand: string) => {
+    if (!event) return;
+    const hashtag = makeHashtag(coupleName);
+    const appTag = brand === 'fotosposi' ? '@fotosposi' : '@weddingmoments';
+    const shareText = `Che meraviglia! 💍 ${coupleName}\n\n${hashtag} ${appTag}`;
+
+    setShareLoading(mediaId);
+    try {
+      const resp = await fetch(`/api/photos/${mediaId}/share?eventId=${event.id}&format=story`);
+      if (!resp.ok) throw new Error('share failed');
+      const blob = await resp.blob();
+      const file = new File([blob], 'photo_story.jpg', { type: 'image/jpeg' });
+
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], text: shareText });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'photo_story.jpg'; a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      const url = `/api/photos/${mediaId}/share?eventId=${event.id}&format=story`;
+      const a = document.createElement('a');
+      a.href = url; a.download = 'photo_story.jpg'; a.click();
+    }
+    setShareLoading(null);
+  }, [event]);
+
   const photos = media.filter(m => m.type === 'photo');
   const now = new Date();
   const canUpload = !window || (now >= new Date(window.opens_at) && now <= new Date(window.closes_at));
@@ -104,12 +139,33 @@ export default function GuestEventPage() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
           {media.map((m) => (
-            <Card key={m.id} className="overflow-hidden">
+            <Card key={m.id} className="overflow-hidden group relative">
               <CardContent className="p-1">
                 {m.type === 'photo'
                   ? <img src={m.url} alt="" className="w-full h-36 object-cover rounded" />
                   : <video src={m.url} className="w-full h-36 object-cover rounded" controls />}
               </CardContent>
+              {m.type === 'photo' && (
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                  <button
+                    onClick={() => handleShare(m.id, event.couple_name, event.brand)}
+                    disabled={shareLoading === m.id}
+                    className="bg-white/90 text-sm px-2 py-1.5 rounded hover:bg-white flex items-center gap-1 disabled:opacity-50"
+                    title="Condividi su Instagram, Facebook, WhatsApp"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    <span className="text-xs">{shareLoading === m.id ? '...' : 'Condividi'}</span>
+                  </button>
+                  <a
+                    href={`/api/photos/${m.id}/share?eventId=${event.id}&format=square`}
+                    download
+                    className="bg-white/90 text-sm px-2 py-1.5 rounded hover:bg-white"
+                    title="Scarica foto"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  </a>
+                </div>
+              )}
             </Card>
           ))}
           {media.length === 0 && (

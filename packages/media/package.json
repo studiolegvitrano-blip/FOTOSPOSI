@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@fotosposi/core": "*",
-    "@fotosposi/events": "*"
+    "@fotosposi/events": "*",
+    "@fotosposi/r2-storage": "*"
   },
   "devDependencies": {
     "typescript": "^5.8.0"

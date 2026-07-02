@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { createClient } from '@fotosposi/core';
 import { getCategories, getLeaderboard } from '@fotosposi/games';
 import type { GameCategory } from '@fotosposi/games';
 
@@ -25,15 +26,25 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     if (!activeCategory) return;
-    const interval = setInterval(() => {
-      getLeaderboard(eventId, activeCategory).then((r) => {
-        if (r.leaderboard) setLeaderboard(r.leaderboard);
-      });
-    }, 5000);
+    const supabase = createClient();
+
     getLeaderboard(eventId, activeCategory).then((r) => {
       if (r.leaderboard) setLeaderboard(r.leaderboard);
     });
-    return () => clearInterval(interval);
+
+    const channel = supabase
+      .channel(`leaderboard-${eventId}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'votes', filter: `event_id=eq.${eventId}` },
+        () => {
+          getLeaderboard(eventId, activeCategory).then((r) => {
+            if (r.leaderboard) setLeaderboard(r.leaderboard);
+          });
+        },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [eventId, activeCategory]);
 
   const maxVotes = leaderboard.length > 0 ? leaderboard[0]!.votes : 1;
@@ -110,7 +121,7 @@ export default function LeaderboardPage() {
       )}
 
       <p style={{ marginTop: '2rem', color: '#999', textAlign: 'center', fontSize: '0.9rem' }}>
-        Classifica live — si aggiorna ogni 5 secondi
+        Classifica live — aggiornata in tempo reale
       </p>
 
       <p style={{ marginTop: '1rem' }}>

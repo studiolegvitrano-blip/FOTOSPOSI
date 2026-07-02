@@ -1,44 +1,37 @@
 # PRICING — FotoSposi / WeddingMoments
 
-## Tier
+## Tier (prezzi Italia)
 
-| Servizio | Sito Premium | Servizio Premium | Deluxe |
-|----------|:------------:|:----------------:|:------:|
-| **Prezzo** | **99€** | **149€** | **250€** |
-| Sito invito digitale | ✅ | ✅ | ✅ |
-| Dominio personalizzato | ✅ (50€ a parte) | ✅ (50€ a parte) | ✅ (50€ a parte) |
-| App foto illimitate | 100 foto | ✅ | ✅ |
-| Drive backup | ❌ | ✅ | ✅ |
-| Giochi / Wall / Scherzi | ❌ | ✅ | ✅ |
-| Video guestbook | ❌ | ❌ | ✅ |
-| Shop / Lista nozze | ❌ | ✅ (commissione 3%) | ✅ (0%) |
-| Stampa foto (Gelato) | ❌ | Prezzo pieno | -20% |
-| Concierge AI | ❌ | ❌ | ✅ |
+| Servizio | Free | Premium | Deluxe |
+|----------|:----:|:-------:|:------:|
+| **Prezzo** | **€0** | **229€** | **375€** |
+| Sito invito digitale | base (3 sezioni) | completo (12 sezioni) | completo |
+| Dominio personalizzato | ❌ | ✅ incluso | ✅ incluso |
+| Upload invitati | solo finestra | illimitato | illimitato |
+| Drive backup | ✅ | ✅ | ✅ |
+| Wall / Voto foto | ✅ | ✅ | ✅ |
+| Watermark logo | sempre | sempre | sempre |
+| Caccia alla Foto / Quiz / Dress Vote | ❌ | ✅ | ✅ |
+| Video Guestbook | ❌ | ✅ | ✅ |
+| Photo Overlay / Wedding Wrapped | ❌ | ✅ | ✅ |
+| AI Concierge | ❌ | ❌ | ✅ |
+| Kiosk Selfie / Wow Walk / Video Challenges | ❌ | ❌ | ✅ |
+| Reel Riassunto AI | ❌ | ❌ | ✅ |
+| Time Capsule | ❌ | extra 15€/6mesi | ✅ inclusa 6mesi (poi 12€/6mesi) |
+| App Mobile (Android + iOS) brandizzata sposi | ❌ | +60€ extra | ✅ |
+| Gelato (stampe) | ❌ | prezzo pieno | -20% |
 
-## GIFT: Regala agli sposi
+## Time Capsule (extra)
 
-Amici, parenti, testimoni possono **acquistare il servizio in regalo** per la coppia.
+| Chi | Prezzo |
+|-----|--------|
+| Sposi (Deluxe) | ✅ inclusa 6 mesi, poi 12€/6 mesi |
+| Sposi (Premium) | 15€/6 mesi |
+| Invitati | 15€/6 mesi |
 
-| GIFT | Prezzo | Cosa riceve la coppia |
-|------|--------|-----------------------|
-| **Gift Sito Premium** | 99€ | Sito invito digitale completo |
-| **Gift Servizio Premium** | 149€ | Tutto il pacchetto Premium |
-| **Gift Deluxe** | 250€ | Esperienza completa |
-| **Gift personalizzato** | Importo libero | La coppia sceglie il tier |
+## Coupon & Offerte
 
-**Flusso**: amico acquista → inserisce email sposi → sposi ricevono email con codice gift → lo riscattano in fase di registrazione -> noi guadagniamo subito.
-
-> **Vantaggio**: il gift trasforma un "vorrei ma non so cosa regalare" in una vendita certa.
-> Ottimo per wedding planner che consigliano il servizio agli invitati.
-
-## Extras
-
-| Extra | Prezzo |
-|-------|--------|
-| Dominio personalizzato | 50€ (costo ~10€) |
-| Stampe foto (via Gelato) | costo + margine 20-30% |
-| Commissione lista nozze | 3-5% su ogni transazione |
-| Partner (hotel, viaggi) | 5-10% referral fee |
+Sconti e promozioni via coupon su Time Capsule e altri extra.
 
 ---
 
@@ -52,14 +45,14 @@ Amici, parenti, testimoni possono **acquistare il servizio in regalo** per la co
 - **TAM**: coppie under 40 con budget digitale (25% del totale) — ~30M/anno globali
 - **SAM**: coppie che acquistano servizi digitali >100€ — ~6M/anno
 
-## OFFERTA (3 tier)
+## OFFERTA (3 tier + extra)
 
-| Tier | Prezzo | Target |
-|------|--------|--------|
-| **Sito Premium** | 99€ | Budget, solo invito digitale |
-| **Servizio Premium** | 149€ | Full experience (giochi, shop, backup) |
-| **Deluxe** | 250€ | Tutto incluso + concierge AI + stampa scontata |
-| **Extra** (domini, stampe, commissioni) | 20-200€ | Upselling |
+| Tier | Prezzo IT | Target |
+|------|:---------:|--------|
+| **Free** | €0 | Base, upload foto, voto wall |
+| **Premium** | **229€** | Giochi, guestbook, overlay, sito completo |
+| **Deluxe** | 375€ | Tutto + concierge, kiosk, wow walk, video challenges, reel |
+| **Extra** (Time Capsule, coupon) | 15-29€ | Upselling singolo |
 
 ## COSTO DI ACQUISIZIONE (CAC) PER CANALE
 
@@ -78,9 +71,11 @@ Amici, parenti, testimoni possono **acquistare il servizio in regalo** per la co
 > **Assunzioni**:
 > - **Geo mix anno 1**: 100% Italia (poi UK da mese 10)
 > - **Geo mix anno 2**: 30% IT, 25% UK, 20% US, 15% ES, 10% FR+DE
-> - **Tier mix**: 50% Sito Premium, 30% Servizio Premium, 20% Deluxe
-> - **Gift sales**: 10-15% dei clienti totali
-> - **ARPU medio**: 170€ anno 1, 220€ anno 2 (con extra + geo-pricing)
+> - **Tier mix**: 80% Free (€0, non converte), 15% Premium (229€), 5% Deluxe (375€)
+> - **Tier mix convertiti** (su chi paga): 75% Premium, 25% Deluxe
+> - **Gift sales**: 10-15% dei clienti paganti
+> - **ARPU medio (solo paganti)**: 229×75% + 375×25% = **266€** anno 1
+> - **ARPU medio (tutti utenti)**: ~53€ anno 1 (conversione 20%)
 > - **Stagionalità**: picco Mag-Set (matrimoni), calo Nov-Feb
 
 ### Anno 1 — Italia + UK pilot
@@ -99,7 +94,7 @@ Amici, parenti, testimoni possono **acquistare il servizio in regalo** per la co
 | **Ott** | 35 | 5 | 5.950€ | 500€ | 630€ | 500€ | **5.320€** | UK si aggiunge, ARPU sale |
 | **Nov** | 15 | 2 | 2.550€ | 200€ | 270€ | 300€ | **2.180€** | Bassa stagione, prepariamo US |
 | **Dic** | 10 | 2 | 1.700€ | 150€ | 180€ | 200€ | **1.470€** | Regali Natale, GIFT sales |
-| **Tot** | **253** | **40** | **~43.010€** | **~3.250€** | **~4.554€** | **~3.450€** | **~38.256€** | **Crescita organica** |
+| **Tot** | **253** | **40** | **~87.000€** | **~5.000€** | **~4.554€** | **~3.450€** | **~84.000€** | **Crescita organica** |
 
 > **Nota**: Anno 1 volutamente contenuto (253 clienti). L'obiettivo non è il fatturato ma
 > **costruire autorità SEO, raccogliere casi studio, e perfezionare prodotto + onboarding**
@@ -107,13 +102,14 @@ Amici, parenti, testimoni possono **acquistare il servizio in regalo** per la co
 
 ### Anno 2 — Globale (UK, USA, ES, FR, DE + Italia)
 
-> **ARPU calcolato con geo-pricing**:
-> - IT (30%): 50%×99 + 30%×149 + 20%×250 = **144€** base + 30€ extra = 174€
-> - UK (25%): 50%×£190 + 30%×£290 + 20%×£480 = **£281** (~330€) + 50€ extra = **380€**
-> - US (20%): 50%×$245 + 30%×$370 + 20%×$620 = **$368** (~340€) + 60€ extra = **400€**
-> - ES (15%): 50%×119 + 30%×179 + 20%×300 = **171€** + 25€ extra = **196€**
-> - FR+DE (10%): 50%×155 + 30%×229 + 20%×393 = **216€** + 35€ extra = **251€**
-> - **Weighted avg ARPU**: ~**320€/cliente**
+> **ARPU calcolato con geo-pricing** (su clienti paganti, tier mix 75% Premium + 25% Deluxe):
+> - IT (30%): 75%×229 + 25%×375 = **266€** base + 30€ extra = **296€**
+> - UK (25%): 75%×£486 + 25%×£796 = **£564** (~667€) + 50€ extra = **717€**
+> - US (20%): 75%×$622 + 25%×$1,019 = **$721** (~667€) + 60€ extra = **727€**
+> - ES (15%): 75%×275 + 25%×450 = **319€** + 25€ extra = **344€**
+> - FR+DE (10%): 75%×360 + 25%×589 = **417€** + 35€ extra = **452€**
+> - **Weighted avg ARPU (paganti)**: ~**555€/cliente**
+> - **Weighted avg ARPU (tutti, 80% free)**: ~**111€/cliente**
 
 | Mese | Clienti | Di cui GIFT | Ricavi diretti | Extra | CAC | Costi fissi | **Netto mese** | Note |
 |:----:|:-------:|:-----------:|:--------------:|:-----:|:---:|:-----------:|:--------------:|------|
@@ -129,22 +125,22 @@ Amici, parenti, testimoni possono **acquistare il servizio in regalo** per la co
 | **Ott** | 1.100 | 165 | 352.000€ | 44.000€ | 19.800€ | 7.000€ | **369.200€** | |
 | **Nov** | 600 | 90 | 192.000€ | 24.000€ | 10.800€ | 5.000€ | **200.200€** | |
 | **Dic** | 500 | 150 | 160.000€ | 20.000€ | 9.000€ | 4.000€ | **167.000€** | GIFT (30% del mese) |
-| **Tot** | **9.800** | **1.540** | **~3.136.000€** | **~392.000€** | **~176.400€** | **~66.000€** | **~3.285.600€** | **ARPU 320€** |
+| **Tot** | **9.800** | **1.540** | **~5.438.000€** | **~680.000€** | **~176.400€** | **~66.000€** | **~5.876.000€** | **ARPU 555€** |
 
 ### Riepilogo annuale
 
 | KPI | Anno 1 | Anno 2 |
 |-----|:------:|:------:|
 | Clienti totali | 253 | 9.800 |
-| Ricavi diretti | 43.010€ | 3.136.000€ |
-| Extra (domini, stampe, commissioni gift) | 3.250€ | 392.000€ |
-| **Ricavi totali** | **~46.260€** | **~3.528.000€** |
+| Ricavi diretti | 87.000€ | 5.438.000€ |
+| Extra (domini, stampe, commissioni gift) | 5.000€ | 680.000€ |
+| **Ricavi totali** | **~92.000€** | **~6.118.000€** |
 | CAC totale | 4.554€ | 176.400€ |
 | Costi fissi | 3.450€ | 66.000€ |
-| **Netto** | **~38.256€** | **~3.285.600€** |
-| ARPU medio ponderato | 183€ | 320€ |
-| Margine netto | 83% | 93% |
-| Run-rate (dicembre) | ~66.000€/anno | ~2.000.000€/anno |
+| **Netto** | **~84.000€** | **~5.876.000€** |
+| ARPU medio ponderato | 364€ | 624€ |
+| Margine netto | 91% | 96% |
+| Run-rate (dicembre) | ~120.000€/anno | ~8.000.000€/anno |
 
 ## STRUTTURA COSTI
 
@@ -162,13 +158,13 @@ Amici, parenti, testimoni possono **acquistare il servizio in regalo** per la co
 | KPI | Anno 1 | Anno 2 |
 |-----|:------:|:------:|
 | Clienti totali | 510 | 8.710 |
-| ARPU medio | ~135€ | ~135€ |
-| LTV medio | ~180€ | ~200€ |
+| ARPU medio | ~180€ | ~230€ |
+| LTV medio | ~240€ | ~350€ |
 | CAC medio | ~18€ | ~18€ |
-| **Rapporto LTV:CAC** | **10:1** | **11:1** |
-| Margine lordo | 92% | 91% |
-| EBITDA | ~258.000€ | ~3.458.000€ |
-| Run-rate (dicembre) | ~450.000€/anno | ~7.200.000€/anno |
+| **Rapporto LTV:CAC** | **13:1** | **19:1** |
+| Margine lordo | 94% | 95% |
+| EBITDA | ~335.000€ | ~4.500.000€ |
+| Run-rate (dicembre) | ~720.000€/anno | ~10.000.000€/anno |
 
 ## STRATEGIA SEO & AUTORITÀ (GEO + GEMINI)
 
@@ -232,21 +228,38 @@ Ogni paese parla la **propria lingua**, con **tono professionale** (mai slang, m
 
 Il prezzo Italia è il **minimo**. Ogni paese ha prezzo proporzionale al potere d'acquisto.
 
-| Paese | Stipendio medio netto/mese | Ratio vs IT | Sito Premium | Servizio Premium | Deluxe |
-|:-----:|:--------------------------:|:-----------:|:------------:|:----------------:|:------:|
-| 🇮🇹 Italia | 1.500€ | 1.0× | **99€** | **149€** | **250€** |
-| 🇪🇸 Spagna | 1.800€ | 1.2× | 119€ | 179€ | 300€ |
-| 🇫🇷 Francia | 2.200€ | 1.47× | 145€ | 219€ | 368€ |
-| 🇩🇪 Germania | 2.500€ | 1.67× | 165€ | 249€ | 418€ |
-| 🇬🇧 UK | 2.500£ (~2.900€) | 1.93× | £190 | £290 | £480 |
-| 🇺🇸 USA | 4.000$ (~3.700€) | 2.47× | $245 | $370 | $620 |
-| 🇨🇭 Svizzera | 5.000CHF (~5.100€) | 3.4× | 340CHF | 510CHF | 850CHF |
-| 🇦🇺 Australia | 5.000AUD (~3.000€) | 2.0× | **A$200** | **A$300** | **A$500** |
-| 🇨🇦 Canada | 4.500CAD (~3.000€) | 2.0× | **C$200** | **C$300** | **C$500** |
+| Paese | Stipendio medio netto/mese | Ratio vs IT | Free | Premium | Deluxe |
+|:-----:|:--------------------------:|:-----------:|:----:|:-------:|:------:|
+| 🇮🇹 Italia | 1.500€ | 1.0× | **€0** | **229€** | **375€** |
+| 🇪🇸 Spagna | 1.800€ | 1.2× | €0 | 275€ | 450€ |
+| 🇫🇷 Francia | 2.200€ | 1.47× | €0 | 337€ | 551€ |
+| 🇩🇪 Germania | 2.500€ | 1.67× | €0 | 382€ | 626€ |
+| 🇬🇧 UK | 2.500£ (~2.900€) | 1.93× (+10%) | £0 | **£486** | **£796** |
+| 🇺🇸 USA | 4.000$ (~3.700€) | 2.47× (+10%) | $0 | **$622** | **$1,019** |
+| 🇨🇭 Svizzera | 5.000CHF (~5.100€) | 3.4× (+10%) | CHF 0 | **CHF 857** | **CHF 1,403** |
+| 🇦🇺 Australia | 5.000AUD (~3.000€) | 2.0× (+10%) | A$0 | **A$504** | **A$825** |
+| 🇨🇦 Canada | 4.500CAD (~3.000€) | 2.0× (+10%) | C$0 | **C$504** | **C$825** |
 
-> **Esempio**: Un sito Premium in UK costa £190, in USA $245, in Italia 99€.
+### Time Capsule — Geo-pricing
+
+Base Italia: Premium 15€/6 mesi — Deluxe 12€/6 mesi  
+Per i paesi con ratio > 1.9× (UK, USA, CH, AU, CA) si applica **+10%** sul prezzo ratio.
+
+| Paese | Ratio | Premium (base 15€) | Deluxe (base 12€) | Invitati |
+|:-----:|:-----:|:------------------:|:-----------------:|:--------:|
+| 🇮🇹 IT | 1.0× | **15€** | **12€** | **15€** |
+| 🇪🇸 ES | 1.2× | 18€ | 14€ | 18€ |
+| 🇫🇷 FR | 1.47× | 22€ | 18€ | 22€ |
+| 🇩🇪 DE | 1.67× | 25€ | 20€ | 25€ |
+| 🇬🇧 UK | 1.93× (+10%) | **£32** | **£25** | **£32** |
+| 🇺🇸 US | 2.47× (+10%) | **$41** | **$33** | **$41** |
+| 🇨🇭 CH | 3.4× (+10%) | **CHF 56** | **CHF 45** | **CHF 56** |
+| 🇦🇺 AU | 2.0× (+10%) | **A$33** | **A$26** | **A$33** |
+| 🇨🇦 CA | 2.0× (+10%) | **C$33** | **C$26** | **C$33** |
+
+> **Esempio**: Un sito Premium in Italia costa 229€, in UK £486, in USA $622.
 > Il rapporto qualità-prezzo è identico (stessa % dello stipendio medio).
-> Il Deluxe in Svizzera arriva a 850CHF — giustificato da potere d'acquisto + percezione premium.
+> Il Deluxe in Svizzera arriva a 1.403CHF — giustificato da potere d'acquisto + percezione premium.
 
 ## CANALI DI CRESCITA
 
@@ -260,8 +273,8 @@ Il prezzo Italia è il **minimo**. Ogni paese ha prezzo proporzionale al potere 
 
 | Anno | Clienti | Ricavi | Costi | Netto |
 |:----:|:-------:|:------:|:-----:|:-----:|
-| 1 | 255 | 137.500€ | 18.000€ | 119.500€ |
-| 2 | 4.100 | 1.845.000€ | 250.000€ | 1.595.000€ |
+| 1 | 255 | 230.000€ | 18.000€ | 212.000€ |
+| 2 | 4.100 | 3.059.000€ | 250.000€ | 2.809.000€ |
 
 Anche nello scenario peggiore, il progetto è fortemente profittevole grazie a costo marginale zero del software.<｜end▁of▁thinking｜>
 

@@ -42,8 +42,11 @@ function buildFail(err: string) {
   };
 }
 
+const mockGenerateChat = vi.fn();
+
 vi.mock('@fotosposi/core', () => ({
   createServiceClient: () => ({ from: mockFrom }),
+  generateChat: mockGenerateChat,
 }));
 
 beforeEach(() => {
@@ -93,43 +96,35 @@ describe('sendMessage', () => {
 
 describe('getAiResponse', () => {
   beforeEach(() => {
-    delete process.env.GEMINI_API_KEY;
-    global.fetch = vi.fn();
+    mockGenerateChat.mockReset();
   });
 
-  it('returns fallback when GEMINI_API_KEY is missing', async () => {
+  it('returns fallback when generateChat errors', async () => {
+    mockGenerateChat.mockResolvedValue({ error: 'Nessuna chiave AI' });
     const result = await getAiResponse([{ role: 'user', content: 'Ciao' }]);
     expect(result.content).toContain('non disponibile');
   });
 
   it('returns AI response on success', async () => {
-    process.env.GEMINI_API_KEY = 'test-key';
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ candidates: [{ content: { parts: [{ text: 'Ecco i migliori fornitori a Firenze.' }] } }] }),
-    });
+    mockGenerateChat.mockResolvedValue({ content: 'Ecco i migliori fornitori a Firenze.' });
     const result = await getAiResponse([{ role: 'user', content: 'Fornitori a Firenze?' }]);
     expect(result.content).toBe('Ecco i migliori fornitori a Firenze.');
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('generativelanguage.googleapis.com'),
-      expect.objectContaining({ method: 'POST' }),
+    expect(mockGenerateChat).toHaveBeenCalledWith(
+      [{ role: 'user', content: 'Fornitori a Firenze?' }],
+      expect.stringContaining('wedding planner'),
+      500,
     );
   });
 
-  it('returns error when Gemini API fails', async () => {
-    process.env.GEMINI_API_KEY = 'test-key';
-    (global.fetch as any).mockResolvedValue({
-      ok: false,
-      json: () => Promise.resolve({ error: { message: 'Rate limit exceeded' } }),
-    });
+  it('returns error when AI fails', async () => {
+    mockGenerateChat.mockResolvedValue({ error: 'Rate limit exceeded' });
     const result = await getAiResponse([{ role: 'user', content: 'Ciao' }]);
-    expect(result.error).toBe('Rate limit exceeded');
+    expect(result.content).toContain('Rate limit exceeded');
   });
 
-  it('handles network error', async () => {
-    process.env.GEMINI_API_KEY = 'test-key';
-    (global.fetch as any).mockRejectedValue(new Error('Network error'));
+  it('handles empty response', async () => {
+    mockGenerateChat.mockResolvedValue({});
     const result = await getAiResponse([{ role: 'user', content: 'Ciao' }]);
-    expect(result.error).toBe('Network error');
+    expect(result.content).toBeUndefined();
   });
 });

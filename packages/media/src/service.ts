@@ -1,4 +1,5 @@
 import { createServiceClient } from '@fotosposi/core';
+import { getPresignedUploadUrl, deleteObject } from '@fotosposi/r2-storage';
 import type { MediaUpload, VideoMessage } from './index';
 
 export async function createMediaRecord(params: {
@@ -87,6 +88,22 @@ export async function getMediaBySubEvent(subEventId: string): Promise<{ media?: 
     .order('created_at', { ascending: false });
   if (error) return { error: error.message };
   return { media: data ?? [] };
+}
+
+export async function uploadToR2(
+  prefix: string,
+  filename: string,
+  contentType: string,
+): Promise<{ key?: string; url?: string; presignedUrl?: string; error?: string }> {
+  const result = await getPresignedUploadUrl(prefix, filename, contentType);
+  if (!result.success) return { error: result.error };
+  return { key: result.key, url: result.url, presignedUrl: result.presignedUrl };
+}
+
+export async function deleteFromR2(key: string): Promise<{ error?: string }> {
+  const ok = await deleteObject(key);
+  if (!ok) return { error: 'Errore cancellazione R2' };
+  return {};
 }
 
 export async function uploadToStorage(

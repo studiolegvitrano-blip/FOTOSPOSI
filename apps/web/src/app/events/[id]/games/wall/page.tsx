@@ -3,23 +3,43 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getMediaByEvent } from '@fotosposi/media';
+import { useTranslations } from 'next-intl';
+import { createClient } from '@fotosposi/core';
+import { getCuratedMediaByEvent } from '@fotosposi/media';
 import type { MediaUpload } from '@fotosposi/media';
 
 export default function WallPage() {
   const params = useParams();
   const eventId = params.id as string;
+  const t = useTranslations('wall');
   const [media, setMedia] = useState<MediaUpload[]>([]);
   const [page, setPage] = useState(0);
   const itemsPerPage = 12;
+  const loaded = useRef(false);
 
   useEffect(() => {
     if (!eventId) return;
-    const interval = setInterval(() => {
-      getMediaByEvent(eventId).then((r) => { if (r.media) setMedia(r.media); });
-    }, 10000);
-    getMediaByEvent(eventId).then((r) => { if (r.media) setMedia(r.media); });
-    return () => clearInterval(interval);
+    const supabase = createClient();
+
+    getCuratedMediaByEvent(eventId).then((r) => {
+      if (r.media) {
+        setMedia(r.media);
+        loaded.current = true;
+      }
+    });
+
+    const channel = supabase
+      .channel(`wall-${eventId}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'media_uploads', filter: `event_id=eq.${eventId}` },
+        (payload) => {
+          const m = payload.new as MediaUpload;
+          setMedia((prev) => [m, ...prev]);
+        },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [eventId]);
 
   useEffect(() => {
@@ -37,8 +57,8 @@ export default function WallPage() {
   return (
     <main style={{ minHeight: '100vh', background: '#111', color: '#fff', padding: '1rem' }}>
       <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-        <h1 style={{ fontSize: '2rem', color: '#d4a574' }}>Wall</h1>
-        <p style={{ color: '#888' }}>{media.length} foto • si aggiorna ogni 10s</p>
+        <h1 style={{ fontSize: '2rem', color: '#d4a574' }}>{t('title')}</h1>
+        <p style={{ color: '#888' }}>{media.length} {t('subtitle')}</p>
       </div>
 
       <div style={{
@@ -64,7 +84,7 @@ export default function WallPage() {
       </div>
 
       <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-        <Link href={`/events/${eventId}/games`} style={{ color: '#d4a574' }}>← Torna ai giochi</Link>
+        <Link href={`/events/${eventId}/games`} style={{ color: '#d4a574' }}>{t('refresh')}</Link>
       </div>
 
       <style>{`

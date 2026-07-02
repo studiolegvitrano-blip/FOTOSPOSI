@@ -53,6 +53,8 @@ export {
   getMediaBySubEvent,
   uploadToStorage,
   deleteFromStorage,
+  uploadToR2,
+  deleteFromR2,
   createVideoMessage,
   getVideoMessages,
   updateDriveSyncStatus,

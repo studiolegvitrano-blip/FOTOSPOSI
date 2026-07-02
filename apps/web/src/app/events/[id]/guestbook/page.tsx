@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { createClient, getCurrentUser, createServiceClient } from '@fotosposi/core';
+import { createClient, getCurrentUser } from '@fotosposi/core';
 import { getVideoMessages, createVideoMessage } from '@fotosposi/media';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -16,6 +16,8 @@ export default function GuestbookPage() {
   const [tab, setTab] = useState<'record' | 'view'>('view');
   const [uploading, setUploading] = useState(false);
   const [name, setName] = useState('');
+  const [suggestedText, setSuggestedText] = useState('');
+  const [loadingText, setLoadingText] = useState(false);
 
   useEffect(() => {
     getCurrentUser().then(({ user: u, error }) => {
@@ -29,6 +31,19 @@ export default function GuestbookPage() {
   const loadMessages = async () => {
     const r = await getVideoMessages(id as string, 'guestbook');
     if (r.messages) setMessages(r.messages);
+  };
+
+  const handleTabRecord = async () => {
+    setTab('record');
+    setLoadingText(true);
+    try {
+      const res = await fetch(`/api/guestbook/suggested-text?eventId=${id}&guestName=${encodeURIComponent(name || 'amico')}`);
+      const data = await res.json();
+      if (data.text) setSuggestedText(data.text);
+    } catch {
+      setSuggestedText('');
+    }
+    setLoadingText(false);
   };
 
   const handleVideoComplete = async (blob: Blob) => {
@@ -56,20 +71,30 @@ export default function GuestbookPage() {
         <h1 className="text-2xl font-bold">Video Guestbook</h1>
         <div className="flex gap-2">
           <Button variant={tab === 'view' ? 'default' : 'outline'} onClick={() => setTab('view')}>Vedi messaggi</Button>
-          <Button variant={tab === 'record' ? 'default' : 'outline'} onClick={() => setTab('record')}>Registra</Button>
+          <Button variant={tab === 'record' ? 'default' : 'outline'} onClick={handleTabRecord}>Registra</Button>
           <Button variant="ghost" onClick={() => router.push(`/events/${id}`)}>←</Button>
         </div>
       </div>
 
       {tab === 'record' && (
         <Card>
-          <CardHeader><CardTitle>Lascia un messaggio video</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Lascia un messaggio video</CardTitle>
+            <p className="text-sm text-text-muted mt-1">
+              Durante la registrazione vedrai un testo suggerito in basso come promemoria.
+              Puoi seguirlo o parlare liberamente. Alla fine rivedi il video prima di inviarlo.
+            </p>
+          </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <label className="text-sm font-medium">Il tuo nome</label>
               <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm mt-1" value={name} onChange={e => setName(e.target.value)} placeholder="Nome" />
             </div>
-            <VideoRecorder onRecordingComplete={handleVideoComplete} maxDuration={30} />
+            {loadingText ? (
+              <p className="text-sm text-text-muted text-center">Generazione testo suggerito...</p>
+            ) : (
+              <VideoRecorder onRecordingComplete={handleVideoComplete} maxDuration={30} suggestedText={suggestedText} />
+            )}
             {uploading && <p className="text-sm text-text-muted text-center">Caricamento video...</p>}
           </CardContent>
         </Card>
@@ -81,12 +106,12 @@ export default function GuestbookPage() {
             <Card>
               <CardContent className="py-8 text-center text-text-muted">
                 Nessun messaggio video ancora. <br />
-                <Button variant="link" onClick={() => setTab('record')}>Registra il primo!</Button>
+                <Button variant="link" onClick={handleTabRecord}>Registra il primo!</Button>
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {messages.map((m) => (
+              {messages.map((m: any) => (
                 <Card key={m.id}>
                   <CardContent className="p-3">
                     <video src={m.url} controls className="w-full rounded-md aspect-[4/3] object-cover bg-black" />

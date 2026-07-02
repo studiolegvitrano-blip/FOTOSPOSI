@@ -41,3 +41,18 @@ export {
   validateQrToken,
   createQrToken,
 } from './auth';
+
+export {
+  generateChat,
+  generateText,
+} from './ai';
+
+export {
+  getEventTier,
+  updateEventTier,
+  hasFeature,
+} from './tiers';
+export type { Tier, TierInfo } from './tiers';
+export { TIERS } from './tiers';
+
+export { rateLimit } from './rate-limit';

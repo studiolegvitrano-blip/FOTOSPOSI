@@ -144,6 +144,26 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
             </div>
           )}
 
+          {c.navettaEnabled && (
+            <div className="section" style={{ padding: '48px 32px', background: p3, color: p2 }}>
+              <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>Navetta ospiti</h2>
+              {c.navettaOrari && <p style={{ fontSize: 14, lineHeight: 1.7, opacity: 0.8, marginBottom: 12, whiteSpace: 'pre-line' }}>{c.navettaOrari}</p>}
+              {c.navettaMappa && (
+                <a href={c.navettaMappa} target="_blank" style={{ display: 'inline-block', padding: '10px 24px', borderRadius: 999, fontSize: 14, background: p0, color: '#fff', textDecoration: 'none', marginBottom: 12 }}>
+                  Mappa parcheggio ↗
+                </a>
+              )}
+              {c.navettaNote && <p style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.6, whiteSpace: 'pre-line' }}>{c.navettaNote}</p>}
+              {c.navettaContatti && <p style={{ fontSize: 13, opacity: 0.7, marginTop: 8 }}>Contatti: {c.navettaContatti}</p>}
+              {c.navettaMatchmaking && (
+                <div style={{ marginTop: 16, padding: 16, borderRadius: 12, background: p1 }}>
+                  <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>🚗 Matchmaking passaggi</p>
+                  <p style={{ fontSize: 13, opacity: 0.7 }}>Chi dà un passaggio e chi cerca si organizzano qui</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {c.hashtagEnabled && c.hashtag && (
             <div className="section" style={{ padding: '24px', textAlign: 'center', background: p2, color: p3 }}>
               <p style={{ fontSize: 14 }}>Seguici con <strong>{c.hashtag}</strong></p>

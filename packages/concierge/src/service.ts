@@ -1,4 +1,4 @@
-import { createServiceClient } from '@fotosposi/core';
+import { createServiceClient, generateChat } from '@fotosposi/core';
 
 const SYSTEM_PROMPT = 'Sei un wedding planner AI. Aiuti gli sposi con consigli su matrimonio: organizzazione, tempistiche, fornitori, tradizioni. Rispondi in italiano, tono professionale ed elegante.';
 
@@ -33,34 +33,7 @@ export async function sendMessage(params: {
 }
 
 export async function getAiResponse(messages: { role: string; content: string }[]): Promise<{ content?: string; error?: string }> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return { content: 'Chat AI non disponibile. Configura GEMINI_API_KEY per abilitare il concierge AI.' };
-
-  try {
-    const history = messages.slice(0, -1).map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }));
-    const lastMsg = messages[messages.length - 1];
-
-    const contents = [
-      ...history,
-      { role: 'user', parts: [{ text: lastMsg.content }] },
-    ];
-
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents,
-        generationConfig: { maxOutputTokens: 500, temperature: 0.7 },
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) return { error: data.error?.message || 'Errore Gemini API' };
-    return { content: data.candidates?.[0]?.content?.parts?.[0]?.text || '' };
-  } catch (e: any) {
-    return { error: e.message };
-  }
+  const result = await generateChat(messages, SYSTEM_PROMPT, 500);
+  if (result.error) return { content: `AI non disponibile (${result.error}). Configura GROQ_API_KEY o GEMINI_API_KEY.` };
+  return result;
 }

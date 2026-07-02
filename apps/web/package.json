@@ -26,6 +26,7 @@
     "@fotosposi/face-recognition": "*",
     "@fotosposi/marketplace": "*",
     "@fotosposi/concierge": "*",
+    "@fotosposi/r2-storage": "*",
     "@radix-ui/react-slot": "^1.3.0",
     "@supabase/ssr": "^0.6.0",
     "@supabase/supabase-js": "^2.49.0",

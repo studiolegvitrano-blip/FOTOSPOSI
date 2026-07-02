@@ -3,12 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { listProducts } from '@fotosposi/commerce';
 import type { Product } from '@fotosposi/commerce';
 
 export default function ShopPage() {
   const params = useParams();
   const eventId = params.id as string;
+  const t = useTranslations('commerce');
+  const c = useTranslations('common');
   const [products, setProducts] = useState<Product[]>([]);
   const [filter, setFilter] = useState('');
 
@@ -19,16 +22,16 @@ export default function ShopPage() {
   }, [filter]);
 
   const categories = [
-    { value: '', label: 'Tutti' },
-    { value: 'stampa', label: 'Stampe' },
-    { value: 'gadget', label: 'Gadget' },
-    { value: 'maglietta', label: 'Magliette' },
-    { value: 'album', label: 'Album' },
+    { value: '', label: t('category_all') },
+    { value: 'stampa', label: t('category_stampa') },
+    { value: 'gadget', label: t('category_gadget') },
+    { value: 'maglietta', label: t('category_maglietta') },
+    { value: 'album', label: t('category_album') },
   ];
 
   return (
     <main style={{ maxWidth: 900, margin: '2rem auto', padding: '0 1rem' }}>
-      <h1 style={{ marginBottom: '1.5rem' }}>Shop</h1>
+      <h1 style={{ marginBottom: '1.5rem' }}>{t('shop')}</h1>
 
       <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
         {categories.map((c) => (
@@ -51,7 +54,7 @@ export default function ShopPage() {
 
       {products.length === 0 ? (
         <p style={{ color: '#666', textAlign: 'center', padding: '2rem' }}>
-          Nessun prodotto disponibile
+          {t('no_products')}
         </p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1.5rem' }}>
@@ -85,7 +88,7 @@ export default function ShopPage() {
       )}
 
       <p style={{ marginTop: '2rem' }}>
-        <Link href={`/events/${eventId}`} style={{ color: '#d4a574' }}>← Torna all'evento</Link>
+        <Link href={`/events/${eventId}`} style={{ color: '#d4a574' }}>{c('back_to_event')}</Link>
       </p>
     </main>
   );

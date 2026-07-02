@@ -29,6 +29,8 @@ function build(val: any) {
     select: () => chain(val),
     insert: (obj?: any) => chain(obj ?? val),
     upsert: () => chain(null),
+    update: () => chain(null),
+    delete: () => chain(null),
   };
 }
 
@@ -37,6 +39,8 @@ function buildFail(err: string) {
     select: () => failChain(err),
     insert: () => failChain(err),
     upsert: () => failChain(err),
+    update: () => failChain(err),
+    delete: () => failChain(err),
   };
 }
 
@@ -48,7 +52,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-const { getSuppliers, getSupplierById, createReview, getReviews, getAvgRating } = await import('../service');
+const { getSuppliers, getSupplierById, createReview, getReviews, getAvgRating, getAllSuppliers, approveSupplier, deleteSupplier } = await import('../service');
 
 describe('getSuppliers', () => {
   it('returns approved suppliers', async () => {
@@ -140,5 +144,55 @@ describe('getAvgRating', () => {
     const result = await getAvgRating('s1');
     expect(result.avg).toBe(0);
     expect(result.count).toBe(0);
+  });
+});
+
+describe('getAllSuppliers', () => {
+  it('returns all suppliers including unapproved', async () => {
+    mockFrom.mockReturnValue(build([{ id: 's1', name: 'Approved', approved: true }, { id: 's2', name: 'Pending', approved: false }]));
+    const result = await getAllSuppliers();
+    expect(result.suppliers).toHaveLength(2);
+    expect(result.suppliers![0].name).toBe('Approved');
+    expect(result.suppliers![1].approved).toBe(false);
+  });
+
+  it('returns error on DB failure', async () => {
+    mockFrom.mockReturnValue(buildFail('DB error'));
+    const result = await getAllSuppliers();
+    expect(result.error).toBe('DB error');
+  });
+});
+
+describe('approveSupplier', () => {
+  it('approves a supplier', async () => {
+    mockFrom.mockReturnValue(build(null));
+    const result = await approveSupplier('s1', true);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('revokes approval', async () => {
+    mockFrom.mockReturnValue(build(null));
+    const result = await approveSupplier('s1', false);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('returns error on DB failure', async () => {
+    mockFrom.mockReturnValue(buildFail('DB error'));
+    const result = await approveSupplier('s1', true);
+    expect(result.error).toBe('DB error');
+  });
+});
+
+describe('deleteSupplier', () => {
+  it('deletes a supplier', async () => {
+    mockFrom.mockReturnValue(build(null));
+    const result = await deleteSupplier('s1');
+    expect(result.error).toBeUndefined();
+  });
+
+  it('returns error on DB failure', async () => {
+    mockFrom.mockReturnValue(buildFail('DB error'));
+    const result = await deleteSupplier('s1');
+    expect(result.error).toBe('DB error');
   });
 });

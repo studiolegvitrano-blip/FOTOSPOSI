@@ -3,12 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { getProduct, createCheckoutSession } from '@fotosposi/commerce';
 import type { Product } from '@fotosposi/commerce';
 
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const t = useTranslations('commerce');
+  const c = useTranslations('common');
   const eventId = params.id as string;
   const productId = params.productId as string;
 
@@ -44,8 +47,8 @@ export default function ProductDetailPage() {
     }
   };
 
-  if (loading) return <p>Caricamento...</p>;
-  if (!product) return <p>Prodotto non trovato</p>;
+  if (loading) return <p>{c('loading')}</p>;
+  if (!product) return <p>{t('no_products')}</p>;
 
   return (
     <main style={{ maxWidth: 700, margin: '2rem auto', padding: '0 1rem' }}>
@@ -61,7 +64,7 @@ export default function ProductDetailPage() {
         </div>
         <div style={{ flex: 1, minWidth: 280 }}>
           <h1>{product.name}</h1>
-          <p style={{ color: '#666', marginBottom: '0.5rem' }}>Tipo: {product.type}</p>
+          <p style={{ color: '#666', marginBottom: '0.5rem' }}>{t('type')} {product.type}</p>
           {product.description && <p style={{ marginBottom: '1rem' }}>{product.description}</p>}
           <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#d4a574', marginBottom: '1.5rem' }}>
             {(product.price / 100).toFixed(2)} {product.currency}
@@ -82,13 +85,13 @@ export default function ProductDetailPage() {
               cursor: 'pointer',
             }}
           >
-            {checkingOut ? 'Reindirizzamento...' : 'Acquista ora'}
+            {checkingOut ? t('redirecting') : t('buy_now')}
           </button>
         </div>
       </div>
 
       <p style={{ marginTop: '2rem' }}>
-        <Link href={`/events/${eventId}/shop`} style={{ color: '#d4a574' }}>← Torna allo shop</Link>
+        <Link href={`/events/${eventId}/shop`} style={{ color: '#d4a574' }}>{t('back_to_shop')}</Link>
       </p>
     </main>
   );

@@ -35,7 +35,7 @@
 - [x] lucide-react, uppy, react-datepicker, qr-code-styling
 - [x] Refactor login/signup/dashboard/admin con shadcn
 - [x] Vitest + @testing-library/react
-- [x] 74 test: auth (9), events (10), Button (3), analytics (4), notifications (11), marketplace (13), concierge (9), face-recognition (15)
+- [x] 102 test: auth (9), events (10), Button (3), analytics (4), notifications (11), marketplace (20), concierge (9), face-recognition (15), games (21)
 - [x] Ruolo manager + admin panel + tabella event_managers
 
 ### Checklist Fase 4 (Site-builder + Guestbook + Scherzi)
@@ -47,7 +47,8 @@
 ### Checklist Fase 5 (Advanced)
 - [x] Modulo face-recognition: consenso GDPR + tagging
 - [x] Modulo notifications: preferenze + invio (Resend/Evolution) + log
-- [x] Modulo analytics: statistiche evento + dashboard B2B admin
+- [x] Modulo analytics: statistiche evento + dashboard B2B admin + 4 metriche strategiche
+- [x] `social_shares` table + `marketplace_suppliers.contacted_at/active` columns
 - [x] Modulo marketplace: fornitori + recensioni
 - [x] Modulo concierge: chat AI (struttura + Claude API)
 - [x] Drive OAuth: Google OAuth per Drive personale sposo + sync
@@ -58,13 +59,60 @@
 - Stripe: STRIPE_SECRET_KEY / NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY / STRIPE_WEBHOOK_SECRET
 - Gelato: GELATO_API_KEY
 - Resend: RESEND_API_KEY
-- Claude: ANTHROPIC_API_KEY
 - Evolution API: EVOLUTION_API_URL / EVOLUTION_API_KEY
 
-### Completato (fix Fase 5)
-- [x] Google OAuth configurato: client_id e client_secret in `.env.local`
+### Configurato (chiavi presenti)
+- ✅ Supabase: URL + anon key + service role
+- ✅ Google OAuth: client_id + client_secret
+- ✅ Cloudflare R2: account_id + access_key + secret_key
+- ✅ Groq: GROQ_API_KEY (AI primaria)
+- ✅ Gemini: GEMINI_API_KEY (AI fallback)
+
+### Storage: Supabase → Cloudflare R2 (buffer) + Google Drive (permanente)
+- [x] `packages/r2-storage/`: S3 client, presigned URL, upload, delete
+- [x] API routes: `POST /api/r2/upload` (presigned URL) + `POST /api/r2/delete`
+- [x] Upload page riscritta: client upload diretto a R2 → processa → Drive sync → cancella R2
+- [x] Niente più Supabase Storage per i file (solo metadati in DB)
+- [x] R2 free tier: 10 GB storage, bandwidth ∞, $0/mese
+- [x] Stress test: `scripts/stress-test.mjs` + RPC `pg_database_size()` / `get_table_sizes()`
+- [x] Stima: ~100k eventi in 500 MB DB Supabase (Storage non è più limite)
+
+### Tier System (Fase 5 — Monetizzazione)
+- [x] Migration 00015: event_tiers (free/premium/deluxe) + tier_features mapping table
+- [x] Packages/core/src/tiers.ts: `getEventTier`, `updateEventTier`, `hasFeature`
+- [x] Eventi nuovi con tier='free' di default
+- [x] Games hub: mostra solo giochi disponibili per tier + lock visivo per feature bloccate
+- [x] Games manage: badge tier per feature, toggle disabilitato se tier insufficiente
+- [x] Watermark logo su download/condivisione social per tutti i tier
+- [x] Drive backup per tutti i tier (free/premium/deluxe)
+- [x] Jokes/Barzellette rimosse da AVAILABLE_FEATURES (fuori dal prodotto)
+- [x] PRICING.md aggiornato: Free €0 / Premium 229€ / Deluxe 375€ + geo-pricing 9 paesi
+- [x] Time Capsule geo-pricing (+10% paesi ricchi UK/US/CH/AU/CA)
+- [ ] Stripe one-time payment (bloccato: STRIPE_SECRET_KEY mancante)
+- [ ] Time Capsule acquisto singolo (Premium: 15€/6mesi, Invitati: 15€/6mesi)
+- [ ] Finestra 48h Addio Celibato/Nubilato per Premium+
+- [ ] Video before/after (design in corso)
+
+### Pricing finale (IT)
+| Tier | Prezzo |
+|------|--------|
+| Free | €0 |
+| Premium | 229€ |
+| Deluxe | 375€ |
+| Time Capsule extra | 15€/6 mesi |
+| Time Capsule Deluxe | inclusa 6 mesi, poi 12€/6 mesi |
+
+### Geo-pricing esempi
+| Paese | Premium | Deluxe |
+|:-----:|:-------:|:------:|
+| 🇮🇹 IT | 229€ | 375€ |
+| 🇬🇧 UK | £486 | £796 |
+| 🇺🇸 US | $622 | $1,019 |
+
+### Google OAuth configurato: client_id e client_secret in `.env.local`
 - [x] Drive OAuth funzionante (sposi + admin)
-- [x] 74 test totali (9 file) — tutti verdi
+- [x] 131 test totali (10 file) — tutti verdi
+- [x] **Quiz sugli Sposi** (migration 00013, modulo games 17 nuovi test, admin + play + leaderboard pagine, tema consigliato basato sulle preferenze, 6 lingue i18n)
 - [x] `createServiceClient` fallback all'anon key nel browser (nessun errore lato client)
 - [x] RLS policies: INSERT per events + core_auth_tokens
 - [x] Creazione automatica tenant + core_users in signup e conferma email
@@ -94,43 +142,25 @@
 - [x] Event Codes — tabella event_codes, formato EV_IT001 auto-generato in createEvent, getEventByCode()
 
 ### Prossime attività
-- **Admin marketplace**: UI per approvazione fornitori
-- **Configurare chiavi API mancanti**: Stripe, Resend, Claude, Gelato, Evolution
-- **Quiz sugli Sposi** (prima priorità backlog)
+- **App Mobile brandizzata** (Android + iOS): PWA o app nativa personalizzata per gli sposi (colori, logo, data), con upload foto, giochi, wall, guestbook, time capsule. Inclusa in Deluxe, aggiungibile a Premium per +60€.
+- **Configurare chiavi API mancanti**: Stripe, Resend, Gelato, Evolution
 
 ### Nuove idee backlog
-- **Sfide Addio al Celibato/Nubilato** (modulo `games`): testimoni creano/selezionano missioni per sposi, gadget shop collegati, completamento via WhatsApp
-- **Caccia alla Foto in Chiesa** (modulo `games`): ospiti si registrano con ruolo (amico/parente/collega/altro), amici ricevono compiti fotografici (foto con zia, padre sposa, single, pelato, ecc.), classifica punti
-- **Prima Notte di Sposi** (modulo `commerce`): amici possono regalare scherzi o "cose hot" dal nostro shop, integrato con lista nozze
-- **Quiz sugli Sposi** (modulo `games`): domande tipo "chi ha detto ti amo per primo?", "quanti anni ha la sposa?" — punti e podio in tempo reale
-- **Reel Riassunto** (modulo `commerce`): video AI (Claude + FFmpeg) con foto/giochi. Incluso in Deluxe per sposi. Anche invitati acquistano reel personalizzato (max 4 persone: loro + accompagnatore + citazione sposi). 49€
-- **Hashtag Generator** (modulo `site-builder`): AI (Claude) suggerisce hashtag basati su nomi sposi, tema, location — integrato nel sito-evento
-- **App & Sito** contenitore di tutte le funzionalità sopra (web app responsive + sito-evento pubblico)
-- **Navetta Ospiti** (modulo `site-builder`): sezione sito-evento con orari navetta, mappa parcheggi, contatti tassisti, matchmaking chi cerca/dà passaggio
-- **Vota il Vestito** (modulo `games`): durante ricevimento, ospiti votano vestito sposo e sposa — gioco veloce
-- **Tavolo Selfie** (modulo `media`): pagina web per chiosco selfie con filtri/logo WeddingMoments, upload diretto su Drive
+- **Morning-After AI Teaser**: alle 09:00 del giorno dopo le nozze, AI seleziona le migliori 15 clip video/foto, monta a tempo di musica e notifica push. Condivisione virale IG/TT con frame brandizzato.
+- **VIP Face-Match Gallery**: face recognition GDPR-compliant. Ogni invitato riceve link alla sua galleria personale con solo le foto in cui appare.
+- **Digital Flash-Mob & Light Show Sync**: smartphone invitati lampeggiano a tempo di musica sincronizzato durante il primo ballo.
 
-## Nuove feature virali — Settimana 1
-
-### ✔ Frame/Overlay brandizzato automatico
-- [x] `packages/photo-overlay/` — sharp: `applyOverlay(imageBuffer, options)` genera overlay con banda nomi sposi + data + wordmark
-- [x] Due formati: `square` (download foto) e `story` (9:16 per IG/TikTok Stories)
-- [x] Tabella `event_branding`: colore, font, logo — seeded da template sito esistente
-- [x] API route `GET /api/photos/[id]/share?eventId=X&format=square|story`
-- [x] Cache su Storage (sovrascrive a ogni richiesta, non rigenera se già presente)
-- [x] Bottone "Scarica" + "IG/TT" con overlay hover nella galleria invitato
-- [x] Colore tema e font ereditati dal template sito scelto dalla coppia
-
-### ✔ Wedding Wrapped (Settimana 2-3)
-- [x] `packages/wrapped/` — query aggregazione dati invitato (foto, voti, tag, badge, regali)
-- [x] API route `GET /api/wrapped/[guestId]/card?eventId=X` — genera card 1080×1920 via `@vercel/og` (ImageResponse)
-- [x] Pagina pubblica `/e/[id]/wrapped/[guestId]` — riepilogo dati + anteprima card + Condividi
-- [ ] Job schedulato generazione card (post-finestra evento) — rimandato
-
-### ✔ Live Curation Fase 1 (Settimana 4)
-- [x] Colonna `wall_priority_score` su foto
-- [x] Trigger ricalcolo a ogni voto/upload
-- [x] Query wall pesata con rotazione
+### ✔ Batch 2 — Giochi virali + Video Challenges
+- [x] **Admin marketplace**: `getAllSuppliers`, `approveSupplier`, `deleteSupplier` in service.ts; pagina `/admin/marketplace` con stats + table
+- [x] **Caccia alla Foto** (`/events/[id]/games/photo-hunt`): registrazione con ruolo, 10 task default, upload foto, leaderboard punti
+- [x] **Navetta Ospiti** (modulo `site-builder`): sezione toggle con orari, mappa, contatti, matchmaking
+- [x] **Vota il Vestito** (`/events/[id]/games/dress-vote`): star rating 1-5 per sposo/sposa, barre comparative, upsert
+- [x] **Tavolo Selfie** (`/kiosk/[code]`): camera access, countdown, capture, compress, upload, dark UI brandizzata
+- [x] **Primo Alcolico** (`/events/[id]/games/primo-alcolico`): 5 cardio targets, foto/video, localStorage
+- [x] **Wow Walk** (`/events/[id]/wow-walk`): before/after walking video, side-by-side sync playback
+- [x] **Video Challenges Addio al Celibato** (`/events/[id]/video-challenges`): 21 sfide, prima=addio celibato / dopo=cerimonia, side-by-side, localStorage
+- [x] **21 nuovi test games**: photo_hunt (register, tasks, submit, leaderboard), dress_vote (cast, stats, my vote), ensureDefaultTasks
+- [x] **131 test totali (10 file)** — tutti verdi
 
 ## Log cronologico
 | Data | Modulo | Commit |
@@ -167,3 +197,88 @@
 | 01/07/2026 | feat | — Drive sync: cartelle Foto/Video/Ricevimento/Cerimonia create su OAuth, `getEventDriveFolders()`, upload usa cartelle corrette |
 | 01/07/2026 | feat | — Video guestbook con teleprompter AI (Gemini API route + review prima invio) |
 | 01/07/2026 | feat | 15eebae — Time Capsule + Work Diary + Event Codes: migration 00011, packages/time-capsule, packages/work-diary, API routes, pagine pubbliche/gestione, file naming YYYY_MM_DD_EV_IT001 |
+| 02/07/2026 | feat | — Batch 2 giochi virali: Caccia alla Foto, Navetta, Vota il Vestito, Tavolo Selfie, Primo Alcolico, Wow Walk, Video Challenges Addio al Celibato |
+| 02/07/2026 | test | — 21 nuovi test games (photo_hunt + dress_vote) + fix build TS, **102 test totali** |
+| 02/07/2026 | docs | — Aggiornato PROJECT_STATUS.md con Batch 2 completato |
+| 02/07/2026 | feat | — **4 metriche strategiche analytics**: tasso attivazione, coinvolgimento invitati, coefficiente virale, conversione B2B |
+| 02/07/2026 | data | — Migrazione 00012: `social_shares` table + `marketplace_suppliers.contacted_at/active` + tab Analytics con 5 schede |
+| 02/07/2026 | test | — 12 nuovi test analytics (activation, engagement, viral, b2b) — **114 test totali** |
+| 02/07/2026 | docs | — Aggiornato PROJECT_STATUS.md con metriche strategiche |
+| 02/07/2026 | i18n | — next-intl setup, cookie-based locale detection, middleware aggiornato |
+| 02/07/2026 | i18n | — messages/it.json + en-US.json (tone wedding-tech americano), LanguageSwitcher, home page i18n |
+| 02/07/2026 | docs | — Ricerca usanze matrimoniali per paese + strategia internazionalizzazione in AGENTS.md |
+| 02/07/2026 | i18n | — Convertite a i18n: Login, Signup, Dashboard, Event detail, Wall, Jokes, Games hub, Kiosk, Admin analytics — build OK |
+| 02/07/2026 | i18n | — Convertito Site-builder a i18n — build OK |
+| 02/07/2026 | i18n | — Convertiti Shop (listing, dettaglio, ordini) e Gift registry a i18n — build OK |
+| 02/07/2026 | i18n | — Create en-GB.json (UK wedding tone), de.json (formal Sie), fr.json (elegant vous) — build OK |
+| 02/07/2026 | i18n | — Create es.json (Spanish, "tú" tone) + routing + LanguageSwitcher + AGENTS.md customs — build OK |
+| 02/07/2026 | i18n | — DE/ES: copiate versioni validate da FOTO AGO/, fix video_challenges.title gender-inclusive (IT/EN-US/EN-GB) — build OK, 114 test verdi |
+| 02/07/2026 | feat | — **Quiz sugli Sposi**: migration 00013 (quiz_questions + quiz_answers), 17 nuovi servizi in games, pagina admin (domande con opzioni/tema/risposte), pagina play (quiz interattivo con risultati + tema consigliato), pagina leaderboard, i18n 6 lingue, 131 test totali |
+| 02/07/2026 | tier | — **Tier System**: migration 00015 (free/premium/deluxe), `packages/core/src/tiers.ts`, games hub/gestione filtrano per tier, PRICING.md aggiornato 229€/375€ + geo-pricing 9 paesi |
+| 02/07/2026 | r2 | — **R2 Storage**: `packages/r2-storage/` (S3 client, presigned URL), API routes upload/delete, upload page riscritta: client→R2→Drive sync→cancella R2, niente più Supabase Storage |
+| 02/07/2026 | test | — Stress test `scripts/stress-test.mjs` + RPC `pg_database_size()` / `get_table_sizes()`, stima ~100k eventi in 500 MB |
+
+## Internazionalizzazione
+
+### Setup tecnico
+- **Libreria**: next-intl (v4) con App Router
+- **Strategia**: cookie-based (nessun URL prefix), locale rilevato da Accept-Language + cookie
+- **File messaggi**: `apps/web/messages/{locale}.json`, fallback a `it.json`
+- **Provider**: `NextIntlClientProvider` nel root layout
+- **Middleware**: locale detection + cookie `NEXT_LOCALE`
+
+### Lingue configurate
+| Codice | Lingua | Stato |
+|--------|--------|-------|
+| `it` | Italiano (sorgente/fallback) | ✅ Completo |
+| `en-US` | Inglese USA (pilota) | ✅ Completo, tono Zola-style |
+| `en-GB` | Inglese UK | ✅ Completo, tono UK wedding ("Sign in", "Wedding List", "Stag Do", "basket") |
+| `de` | Tedesco | ✅ Completo, tono formale "Sie", diretto/funzionale |
+| `fr` | Francese | ✅ Completo, tono elegante "vous" |
+| `es` | Spagnolo | ✅ Completo, tono caldo informale "tú" ("Lista de Bodas", "Despedida de soltero/a") |
+
+### Scelte di tono deliberate (en-US)
+| Italiano | Traduzione letterale | Scelta nativa | Perché |
+|----------|---------------------|---------------|--------|
+| Angolo Scherzi | Jokes Corner | **Roast Corner** | Un'app wedding USA chiamerebbe così una sezione di prese in giro affettuose |
+| Wall | Wall | **The Feed** | "Feed" è il termine wedding-tech standard per flusso foto live |
+| Lista Nozze | Wedding List | **Gift Registry** | Registry è lo standard USA, "wedding list" suona britannico |
+| Vota il Vestito | Vote the Dress | **Rate the Fit** | Slang naturale per un gioco social su Instagram/TikTok |
+| Sfide Video | Video Challenges | **Bachelor Party Challenges** | Specifica il contesto (addio celibato) nel titolo |
+| Concierge | Concierge | **AI Concierge** | Si mantiene "Concierge" perché è ormai un termine internazionale nel wedding-tech |
+
+### Prossimi passi i18n
+1. Validare en-US.json con madrelingua wedding-tech reale
+2. Validare en-GB, de, fr, es con madrelingua
+3. Convertire pagine minori a `useTranslations()` (Upload, Guestbook, Video challenges, ecc.)
+   - [x] Login (`/login`)
+   - [x] Signup (`/signup`)
+   - [x] Dashboard (`/dashboard`)
+   - [x] Event detail (`/events/[id]`)
+   - [x] Site-builder (`/events/[id]/site-builder`)
+   - [x] Wall (`/events/[id]/games/wall`)
+   - [x] Jokes (`/events/[id]/games/jokes`)
+   - [x] Shop (`/events/[id]/shop` + product detail + orders)
+   - [x] Gift registry (`/events/[id]/gift`)
+   - [x] Kiosk (`/kiosk/[code]`)
+   - [x] Games hub (`/events/[id]/games`)
+   - [x] Admin analytics (`/admin/analytics`)
+
+## Strategia — Business
+
+### 4 Metriche da tracciare (implementate nel modulo analytics)
+
+| Metrica | Descrizione | Fonte Dati |
+|---------|-------------|-----------|
+| **Tasso attivazione sposi** | % che completa setup sito entro 48h dalla registrazione | `events.created_at` + `site_drafts.published`/`updated_at` |
+| **Coinvolgimento invitati** | % invitati che caricano ≥1 foto o partecipano a ≥1 gioco | `media_uploads` + `votes` + `joke_entries` + `photo_hunt_registrations` + `dress_votes` |
+| **Coefficiente virale** | Condivisioni social (Wrapped/overlay) per evento e click di ritorno | `social_shares` (nuova tabella, tracciata via Web Share API) |
+| **Conversione B2B** | Fornitori contattati → attivi | `marketplace_suppliers.contacted_at` + `.active` (nuove colonne) |
+
+### Necessità di investimento
+- **Bootstrap minimo**: ~3.000-6.000€ per arrivare a validazione (chiavi API, hosting, marketing base)
+- **Investimento esterno**: solo DOPO validazione con retention reale, coefficiente virale misurato, 5-10 partner B2B attivi
+- **Pre-seed target**: 50-150k€ (business angel wedding/turismo, incubatore travel-tech italiano)
+
+### Rischio principale
+Mercato matrimoni Italia in contrazione (-5,9% annuo) ma valore medio per evento in crescita. La crescita deve venire da **quota di mercato sottratta a Google Drive/WhatsApp/soluzioni fai-da-te**, non dall'espansione del mercato.

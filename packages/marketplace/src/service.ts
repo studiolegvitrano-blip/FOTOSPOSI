@@ -59,3 +59,24 @@ export async function getAvgRating(supplierId: string): Promise<{ avg: number; c
   if (ratings.length === 0) return { avg: 0, count: 0 };
   return { avg: ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length, count: ratings.length };
 }
+
+export async function getAllSuppliers(): Promise<{ suppliers?: MarketplaceSupplier[]; error?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.from('marketplace_suppliers').select('*').order('created_at', { ascending: false });
+  if (error) return { error: error.message };
+  return { suppliers: data ?? [] };
+}
+
+export async function approveSupplier(id: string, approved: boolean): Promise<{ error?: string }> {
+  const supabase = createServiceClient();
+  const { error } = await supabase.from('marketplace_suppliers').update({ approved }).eq('id', id);
+  if (error) return { error: error.message };
+  return {};
+}
+
+export async function deleteSupplier(id: string): Promise<{ error?: string }> {
+  const supabase = createServiceClient();
+  const { error } = await supabase.from('marketplace_suppliers').delete().eq('id', id);
+  if (error) return { error: error.message };
+  return {};
+}

@@ -48,7 +48,7 @@ export default function AdminPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild><Link href="/admin/analytics">Analytics</Link></Button>
-          <Button variant="outline" asChild><Link href="/marketplace">Fornitori</Link></Button>
+          <Button variant="outline" asChild><Link href="/admin/marketplace">Fornitori</Link></Button>
           <Button variant="outline" asChild><Link href="/dashboard">Dashboard</Link></Button>
           <Button variant="ghost" onClick={handleLogout}>Esci</Button>
         </div>

@@ -51,6 +51,12 @@ export interface SiteContent {
   playlistLink?: string;
   hashtagEnabled?: boolean;
   hashtag?: string;
+  navettaEnabled?: boolean;
+  navettaOrari?: string;
+  navettaMappa?: string;
+  navettaNote?: string;
+  navettaContatti?: string;
+  navettaMatchmaking?: boolean;
 }
 
 export interface SiteDraft {
@@ -136,6 +142,16 @@ export const SUGGESTED_PHRASES = {
     'Facci sapere se ci sarai entro...',
     'Ti aspettiamo! Conferma entro...',
   ],
+  navettaOrari: [
+    'La navetta partirà alle ore 18:00 dalla chiesa al ricevimento',
+    'Servizio navetta gratuito: chiesa → ricevimento e ritorno',
+    'Navetta disponibile dalle 17:30. Ultima corsa alle 23:00',
+  ],
+  navettaNote: [
+    'Parcheggio gratuito disponibile presso la chiesa',
+    'Parcheggio custodito presso il ricevimento',
+    'Consigliamo di parcheggiare presso la chiesa e usare il servizio navetta',
+  ],
 };
 
 export {
@@ -146,6 +162,6 @@ export {
   updateDraft,
   updateDraftTemplate,
   publishSite,
-  generateText,
+  generateSiteText,
   getGeneratedTexts,
 } from './service';

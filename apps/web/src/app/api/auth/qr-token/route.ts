@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { rateLimit } from '@fotosposi/core';
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for') || 'unknown';
+  const rl = rateLimit(`qr-token:${ip}`, 10, 60000);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Troppe richieste. Riprova tra qualche secondo.' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetIn / 1000)) } },
+    );
+  }
+
   const { eventId, expiresAt: clientExpires } = await req.json();
   if (!eventId) {
     return NextResponse.json({ error: 'eventId mancante' }, { status: 400 });

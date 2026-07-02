@@ -1,3 +1,5 @@
+import type { Tier } from '@fotosposi/core';
+
 export type SubEventType = 'addio_celibato' | 'matrimonio' | 'brunch' | 'cena_prova';
 
 export interface WeddingEvent {
@@ -10,7 +12,7 @@ export interface WeddingEvent {
   church?: string;
   venue?: string;
   brand: 'fotosposi' | 'weddingmoments';
-  tier: 'base' | 'premium' | 'destination';
+  tier: Tier;
   created_at: string;
   code?: string;
 }

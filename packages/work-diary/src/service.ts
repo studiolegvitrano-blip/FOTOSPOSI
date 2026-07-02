@@ -65,17 +65,17 @@ export async function getDiarySummary(eventId: string): Promise<{ summary?: Diar
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from('event_work_diary')
-    .select('*')
+    .select()
     .eq('event_id', eventId);
   if (error) return { error: error.message };
-  const entries = data ?? [];
+  const entries: any[] = data ?? [];
   const first = entries[0];
   return {
     summary: {
       total: entries.length,
-      todo: entries.filter(e => e.status === 'todo').length,
-      done: entries.filter(e => e.status === 'done').length,
-      cancelled: entries.filter(e => e.status === 'cancelled').length,
+      todo: entries.filter((e: any) => e.status === 'todo').length,
+      done: entries.filter((e: any) => e.status === 'done').length,
+      cancelled: entries.filter((e: any) => e.status === 'cancelled').length,
       phase: first?.phase || 'bozza',
     },
   };

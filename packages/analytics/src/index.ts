@@ -10,6 +10,6 @@ export interface B2BReport {
   created_at: string;
 }
 
-export type { AnalyticsSnapshot } from './service';
+export type { AnalyticsSnapshot, ActivationMetrics, EngagementMetrics, ViralMetrics, B2BConversionMetrics } from './service';
 
-export { getEventAnalytics, getB2BAnalytics } from './service';
+export { getEventAnalytics, getB2BAnalytics, getActivationMetrics, getEngagementMetrics, getViralMetrics, getB2BConversionMetrics } from './service';

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { createJoke, getJokes, deleteJoke } from '@fotosposi/games';
 import { createClient, getCurrentUser } from '@fotosposi/core';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,8 @@ import type { JokeEntry } from '@fotosposi/games';
 export default function JokesPage() {
   const params = useParams();
   const eventId = params.id as string;
+  const t = useTranslations('jokes');
+  const c = useTranslations('common');
 
   const [userId, setUserId] = useState<string | null>(null);
   const [content, setContent] = useState('');
@@ -58,7 +61,7 @@ export default function JokesPage() {
       const supabase = createClient();
       const fileName = `jokes/${eventId}/${userId}_${Date.now()}_${mediaFile.name}`;
       const { error: uploadError } = await supabase.storage.from('media').upload(fileName, mediaFile);
-      if (uploadError) { setError('Upload media fallito'); setUploading(false); return; }
+      if (uploadError) { setError(c('error_generic')); setUploading(false); return; }
       const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(fileName);
       mediaUrl = publicUrl;
     }
@@ -109,31 +112,31 @@ export default function JokesPage() {
   return (
     <main className="max-w-3xl mx-auto p-4 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Angolo scherzi</h1>
-        <Button variant="ghost" asChild><Link href={`/events/${eventId}/games`}>← Giochi</Link></Button>
+        <h1 className="text-2xl font-bold">{t('title')}</h1>
+        <Button variant="ghost" asChild><Link href={`/events/${eventId}/games`}>{c('back')}</Link></Button>
       </div>
-      <p className="text-text-muted">I contenuti restano nascosti fino al reveal scelto</p>
+      <p className="text-text-muted">{t('subtitle')}</p>
 
       {nextReveal && (
         <Card className="bg-muted">
           <CardContent className="py-3 text-sm text-center">
-            Prossimo reveal: {nextReveal.toLocaleString('it-IT')}
+            {t('pending')}: {nextReveal.toLocaleString()}
           </CardContent>
         </Card>
       )}
 
       <Card>
-        <CardHeader><CardTitle>Aggiungi scherzo</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t('submit_joke')}</CardTitle></CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Contenuto</label>
+              <label className="text-sm font-medium">{c('content')}</label>
               <textarea value={content} onChange={(e) => setContent(e.target.value)} required rows={3}
                 className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm mt-1"
-                placeholder="Scrivi qui il tuo scherzo (testo, battuta, dedica...)" />
+                placeholder={t('submit_placeholder')} />
             </div>
             <div>
-              <label className="text-sm font-medium">Media (opzionale)</label>
+              <label className="text-sm font-medium">{c('media')}</label>
               <input type="file" accept="image/*,video/*" onChange={handleMediaSelect} className="mt-1 text-sm" />
               {mediaPreview && (
                 mediaFile?.type.startsWith('video/')
@@ -143,12 +146,12 @@ export default function JokesPage() {
             </div>
             <div className="flex gap-4">
               <div className="flex-1 space-y-1">
-                <label className="text-sm font-medium">Data reveal</label>
+                <label className="text-sm font-medium">{t('reveal_label')}</label>
                 <input type="date" value={revealDate} onChange={(e) => setRevealDate(e.target.value)}
                   className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" />
               </div>
               <div className="flex-1 space-y-1">
-                <label className="text-sm font-medium">Ora reveal</label>
+                <label className="text-sm font-medium">{t('reveal_time')}</label>
                 <input type="time" value={revealTime} onChange={(e) => setRevealTime(e.target.value)}
                   className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" />
               </div>
@@ -156,22 +159,22 @@ export default function JokesPage() {
             {error && <p className="text-sm text-error">{error}</p>}
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={uploading}>{uploading ? 'Caricamento...' : 'Invia scherzo'}</Button>
+            <Button type="submit" disabled={uploading}>{uploading ? c('loading') : t('submit_joke')}</Button>
           </CardFooter>
         </form>
       </Card>
 
       {pending.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-lg font-semibold">In attesa di reveal ({pending.length})</h2>
+          <h2 className="text-lg font-semibold">{t('pending')} ({pending.length})</h2>
           {pending.map((j) => (
             <Card key={j.id} className="bg-amber-50">
               <CardContent className="flex items-center justify-between py-3">
                 <div className="flex items-center gap-2">
-                  <Badge variant="warning">Nascosto</Badge>
-                  <span className="text-sm text-text-muted">Reveal: {new Date(j.reveal_at).toLocaleString('it-IT')}</span>
+                  <Badge variant="secondary">{t('pending')}</Badge>
+                  <span className="text-sm text-text-muted">{t('reveal_label')}: {new Date(j.reveal_at).toLocaleString()}</span>
                 </div>
-                <Button variant="destructive" size="sm" onClick={() => handleDelete(j.id)}>Elimina</Button>
+                <Button variant="destructive" size="sm" onClick={() => handleDelete(j.id)}>{t('delete')}</Button>
               </CardContent>
             </Card>
           ))}
@@ -180,12 +183,12 @@ export default function JokesPage() {
 
       {revealed.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-lg font-semibold">Scherzi rivelati</h2>
+          <h2 className="text-lg font-semibold">{t('revealed')}</h2>
           {revealed.map((j) => (
             <Card key={j.id}>
               <CardContent className="py-3">
                 {renderJokeContent(j)}
-                <p className="text-xs text-text-muted mt-2">Rivelato il {new Date(j.reveal_at).toLocaleDateString('it-IT')}</p>
+                <p className="text-xs text-text-muted mt-2">{t('revealed')} {new Date(j.reveal_at).toLocaleDateString()}</p>
               </CardContent>
             </Card>
           ))}
