@@ -19,6 +19,10 @@ export default function EventDetailPage() {
   const eventId = params.id as string;
   const t = useTranslations('events');
   const c = useTranslations('common');
+  function mediaUrl(m: MediaUpload): string {
+    return m.r2_key ? `/api/media/${m.id}/download` : m.url;
+  }
+
   const [event, setEvent] = useState<WeddingEvent | null>(null);
   const [subEvents, setSubEvents] = useState<SubEvent[]>([]);
   const [media, setMedia] = useState<MediaUpload[]>([]);
@@ -123,8 +127,8 @@ export default function EventDetailPage() {
                   {media.slice(0, 12).map((m) => (
                     <div key={m.id} className="rounded-md overflow-hidden border border-border">
                       {m.type === 'photo'
-                        ? <img src={m.url} alt="" className="w-full h-28 object-cover" />
-                        : <video src={m.url} className="w-full h-28 object-cover" />}
+                        ? <img src={mediaUrl(m)} alt="" className="w-full h-28 object-cover" loading="lazy" />
+                        : <video src={mediaUrl(m)} className="w-full h-28 object-cover" />}
                     </div>
                   ))}
                 </div>

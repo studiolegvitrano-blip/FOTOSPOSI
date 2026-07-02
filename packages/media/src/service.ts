@@ -9,6 +9,7 @@ export async function createMediaRecord(params: {
   type: 'photo' | 'video';
   url: string;
   compressed?: boolean;
+  r2_key?: string;
 }): Promise<{ media?: MediaUpload; error?: string }> {
   const supabase = createServiceClient();
   const { data, error } = await supabase
@@ -21,6 +22,7 @@ export async function createMediaRecord(params: {
     url: params.url,
     drive_sync_status: 'pending',
     compressed: params.compressed ?? false,
+    r2_key: params.r2_key ?? null,
   })
  .select()
  .single();

@@ -8,6 +8,11 @@ import { createClient } from '@fotosposi/core';
 import { getCuratedMediaByEvent } from '@fotosposi/media';
 import type { MediaUpload } from '@fotosposi/media';
 
+function mediaUrl(m: MediaUpload): string {
+  if (m.r2_key) return `/api/media/${m.id}/download`;
+  return m.url;
+}
+
 export default function WallPage() {
   const params = useParams();
   const eventId = params.id as string;
@@ -76,9 +81,9 @@ export default function WallPage() {
             position: 'relative',
           }}>
             {m.type === 'photo' ? (
-              <img src={m.url} alt="" style={{ width: '100%', height: 250, objectFit: 'cover' }} />
+              <img src={mediaUrl(m)} alt="" style={{ width: '100%', height: 250, objectFit: 'cover' }} loading="lazy" />
             ) : (
-              <video src={m.url} style={{ width: '100%', height: 250, objectFit: 'cover' }} autoPlay muted loop />
+              <video src={mediaUrl(m)} style={{ width: '100%', height: 250, objectFit: 'cover' }} autoPlay muted loop playsInline />
             )}
             {m.compressed && (
               <span style={{

@@ -24,6 +24,51 @@ export default function UploadPage() {
 
   const FREE_MAX_PHOTOS = 100;
 
+  const [eventMeta, setEventMeta] = useState<{ couple_name: string; date: string } | null>(null);
+
+  function applyWatermark(blob: Blob, coupleName: string, eventDate: string): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(blob); return; }
+        ctx.drawImage(img, 0, 0);
+        drawWatermark(ctx, canvas.width, canvas.height, coupleName, eventDate);
+        canvas.toBlob(b => { if (b) resolve(b); else resolve(blob); }, blob.type, 0.92);
+      };
+      img.onerror = () => resolve(blob);
+      img.src = URL.createObjectURL(blob);
+    });
+  }
+
+  function drawWatermark(
+    ctx: CanvasRenderingContext2D,
+    w: number, h: number,
+    coupleName: string, eventDate: string,
+  ) {
+    ctx.save();
+    // barra nera 45% trasparente in basso 80px
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0, h - 80, w, 80);
+    // coppia
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.max(18, Math.round(w / 28))}px Georgia, serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(coupleName, w / 2, h - 42);
+    // data
+    ctx.font = `${Math.max(13, Math.round(w / 40))}px Georgia, serif`;
+    ctx.fillText(eventDate, w / 2, h - 16);
+    // logo in alto a destra
+    ctx.font = `${Math.max(14, Math.round(w / 48))}px Georgia, serif`;
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.textAlign = 'right';
+    ctx.fillText('FotoSposi', w - 12, 28);
+    ctx.restore();
+  }
+
   const loadQueue = useCallback(async () => {
     const { items } = await getPendingQueue(eventId);
     if (items) {
@@ -55,6 +100,7 @@ export default function UploadPage() {
       if (!user) { router.push('/login'); return; }
       const { event } = await getEventById(eventId);
       if (!event) return;
+      setEventMeta({ couple_name: event.couple_name, date: event.date });
       const isCreator = event.created_by === user.id;
       if (!isCreator) {
         const { window: w } = await getEventWindow(eventId);
@@ -144,11 +190,15 @@ export default function UploadPage() {
       let uploadFile: Blob | File = file;
       let compressed = false;
 
-      if (isFree && file.type.startsWith('image/')) {
-        try {
-          uploadFile = await compressImage(file, 1200);
-          compressed = true;
-        } catch { }
+      if (file.type.startsWith('image/')) {
+        if (isFree) {
+          try { uploadFile = await compressImage(file, 1200); compressed = true; } catch { }
+        }
+        if (eventMeta) {
+          try {
+            uploadFile = await applyWatermark(uploadFile, eventMeta.couple_name, eventMeta.date);
+          } catch { }
+        }
       }
 
       const { id, error } = await enqueueUpload({

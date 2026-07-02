@@ -49,22 +49,26 @@ export async function castVote(params: {
 export async function getLeaderboard(
   eventId: string,
   categoryId: string,
-): Promise<{ leaderboard?: { media_id: string; url: string; votes: number }[]; error?: string }> {
+): Promise<{ leaderboard?: { media_id: string; media_id_fk?: string; url: string; r2_key: string | null; votes: number }[]; error?: string }> {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from('votes')
-    .select(`media_id, media_uploads!inner(url, type), count:media_id`)
+    .select(`media_id, media_uploads!inner(id, url, r2_key, type), count:media_id`)
     .eq('event_id', eventId)
     .eq('category_id', categoryId)
     .order('count', { ascending: false });
   if (error) return { error: error.message };
-  const grouped = new Map<string, { media_id: string; url: string; votes: number }>();
+  const grouped = new Map<string, { media_id: string; media_id_fk: string; url: string; r2_key: string | null; votes: number }>();
   for (const row of data ?? []) {
     const mid = row.media_id as string;
-    const current = grouped.get(mid) ?? { media_id: mid, url: '', votes: 0 };
+    const media = row.media_uploads as unknown as { id: string; url: string; r2_key: string | null };
+    const current = grouped.get(mid) ?? { media_id: mid, media_id_fk: media?.id || '', url: '', r2_key: null, votes: 0 };
     current.votes++;
-    const media = row.media_uploads as unknown as { url: string };
-    if (media?.url) current.url = media.url;
+    if (media?.url) {
+      current.url = media.url;
+      current.r2_key = media.r2_key;
+      current.media_id_fk = media.id;
+    }
     grouped.set(mid, current);
   }
   return { leaderboard: Array.from(grouped.values()).sort((a, b) => b.votes - a.votes) };

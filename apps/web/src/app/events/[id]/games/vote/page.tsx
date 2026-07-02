@@ -9,6 +9,10 @@ import { getCurrentUser } from '@fotosposi/core';
 import type { GameCategory } from '@fotosposi/games';
 import type { MediaUpload } from '@fotosposi/media';
 
+function mediaUrl(m: MediaUpload): string {
+  return m.r2_key ? `/api/media/${m.id}/download` : m.url;
+}
+
 export default function VotePage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -82,7 +86,7 @@ export default function VotePage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
               {photos.map((photo) => (
                 <div key={photo.id} style={{ border: '1px solid #eee', borderRadius: 8, overflow: 'hidden' }}>
-                  <img src={photo.url} alt="" style={{ width: '100%', height: 180, objectFit: 'cover' }} />
+                  <img src={mediaUrl(photo)} alt="" style={{ width: '100%', height: 180, objectFit: 'cover' }} />
                   <div style={{ padding: '0.5rem', textAlign: 'center' }}>
                     <button
                       onClick={() => handleVote(photo.id)}

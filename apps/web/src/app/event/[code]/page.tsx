@@ -97,6 +97,10 @@ export default function GuestEventPage() {
     setShareLoading(null);
   }, [event]);
 
+  function mediaUrl(m: { id: string; r2_key: string | null; url: string }): string {
+    return m.r2_key ? `/api/media/${m.id}/download` : m.url;
+  }
+
   const photos = media.filter(m => m.type === 'photo');
   const now = new Date();
   const canUpload = !window || (now >= new Date(window.opens_at) && now <= new Date(window.closes_at));
@@ -113,7 +117,7 @@ export default function GuestEventPage() {
             Esci live
           </button>
           <div className="text-white/40 absolute bottom-4 text-sm">{slideIdx + 1} / {photos.length}</div>
-          {photos[slideIdx] && <img src={photos[slideIdx].url} alt="" className="max-w-full max-h-full object-contain" />}
+          {photos[slideIdx] && <img src={mediaUrl(photos[slideIdx])} alt="" className="max-w-full max-h-full object-contain" />}
         </div>
       )}
 
@@ -142,8 +146,8 @@ export default function GuestEventPage() {
             <Card key={m.id} className="overflow-hidden group relative">
               <CardContent className="p-1">
                 {m.type === 'photo'
-                  ? <img src={m.url} alt="" className="w-full h-36 object-cover rounded" />
-                  : <video src={m.url} className="w-full h-36 object-cover rounded" controls />}
+                  ? <img src={mediaUrl(m)} alt="" className="w-full h-36 object-cover rounded" />
+                  : <video src={mediaUrl(m)} className="w-full h-36 object-cover rounded" controls />}
               </CardContent>
               {m.type === 'photo' && (
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">

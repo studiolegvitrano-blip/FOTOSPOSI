@@ -7,13 +7,17 @@ import { createClient } from '@fotosposi/core';
 import { getCategories, getLeaderboard } from '@fotosposi/games';
 import type { GameCategory } from '@fotosposi/games';
 
+function lbMediaUrl(item: { url: string; r2_key?: string | null; media_id_fk?: string }): string {
+  return item.r2_key && item.media_id_fk ? `/api/media/${item.media_id_fk}/download` : item.url;
+}
+
 export default function LeaderboardPage() {
   const params = useParams();
   const eventId = params.id as string;
 
   const [categories, setCategories] = useState<GameCategory[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [leaderboard, setLeaderboard] = useState<{ media_id: string; url: string; votes: number }[]>([]);
+  const [leaderboard, setLeaderboard] = useState<{ media_id: string; url: string; r2_key: string | null; media_id_fk: string; votes: number }[]>([]);
 
   useEffect(() => {
     getCategories(eventId).then((r) => {
@@ -96,7 +100,7 @@ export default function LeaderboardPage() {
                 {index + 1}
               </div>
               {item.url && (
-                <img src={item.url} alt="" style={{ width: 80, height: 60, objectFit: 'cover', borderRadius: 4 }} />
+                <img src={lbMediaUrl(item)} alt="" style={{ width: 80, height: 60, objectFit: 'cover', borderRadius: 4 }} loading="lazy" />
               )}
               <div style={{ flex: 1 }}>
                 <div style={{

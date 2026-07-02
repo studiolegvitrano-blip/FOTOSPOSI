@@ -1,7 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient, rateLimit } from '@fotosposi/core';
 import { createMediaRecord, getDriveToken, getEventDriveFolders, updateDriveSyncStatus } from '@fotosposi/media';
-import { deleteObject, getPresignedDownloadUrl } from '@fotosposi/r2-storage';
+import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
+import sharp from 'sharp';
+
+const FONT_PATH = 'https://fonts.gstatic.com/s/georgia/v39/1.woff2';
+
+async function applyWatermark(
+  buffer: Buffer,
+  coupleName: string,
+  eventDate: string,
+): Promise<Buffer> {
+  try {
+    const meta = await sharp(buffer).metadata();
+    const w = meta.width || 1200;
+    const h = meta.height || 900;
+
+    const fontSizeName = Math.max(18, Math.round(w / 28));
+    const fontSizeDate = Math.max(13, Math.round(w / 40));
+    const fontSizeLogo = Math.max(14, Math.round(w / 48));
+
+    const svgOverlay = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="${h - 80}" width="${w}" height="80" fill="rgba(0,0,0,0.45)" />
+      <text x="${w / 2}" y="${h - 42}" text-anchor="middle"
+        font-family="Georgia, serif" font-weight="bold" font-size="${fontSizeName}"
+        fill="white">${coupleName}</text>
+      <text x="${w / 2}" y="${h - 16}" text-anchor="middle"
+        font-family="Georgia, serif" font-size="${fontSizeDate}"
+        fill="white">${eventDate}</text>
+      <text x="${w - 12}" y="28" text-anchor="end"
+        font-family="Georgia, serif" font-size="${fontSizeLogo}"
+        fill="rgba(255,255,255,0.35)">FotoSposi</text>
+    </svg>`;
+
+    return await sharp(buffer)
+      .composite([{ input: Buffer.from(svgOverlay), top: 0, left: 0 }])
+      .jpeg({ quality: 90 })
+      .toBuffer();
+  } catch {
+    return buffer;
+  }
+}
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get('x-forwarded-for') || 'unknown';
@@ -19,17 +58,23 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceClient();
 
-    const { data: items } = await supabase
-      .from('upload_queue')
-      .select('*')
-      .eq('event_id', eventId)
-      .in('status', ['pending', 'failed'])
-      .order('created_at', { ascending: true })
-      .limit(5);
+    const [{ data: event }, { data: items }] = await Promise.all([
+      supabase.from('events').select('couple_name, date').eq('id', eventId).single(),
+      supabase
+        .from('upload_queue')
+        .select('*')
+        .eq('event_id', eventId)
+        .in('status', ['pending', 'failed'])
+        .order('created_at', { ascending: true })
+        .limit(5),
+    ]);
 
     if (!items || items.length === 0) {
       return NextResponse.json({ done: true, processed: 0 });
     }
+
+    const coupleName = event?.couple_name || '';
+    const eventDate = event?.date ? new Date(event.date).toLocaleDateString('it-IT') : '';
 
     const [{ token }] = await Promise.all([getDriveToken(eventId)]);
     const hasDrive = !!token?.access_token;
@@ -50,7 +95,7 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        const downloadUrl = await getPresignedDownloadUrl(r2Key, 900);
+        const downloadUrl = await getPresignedDownloadUrl(r2Key, 3600);
         if (!downloadUrl) {
           await supabase.from('upload_queue').update({ status: 'failed', error: 'Download R2 fallito' }).eq('id', item.id);
           continue;
@@ -62,15 +107,41 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        const buffer = Buffer.from(await resp.arrayBuffer());
+        const rawArr = await resp.arrayBuffer();
+        let buffer = Buffer.from(rawArr) as Buffer;
 
         const isVideo = item.file_type?.startsWith('video/');
+
+        // Watermark solo immagini
+        if (!isVideo && coupleName && eventDate) {
+          buffer = await applyWatermark(buffer as Buffer, coupleName, eventDate);
+        }
+
+        // Ricarica il file watermarked su R2 (sovrascrive l'originale)
+        const { PutObjectCommand } = await import('@aws-sdk/client-s3');
+        const { S3Client } = await import('@aws-sdk/client-s3');
+        const client = new S3Client({
+          region: 'auto',
+          endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+          credentials: {
+            accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+            secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+          },
+        });
+        await client.send(new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET || 'fotosposi-uploads',
+          Key: r2Key,
+          Body: buffer,
+          ContentType: item.file_type || 'application/octet-stream',
+        }));
+
         const { media, error: recordError } = await createMediaRecord({
           event_id: eventId,
           uploaded_by: item.uploaded_by,
           type: isVideo ? 'video' : 'photo',
-          url: downloadUrl,
+          url: r2Key,
           compressed: item.compressed ?? false,
+          r2_key: r2Key,
         });
 
         if (recordError || !media) {
@@ -80,11 +151,10 @@ export async function POST(request: NextRequest) {
 
         if (hasDrive && folders) {
           try {
-            const isVideo = item.file_type?.startsWith('video/');
             const driveFolderId = isVideo ? (folders['Video'] || folders['root']) : (folders['Foto'] || folders['root']);
 
             const formData = new FormData();
-            const blob = new Blob([buffer], { type: item.file_type || 'application/octet-stream' });
+            const blob = new Blob([new Uint8Array(buffer)], { type: item.file_type || 'application/octet-stream' });
             formData.append('file', blob, item.file_name);
             const metadata: Record<string, unknown> = { name: item.file_name };
             if (driveFolderId) metadata.parents = [driveFolderId];
@@ -99,7 +169,6 @@ export async function POST(request: NextRequest) {
             const driveData = await driveRes.json();
             if (driveRes.ok && driveData.id) {
               await updateDriveSyncStatus(media.id, 'synced', driveData.id);
-              await deleteObject(r2Key);
               await supabase.from('upload_queue').update({ status: 'synced', drive_file_id: driveData.id, processed_at: new Date().toISOString() }).eq('id', item.id);
             } else {
               await updateDriveSyncStatus(media.id, 'failed');

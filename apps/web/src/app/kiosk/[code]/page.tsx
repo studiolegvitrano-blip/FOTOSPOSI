@@ -111,7 +111,7 @@ export default function KioskPage() {
     }, 1000);
   };
 
-  // ------- PHOTO -------
+  // ------- PHOTO (watermark su tutto) -------
   const capturePhoto = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -123,27 +123,21 @@ export default function KioskPage() {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // 1. Cattura ORIGINALE (senza watermark) → upload R2 / Drive
       ctx.drawImage(video, 0, 0);
-      canvasToBlob(canvas).then(originalBlob => {
-        if (eventId && guestName.trim()) autoUpload(originalBlob, eventId, guestName, 'image/jpeg', 'jpg');
-      });
-
-      // 2. Aggiungi watermark → salva sul telefono
       drawWatermark(ctx, canvas.width, canvas.height, coupleName, eventDate);
-      canvasToBlob(canvas).then(wmBlob => {
-        setMediaBlob(wmBlob);
-        const url = URL.createObjectURL(wmBlob);
+      canvasToBlob(canvas).then(blob => {
+        setMediaBlob(blob);
+        const url = URL.createObjectURL(blob);
         setMediaUrl(url);
         autoSave(url, 'jpg');
+        if (eventId && guestName.trim()) autoUpload(blob, eventId, guestName, 'image/jpeg', 'jpg');
         setStep('preview');
       });
-
       stopStream();
     });
   };
 
-  // ------- VIDEO -------
+  // ------- VIDEO (watermark su tutto via canvas.captureStream) -------
   const startVideoRecording = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -155,17 +149,22 @@ export default function KioskPage() {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Registra originale SENZA watermark per R2/Drive
       const stream = videoRef.current?.srcObject as MediaStream | null;
-      const origStream = stream?.clone();
+      drawFrames(ctx, canvas, video);
+      const canvasStream = canvas.captureStream(30);
+      if (stream?.getAudioTracks().length) canvasStream.addTrack(stream.getAudioTracks()[0]!.clone());
+
       chunksRef.current = [];
-      const recorder = new MediaRecorder(origStream!, { mimeType: 'video/webm;codecs=vp9,opus' });
+      const recorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm;codecs=vp9,opus' });
       recorderRef.current = recorder;
       recorder.ondataavailable = e => { if (e.data.size) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
+        cancelAnimationFrame(rafRef.current);
         const blob = new Blob(chunksRef.current, { type: 'video/webm' });
         setMediaBlob(blob);
-        setMediaUrl(URL.createObjectURL(blob));
+        const url = URL.createObjectURL(blob);
+        setMediaUrl(url);
+        autoSave(url, 'webm');
         if (eventId && guestName.trim()) autoUpload(blob, eventId, guestName, 'video/webm', 'webm');
         setRecording(false);
         setStep('preview');
@@ -177,6 +176,12 @@ export default function KioskPage() {
   };
 
   const stopVideoRecording = () => recorderRef.current?.stop();
+
+  function drawFrames(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, video: HTMLVideoElement) {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    drawWatermark(ctx, canvas.width, canvas.height, coupleName, eventDate);
+    rafRef.current = requestAnimationFrame(() => drawFrames(ctx, canvas, video));
+  }
 
   // ------- COMMON -------
   const autoSave = (url: string, ext: string) => {
