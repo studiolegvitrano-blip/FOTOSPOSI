@@ -80,6 +80,9 @@ export default function EventDetailPage() {
           <Button variant="outline" asChild><Link href={`/events/${eventId}/video-challenges`}>{t('video_challenges')}</Link></Button>
           <Button variant="outline" asChild><Link href={`/events/${eventId}/wow-walk`}>{t('wow_walk')}</Link></Button>
           <Button variant="outline" asChild><Link href={`/kiosk/${event.code || eventId}`}>{t('kiosk')}</Link></Button>
+          <Button variant="outline" asChild><Link href={`/events/${eventId}/social-wall`}>
+            {event?.hashtag ? `#${event.hashtag}` : 'Social Wall'}
+          </Link></Button>
           <Button variant="outline" asChild><Link href={`/events/${eventId}/qr`}>{t('qr_code')}</Link></Button>
         </div>
       </div>

@@ -34,6 +34,7 @@ INSERT INTO marketplace_suppliers (name, category, description, city, approved, 
   ('Vodafone', 'servizio_consigliato', 'Fibra e mobile per la nuova casa', NULL, true, true, 'vodafone', 'Primi 3 mesi gratis su fibra', 'https://vodafone.it/partner/fotosposi', '30€ per ogni nuova attivazione'),
   ('Semrush', 'servizio_consigliato', 'Strumento di SEO e marketing digitale per promuovere il tuo business', NULL, true, true, 'semrush', 'Prova gratuita 14 giorni estesa', 'https://semrush.com/affiliates', '200$ flat per abbonamento, cookie 120gg'),
   ('WP Engine', 'servizio_consigliato', 'Hosting WordPress professionale per fotografi e wedding planner', NULL, true, true, 'wp-engine', '1 mese di hosting gratuito', 'https://wpengine.com/affiliates', '200$+ per referral, cookie 180gg'),
+  ('Spotify', 'servizio_consigliato', 'Musica in streaming per il ricevimento, la cena e l\'after party — playlist collaborative', NULL, true, true, 'spotify', '3 mesi Premium gratis', 'https://spotify.com/affiliates', '$7,35 per vendita via Sovrn, 1 mese gratis per referral'),
 
   -- Autonoleggi
   ('Rentalcars.com', 'servizio_consigliato', 'Noleggio auto in Italia e all\'estero per il viaggio di nozze', NULL, true, true, 'rentalcars', '10% di sconto', 'https://rentalcars.com/affiliates', '6% del valore totale noleggio via CJ Affiliate'),

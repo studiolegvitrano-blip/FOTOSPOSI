@@ -15,6 +15,7 @@ export interface WeddingEvent {
   tier: Tier;
   created_at: string;
   code?: string;
+  hashtag?: string;
 }
 
 export interface SubEvent {

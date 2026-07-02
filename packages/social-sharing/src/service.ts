@@ -105,6 +105,88 @@ export async function applyWatermark(
   });
 }
 
+import { createServiceClient } from '@fotosposi/core';
+
+export interface SocialPost {
+  id: string;
+  event_id: string;
+  platform: 'instagram' | 'tiktok' | 'facebook' | 'other';
+  post_url: string;
+  thumbnail_url: string | null;
+  caption: string | null;
+  author_name: string | null;
+  author_avatar: string | null;
+  embed_html: string | null;
+  posted_at: string | null;
+  created_at: string;
+}
+
+export async function getSocialPosts(eventId: string): Promise<{ posts?: SocialPost[]; error?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('social_posts')
+    .select('*')
+    .eq('event_id', eventId)
+    .order('created_at', { ascending: false });
+  if (error) return { error: error.message };
+  return { posts: data ?? [] };
+}
+
+export async function addSocialPost(params: {
+  event_id: string;
+  platform: SocialPost['platform'];
+  post_url: string;
+  thumbnail_url?: string;
+  caption?: string;
+  author_name?: string;
+  author_avatar?: string;
+  embed_html?: string;
+  posted_at?: string;
+}): Promise<{ post?: SocialPost; error?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.from('social_posts').insert(params).select().single();
+  if (error) return { error: error.message };
+  return { post: data };
+}
+
+export async function fetchOEmbed(postUrl: string): Promise<{
+  html?: string;
+  thumbnail_url?: string;
+  author_name?: string;
+  title?: string;
+}> {
+  const providers: { host: string; endpoint: string }[] = [
+    { host: 'instagram.com', endpoint: 'https://www.instagram.com/oembed' },
+    { host: 'www.instagram.com', endpoint: 'https://www.instagram.com/oembed' },
+    { host: 'tiktok.com', endpoint: 'https://www.tiktok.com/oembed' },
+    { host: 'www.tiktok.com', endpoint: 'https://www.tiktok.com/oembed' },
+    { host: 'facebook.com', endpoint: 'https://www.facebook.com/plugins/post/oembed.json' },
+    { host: 'www.facebook.com', endpoint: 'https://www.facebook.com/plugins/post/oembed.json' },
+    { host: 'spotify.com', endpoint: 'https://open.spotify.com/oembed' },
+    { host: 'open.spotify.com', endpoint: 'https://open.spotify.com/oembed' },
+  ];
+
+  try {
+    const urlObj = new URL(postUrl);
+    const provider = providers.find(p => urlObj.hostname === p.host);
+    if (!provider) return {};
+
+    const oembedUrl = `${provider.endpoint}?url=${encodeURIComponent(postUrl)}&format=json`;
+    const res = await fetch(oembedUrl, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) return {};
+
+    const data = await res.json();
+    return {
+      html: data.html,
+      thumbnail_url: data.thumbnail_url,
+      author_name: data.author_name,
+      title: data.title,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export function getShareUrl(eventId: string, brand: 'fotosposi' | 'weddingmoments'): string {
   const base = typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL ?? '';
   return `${base}/event/${eventId}`;
