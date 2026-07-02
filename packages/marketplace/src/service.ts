@@ -18,6 +18,8 @@ export interface MarketplaceSupplier {
   confirmed_sales: number;
   lat: number | null;
   lng: number | null;
+  affiliate_link: string | null;
+  commission_info: string | null;
   created_at: string;
 }
 

@@ -6,6 +6,7 @@ import { getPartners, type MarketplaceSupplier } from '@fotosposi/marketplace';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ExternalLink, PiggyBank } from 'lucide-react';
 
 const CATEGORIES = [
   { key: '', label: 'Tutti' },
@@ -33,8 +34,18 @@ export default function PartnerListPage() {
 
   return (
     <main className="max-w-5xl mx-auto p-4 space-y-6">
-      <h1 className="text-2xl font-bold">Sconti per gli sposi</h1>
-      <p className="text-text-muted">Mostra l'app FotoSposi ai partner e ottieni sconti esclusivi per il tuo matrimonio.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Sconti per gli sposi</h1>
+          <p className="text-text-muted">Mostra l'app FotoSposi ai partner e ottieni sconti esclusivi per il tuo matrimonio.</p>
+        </div>
+        <Button variant="outline" size="sm" asChild className="shrink-0">
+          <Link href="/partner/servizi">
+            <PiggyBank className="w-4 h-4 mr-1" />
+            Servizi Consigliati
+          </Link>
+        </Button>
+      </div>
 
       <div className="flex gap-2 flex-wrap">
         {CATEGORIES.map(c => (
