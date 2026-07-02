@@ -8,18 +8,20 @@ export async function createMediaRecord(params: {
   uploaded_by: string;
   type: 'photo' | 'video';
   url: string;
+  compressed?: boolean;
 }): Promise<{ media?: MediaUpload; error?: string }> {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from('media_uploads')
  .insert({
-   event_id: params.event_id,
-   sub_event_id: params.sub_event_id ?? null,
-   uploaded_by: params.uploaded_by,
-   type: params.type,
-   url: params.url,
-   drive_sync_status: 'pending',
- })
+    event_id: params.event_id,
+    sub_event_id: params.sub_event_id ?? null,
+    uploaded_by: params.uploaded_by,
+    type: params.type,
+    url: params.url,
+    drive_sync_status: 'pending',
+    compressed: params.compressed ?? false,
+  })
  .select()
  .single();
 

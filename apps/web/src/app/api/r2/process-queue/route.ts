@@ -64,11 +64,13 @@ export async function POST(request: NextRequest) {
 
         const buffer = Buffer.from(await resp.arrayBuffer());
 
+        const isVideo = item.file_type?.startsWith('video/');
         const { media, error: recordError } = await createMediaRecord({
           event_id: eventId,
           uploaded_by: item.uploaded_by,
-          type: item.file_type?.startsWith('video/') ? 'video' : 'photo',
+          type: isVideo ? 'video' : 'photo',
           url: downloadUrl,
+          compressed: item.compressed ?? false,
         });
 
         if (recordError || !media) {

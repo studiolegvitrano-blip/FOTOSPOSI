@@ -7,6 +7,7 @@ export interface MediaUpload {
   url: string;
   drive_file_id: string | null;
   drive_sync_status: 'pending' | 'synced' | 'failed';
+  compressed: boolean;
   created_at: string;
 }
 

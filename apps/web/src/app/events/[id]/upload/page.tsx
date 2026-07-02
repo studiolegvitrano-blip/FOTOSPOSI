@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { createMediaRecord, enqueueUpload, getPendingQueue, updateQueueItem, getQueueStats, type QueueItem } from '@fotosposi/media';
-import { getCurrentUser } from '@fotosposi/core';
+import { createMediaRecord, enqueueUpload, getPendingQueue, updateQueueItem, getQueueStats, compressImage, type QueueItem } from '@fotosposi/media';
+import { getCurrentUser, getEventTier, type Tier } from '@fotosposi/core';
 import { getEventById, getEventWindow } from '@fotosposi/events';
 
 export default function UploadPage() {
@@ -13,13 +13,16 @@ export default function UploadPage() {
 
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [phase, setPhase] = useState<'idle' | 'queueing' | 'processing'>('idle');
-  const [paused, setPaused] = useState(false);
   const [stats, setStats] = useState({ pending: 0, processing: 0, synced: 0, failed: 0 });
   const [queueProgress, setQueueProgress] = useState({ current: 0, total: 0 });
   const [eventReady, setEventReady] = useState(false);
+  const [tier, setTier] = useState<Tier>('free');
+  const [skipVideos, setSkipVideos] = useState(0);
+  const [limitReached, setLimitReached] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const pausedRef = useRef(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+
+  const FREE_MAX_PHOTOS = 100;
 
   const loadQueue = useCallback(async () => {
     const { items } = await getPendingQueue(eventId);
@@ -63,6 +66,16 @@ export default function UploadPage() {
           }
         }
       }
+
+      const { tier: evTier } = await getEventTier(eventId);
+      if (evTier) setTier(evTier);
+
+      if (evTier === 'free') {
+        const s = await getQueueStats(eventId);
+        const totalExisting = s.synced + s.pending + s.processing;
+        if (totalExisting >= FREE_MAX_PHOTOS) setLimitReached(true);
+      }
+
       setEventReady(true);
       const hasPending = await loadQueue();
       if (hasPending) {
@@ -97,21 +110,54 @@ export default function UploadPage() {
     const { user } = await getCurrentUser();
     if (!user) return;
 
+    const isFree = tier === 'free';
+    let skippedVideos = 0;
+    let reachedLimit = false;
+
+    const files: File[] = [];
+    for (let i = 0; i < selected.length; i++) {
+      const f = selected.item(i);
+      if (!f) continue;
+      if (isFree && f.type.startsWith('video/')) { skippedVideos++; continue; }
+      files.push(f);
+    }
+
+    setSkipVideos(skippedVideos);
+
+    const s = await getQueueStats(eventId);
+    const totalExisting = s.synced + s.pending + s.processing;
+    const slotsLeft = isFree ? Math.max(0, FREE_MAX_PHOTOS - totalExisting) : files.length;
+    const allowed = files.slice(0, slotsLeft);
+    if (allowed.length < files.length) reachedLimit = true;
+    setLimitReached(reachedLimit);
+
+    if (allowed.length === 0) { setPhase('idle'); return; }
+
     setPhase('queueing');
-    setQueueProgress({ current: 0, total: selected.length });
+    setQueueProgress({ current: 0, total: allowed.length });
     let queued = 0;
 
-    for (let i = 0; i < selected.length; i++) {
-      const file = selected.item(i);
-      if (!file) continue;
-      setQueueProgress({ current: i + 1, total: selected.length });
+    for (let i = 0; i < allowed.length; i++) {
+      const file = allowed[i]!;
+      setQueueProgress({ current: i + 1, total: allowed.length });
+
+      let uploadFile: Blob | File = file;
+      let compressed = false;
+
+      if (isFree && file.type.startsWith('image/')) {
+        try {
+          uploadFile = await compressImage(file, 1200);
+          compressed = true;
+        } catch { }
+      }
 
       const { id, error } = await enqueueUpload({
         event_id: eventId,
         uploaded_by: user.id,
         file_name: file.name,
         file_type: file.type || 'application/octet-stream',
-        file_size: file.size,
+        file_size: uploadFile.size,
+        compressed,
       });
       if (error || !id) continue;
 
@@ -129,7 +175,7 @@ export default function UploadPage() {
 
       const uploadResp = await fetch(r2Data.presignedUrl, {
         method: 'PUT',
-        body: file,
+        body: uploadFile,
         headers: { 'Content-Type': file.type },
       });
       if (!uploadResp.ok) {
@@ -142,11 +188,11 @@ export default function UploadPage() {
       queued++;
       setQueue(prev => [...prev, {
         id, event_id: eventId, uploaded_by: user.id,
-        file_name: file.name, file_type: file.type, file_size: file.size,
+        file_name: file.name, file_type: file.type, file_size: uploadFile.size,
         status: 'pending' as const,
         storage_path: null, compressed_path: null, drive_file_id: null,
-        error: null, retry_count: 0, created_at: new Date().toISOString(), processed_at: null, r2_key: r2Data.key,
-      }]);
+        error: null, retry_count: 0, compressed, created_at: new Date().toISOString(), processed_at: null, r2_key: r2Data.key,
+      } as QueueItem]);
     }
 
     setStats(prev => ({ ...prev, pending: prev.pending + queued }));
@@ -168,12 +214,25 @@ export default function UploadPage() {
         Seleziona tutti i file che vuoi. L'elaborazione continua anche se chiudi la pagina.
       </p>
 
+      {tier === 'free' && (
+        <div style={{ fontSize: '0.85rem', color: '#c00', marginBottom: '1rem', padding: '0.5rem', border: '1px solid #fcc', borderRadius: 6, background: '#fff5f5' }}>
+          <strong>Piano Free</strong> — max {FREE_MAX_PHOTOS} foto, compresse. Nessun video.{' '}
+          <a href={`/events/${eventId}/tier`} style={{ color: '#d4a574' }}>Passa a Premium</a> per foto originali, video illimitati e backup Drive.
+        </div>
+      )}
+
+      {limitReached && (
+        <p style={{ fontSize: '0.85rem', color: '#c00', marginBottom: '0.5rem' }}>
+          Hai raggiunto il limite di {FREE_MAX_PHOTOS} foto del piano Free.
+        </p>
+      )}
+
       <div style={{ marginBottom: '1rem' }}>
         <input
           ref={inputRef}
           type="file"
           multiple
-          accept="image/*,video/*"
+          accept={tier === 'free' ? 'image/*' : 'image/*,video/*'}
           onChange={handleSelectFiles}
           disabled={phase === 'queueing' || phase === 'processing'}
           style={{ width: '100%', padding: '0.5rem' }}
@@ -183,6 +242,12 @@ export default function UploadPage() {
       {phase === 'queueing' && (
         <p style={{ marginBottom: '1rem', color: '#555', fontSize: '0.9rem' }}>
           Accodamento file in corso... {queueProgress.current}/{queueProgress.total}
+        </p>
+      )}
+
+      {skipVideos > 0 && (
+        <p style={{ fontSize: '0.85rem', color: '#c00', marginBottom: '0.5rem' }}>
+          {skipVideos} video skippati (non disponibili nel piano Free).
         </p>
       )}
 

@@ -73,11 +73,21 @@ export default function WallPage() {
             overflow: 'hidden',
             borderRadius: 8,
             animation: 'fadeIn 0.5s ease',
+            position: 'relative',
           }}>
             {m.type === 'photo' ? (
               <img src={m.url} alt="" style={{ width: '100%', height: 250, objectFit: 'cover' }} />
             ) : (
               <video src={m.url} style={{ width: '100%', height: 250, objectFit: 'cover' }} autoPlay muted loop />
+            )}
+            {m.compressed && (
+              <span style={{
+                position: 'absolute', top: 4, right: 4,
+                background: 'rgba(200,100,0,0.7)', color: '#fff',
+                fontSize: '0.6rem', padding: '2px 6px', borderRadius: 4,
+              }}>
+                SD
+              </span>
             )}
           </div>
         ))}

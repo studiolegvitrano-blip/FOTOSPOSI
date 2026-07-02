@@ -92,13 +92,14 @@
 - [ ] Time Capsule acquisto singolo (Premium: 15€/6mesi, Invitati: 15€/6mesi)
 - [ ] Finestra 48h Addio Celibato/Nubilato per Premium+
 - [ ] Video before/after (design in corso)
+- [x] Free tier: max 100 foto, compresse (SD), nessun video — migration 00017 + upload gate + badge SD su Wall
 
 ### Pricing finale (IT)
-| Tier | Prezzo |
-|------|--------|
-| Free | €0 |
-| Premium | 229€ |
-| Deluxe | 375€ |
+| Tier | Prezzo | Foto | Video | Qualità |
+|------|--------|------|-------|---------|
+| Free | €0 | max 100 | ❌ | compressa (SD) |
+| Premium | 229€ | illimitate | ✅ | originale |
+| Deluxe | 375€ | illimitate | ✅ | originale |
 | Time Capsule extra | 15€/6 mesi |
 | Time Capsule Deluxe | inclusa 6 mesi, poi 12€/6 mesi |
 

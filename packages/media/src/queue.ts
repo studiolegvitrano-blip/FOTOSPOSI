@@ -16,6 +16,7 @@ export interface QueueItem {
   created_at: string;
   processed_at: string | null;
   r2_key: string | null;
+  compressed: boolean;
 }
 
 export type QueueStatus = QueueItem['status'];
@@ -26,6 +27,7 @@ export async function enqueueUpload(params: {
   file_name: string;
   file_type: string;
   file_size: number;
+  compressed?: boolean;
 }): Promise<{ id?: string; error?: string }> {
   const supabase = createServiceClient();
   const { data, error } = await supabase
@@ -37,6 +39,7 @@ export async function enqueueUpload(params: {
       file_type: params.file_type,
       file_size: params.file_size,
       status: 'pending',
+      compressed: params.compressed ?? false,
     })
     .select('id')
     .single();
