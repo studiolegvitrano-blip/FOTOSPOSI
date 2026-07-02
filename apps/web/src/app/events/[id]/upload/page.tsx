@@ -217,7 +217,7 @@ export default function UploadPage() {
       {tier === 'free' && (
         <div style={{ fontSize: '0.85rem', color: '#c00', marginBottom: '1rem', padding: '0.5rem', border: '1px solid #fcc', borderRadius: 6, background: '#fff5f5' }}>
           <strong>Piano Free</strong> — max {FREE_MAX_PHOTOS} foto, compresse. Nessun video.{' '}
-          <a href={`/events/${eventId}/tier`} style={{ color: '#d4a574' }}>Passa a Premium</a> per foto originali, video illimitati e backup Drive.
+          <a href={`/events/${eventId}/tier`} style={{ color: '#d4a574' }}>Passa a Premium</a> per foto originali, video illimitati e backup Drive. O in 3 rate con Klarna.
         </div>
       )}
 

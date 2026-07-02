@@ -79,7 +79,7 @@ export async function createCheckoutSession(params: {
     const client = new stripe.default(stripeKey, { apiVersion: '2025-02-24.acacia' as any });
 
     const session = await client.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'klarna'],
       line_items: [
         {
           price_data: {
@@ -157,7 +157,7 @@ export async function createGiftCheckoutSession(params: {
     const client = new stripe.default(stripeKey, { apiVersion: '2025-02-24.acacia' as any });
 
     const session = await client.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'klarna'],
       line_items: [
         {
           price_data: {
