@@ -39,6 +39,7 @@ export function hasFeature(tier: Tier, featureKey: string): boolean {
     video_challenges: 'deluxe',
     ai_concierge: 'deluxe',
     reel_riassunto: 'deluxe',
+    countdown_widget: 'premium',
   };
   const required = requirements[featureKey];
   if (!required) return true;

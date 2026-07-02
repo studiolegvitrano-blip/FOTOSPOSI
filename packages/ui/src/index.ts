@@ -21,3 +21,4 @@ export const brandColors = {
 export type Brand = keyof typeof brandColors;
 
 export { ShareButton } from './share-button';
+export { Countdown } from './countdown';
