@@ -150,6 +150,7 @@
 - **Morning-After AI Teaser**: alle 09:00 del giorno dopo le nozze, AI seleziona le migliori 15 clip video/foto, monta a tempo di musica e notifica push. Condivisione virale IG/TT con frame brandizzato.
 - **VIP Face-Match Gallery**: face recognition GDPR-compliant. Ogni invitato riceve link alla sua galleria personale con solo le foto in cui appare.
 - **Digital Flash-Mob & Light Show Sync**: smartphone invitati lampeggiano a tempo di musica sincronizzato durante il primo ballo.
+- **Rete Partner internazionale**: al lancio in UK/US/DE/FR/ES, reclutare partner locali (fotografi, fornitori, autonoleggi) con geolocalizzazione 140 km + servizi consigliati con referral link specifici per paese.
 
 ### ✔ Batch 2 — Giochi virali + Video Challenges
 - [x] **Admin marketplace**: `getAllSuppliers`, `approveSupplier`, `deleteSupplier` in service.ts; pagina `/admin/marketplace` con stats + table
