@@ -9,14 +9,31 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Camera, Video } from 'lucide-react';
 
-function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number) {
+function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, coupleName?: string, eventDate?: string) {
   ctx.save();
-  ctx.globalAlpha = 0.4;
-  ctx.font = 'bold 28px sans-serif';
+  // Sfondo semitrasparente in basso
+  const barH = 80;
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(0, h - barH, w, barH);
+
+  // Nome coppia + "Sposi"  es. "Marco & Giulia Sposi"
   ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'right';
+  ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.fillText('FotoSposi', w - 16, h - 16);
+  ctx.font = 'bold 26px Georgia, "Times New Roman", serif';
+  ctx.fillText(`${coupleName || 'Gli Sposi'} Sposi`, w / 2, h - 40);
+
+  // Data evento  es. "02/07/2026"
+  ctx.font = '15px Georgia, "Times New Roman", serif';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(eventDate || '', w / 2, h - 14);
+
+  // Brand FotoSposi in alto a destra
+  ctx.globalAlpha = 0.35;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  ctx.font = 'bold 18px sans-serif';
+  ctx.fillText('FotoSposi', w - 12, 12);
   ctx.restore();
 }
 
@@ -38,6 +55,8 @@ export default function KioskPage() {
   const chunksRef = useRef<Blob[]>([]);
 
   const [eventName, setEventName] = useState('');
+  const [coupleName, setCoupleName] = useState('');
+  const [eventDate, setEventDate] = useState('');
   const [eventId, setEventId] = useState<string | null>(null);
   const [guestName, setGuestName] = useState('');
   const [mode, setMode] = useState<'photo' | 'video'>('photo');
@@ -52,7 +71,13 @@ export default function KioskPage() {
   useEffect(() => {
     if (!code) return;
     getEventByCode(code).then(r => {
-      if (r.event) { setEventId(r.event.id); setEventName(r.event.couple_name || 'Evento'); }
+      if (r.event) {
+        setEventId(r.event.id);
+        setEventName(r.event.couple_name || 'Evento');
+        setCoupleName(r.event.couple_name || '');
+        const d = new Date(r.event.date);
+        setEventDate(`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`);
+      }
     });
   }, [code]);
 
@@ -98,7 +123,7 @@ export default function KioskPage() {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       ctx.drawImage(video, 0, 0);
-      drawWatermark(ctx, canvas.width, canvas.height);
+      drawWatermark(ctx, canvas.width, canvas.height, coupleName, eventDate);
       canvasToBlob(canvas).then(blob => {
         setMediaBlob(blob);
         const url = URL.createObjectURL(blob);
@@ -153,7 +178,7 @@ export default function KioskPage() {
 
   function drawFrames(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, video: HTMLVideoElement) {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    drawWatermark(ctx, canvas.width, canvas.height);
+    drawWatermark(ctx, canvas.width, canvas.height, coupleName, eventDate);
     rafRef.current = requestAnimationFrame(() => drawFrames(ctx, canvas, video));
   }
 
