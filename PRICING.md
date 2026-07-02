@@ -4,7 +4,7 @@
 
 | Servizio | Free | Premium | Deluxe |
 |----------|:----:|:-------:|:------:|
-| **Prezzo** | **€0** | **229€** | **375€** |
+| **Prezzo** | **€0** | **229€** (o 3 rate Klarna) | **375€** (o 3 rate Klarna) |
 | Sito invito digitale | base (3 sezioni) | completo (12 sezioni) | completo |
 | Dominio personalizzato | ❌ | ✅ incluso | ✅ incluso |
 | Upload invitati | solo finestra | illimitato | illimitato |
@@ -20,6 +20,13 @@
 | Time Capsule | ❌ | extra 15€/6mesi | ✅ inclusa 6mesi (poi 12€/6mesi) |
 | App Mobile (Android + iOS) brandizzata sposi | ❌ | +60€ extra | ✅ |
 | Gelato (stampe) | ❌ | prezzo pieno | -20% |
+
+## Prezzi Volume (per professionisti)
+| Quantità | Prezzo licenza | Sconto | Extra |
+|:--------:|:--------------:|:------:|:----:|
+| 1-5 | 229€ | - | - |
+| 6-11 | **114.50€** | -50% | - |
+| 12+ | **114.50€** | -50% | +1 gratis (paghi 12, ricevi 13) |
 
 ## Time Capsule (extra)
 

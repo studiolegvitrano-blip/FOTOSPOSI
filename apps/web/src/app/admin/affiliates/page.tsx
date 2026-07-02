@@ -88,7 +88,7 @@ export default function AdminAffiliatesPage() {
             <div className="p-3 border rounded text-center bg-green-50">
               <div className="text-2xl font-bold text-brand">12+</div>
               <div className="text-text-muted">-50% + 1 gratis</div>
-              <div>{vol(12).total}€ per 12 (13a gratis)</div>
+              <div>{vol(12).total}€ per 12, ricevi 13</div>
             </div>
           </div>
         </CardContent>

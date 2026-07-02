@@ -138,9 +138,9 @@ export default function TierPage() {
               className="w-20 border rounded p-2 text-sm" />
             <span className="text-sm">
               {vol.discountPercent > 0 && <Badge variant="default" className="mr-2">-{vol.discountPercent}%</Badge>}
-              {vol.freeLicenses > 0 && <Badge variant="default" className="mr-2">{vol.freeLicenses} gratis</Badge>}
+              {vol.freeLicenses > 0 && <Badge variant="default" className="mr-2">+{vol.freeLicenses} gratis</Badge>}
               {vol.unitPrice}€ cad → <strong>{finalPrice}€ totale</strong>
-              {vol.freeLicenses > 0 && <span className="text-xs text-text-muted ml-2">(paghi {bulkQty - vol.freeLicenses}, ricevi {bulkQty})</span>}
+              {vol.freeLicenses > 0 && <span className="text-xs text-text-muted ml-2">(paghi {bulkQty} a {vol.unitPrice}€, ricevi {bulkQty + vol.freeLicenses})</span>}
             </span>
           </div>
         </CardContent>

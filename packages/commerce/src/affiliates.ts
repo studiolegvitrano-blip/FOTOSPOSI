@@ -212,10 +212,9 @@ export function calculateVolumePrice(basePrice: number, quantity: number): {
   discountPercent: number;
 } {
   if (quantity >= 12) {
-    const paidQuantity = quantity - 1;
     return {
       unitPrice: basePrice * 0.5,
-      total: Math.round(paidQuantity * basePrice * 0.5 * 100) / 100,
+      total: Math.round(quantity * basePrice * 0.5 * 100) / 100,
       freeLicenses: 1,
       discountPercent: 50,
     };
