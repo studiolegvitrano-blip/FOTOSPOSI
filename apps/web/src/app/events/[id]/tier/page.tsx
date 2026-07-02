@@ -88,6 +88,8 @@ export default function TierPage() {
               <li>✓ Drive backup</li>
               <li>✓ tutti i giochi</li>
               <li>✓ Time Capsule</li>
+              <li>✓ sito-evento brandizzato</li>
+              <li>✓ RSVP + menu + mappe</li>
             </ul>
             {currentTier === 'premium' && <Badge className="mt-2">Attuale</Badge>}
           </CardContent>
@@ -102,6 +104,7 @@ export default function TierPage() {
               <li>✓ app mobile brandizzata</li>
               <li>✓ AI concierge</li>
               <li>✓ kiosk selfie</li>
+              <li>✓ <strong>sito col tuo nome</strong> (es. marioelucia.fotosposi.it)</li>
             </ul>
           </CardContent>
         </Card>
