@@ -26,6 +26,8 @@ export function hasFeature(tier: Tier, featureKey: string): boolean {
     photo_vote: 'free',
     wall: 'free',
     drive_backup: 'free',
+    partner_access: 'free',
+    servizi_consigliati: 'free',
     photo_hunt: 'premium',
     quiz: 'premium',
     dress_vote: 'premium',

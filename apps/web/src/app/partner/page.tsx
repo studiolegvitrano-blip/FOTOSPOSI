@@ -63,7 +63,7 @@ export default function PartnerListPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Sconti per gli sposi</h1>
-          <p className="text-text-muted">Mostra l'app FotoSposi ai partner e ottieni sconti esclusivi per il tuo matrimonio.</p>
+          <p className="text-text-muted">Sconti esclusivi per sposi e invitati. Mostra l'app ai partner convenzionati e risparmia sul tuo matrimonio.</p>
         </div>
         <Button variant="outline" size="sm" asChild className="shrink-0">
           <Link href="/partner/servizi">

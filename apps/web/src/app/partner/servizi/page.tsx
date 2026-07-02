@@ -51,10 +51,10 @@ export default function ServiziPage() {
   return (
     <main className="max-w-5xl mx-auto p-4 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">Servizi Consigliati per gli Sposi</h1>
+        <h1 className="text-2xl font-bold">Servizi Consigliati</h1>
         <p className="text-text-muted mt-1">
           Apri un conto, attiva un'offerta o prenota un viaggio tramite i nostri link.
-          Ricevi bonus e sconti esclusivi — e sostieni FotoSposi con una piccola commissione. Zero costi per te.
+          Bonus e sconti esclusivi per sposi e invitati. Zero costi.
         </p>
       </div>
 
