@@ -30,6 +30,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang={locale}>
+      <head>
+        <meta httpEquiv="Content-Security-Policy" content="
+          default-src 'self';
+          img-src 'self' data: blob: https: http:;
+          media-src 'self' blob: https:;
+          frame-src 'self' https://www.instagram.com https://www.tiktok.com https://open.spotify.com https://www.facebook.com;
+          style-src 'self' 'unsafe-inline';
+          script-src 'self' 'unsafe-inline' https://www.instagram.com https://www.tiktok.com;
+          connect-src 'self' https:;
+        " />
+      </head>
       <body suppressHydrationWarning>
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
