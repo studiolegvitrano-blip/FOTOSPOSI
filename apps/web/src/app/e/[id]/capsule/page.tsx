@@ -10,7 +10,7 @@ type SenderType = 'sposo' | 'sposa' | 'invitato';
 type RecipientType = 'sposi' | 'sposo' | 'sposa' | 'singolo' | 'gruppo';
 
 export default function CapsulePage() {
-  const { code } = useParams<{ code: string }>();
+  const { id } = useParams<{ id: string }>();
   const [eventId, setEventId] = useState<string | null>(null);
   const [eventName, setEventName] = useState('');
   const [loading, setLoading] = useState(true);
@@ -27,13 +27,13 @@ export default function CapsulePage() {
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    if (!code) return;
-    getEventByCode(code).then(({ event }) => {
+    if (!id) return;
+    getEventByCode(id).then(({ event }) => {
       if (event) { setEventId(event.id); setEventName(event.couple_name); }
       else setEventName('Evento');
       setLoading(false);
     });
-  }, [code]);
+  }, [id]);
 
   const handleSubmit = async () => {
     if (!eventId || !senderName.trim()) return;
@@ -156,7 +156,7 @@ export default function CapsulePage() {
       {step === 'sent' && (
         <Card>
           <CardContent className="py-8 text-center space-y-3">
-            <p className="text-lg font-medium">Messaggio custodito nella capsula del tempo! 🎉</p>
+            <p className="text-lg font-medium">Messaggio custodito nella capsula del tempo!</p>
             <p className="text-sm text-text-muted">Verrà consegnato tra un anno, giorno per giorno.</p>
           </CardContent>
         </Card>
