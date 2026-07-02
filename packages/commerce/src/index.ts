@@ -45,3 +45,17 @@ export {
   getGiftTransactions,
   createGiftCheckoutSession,
 } from './service';
+
+export type { Coupon, Affiliate, Referral } from './affiliates';
+export {
+  listCoupons,
+  getCoupon,
+  createCoupon,
+  validateCoupon,
+  applyCoupon,
+  listAffiliates,
+  createAffiliate,
+  createReferral,
+  getReferrals,
+  calculateVolumePrice,
+} from './affiliates';
