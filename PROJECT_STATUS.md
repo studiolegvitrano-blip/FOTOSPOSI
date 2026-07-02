@@ -151,6 +151,7 @@
 - **VIP Face-Match Gallery**: face recognition GDPR-compliant. Ogni invitato riceve link alla sua galleria personale con solo le foto in cui appare.
 - **Digital Flash-Mob & Light Show Sync**: smartphone invitati lampeggiano a tempo di musica sincronizzato durante il primo ballo.
 - **Rete Partner internazionale**: al lancio in UK/US/DE/FR/ES, reclutare partner locali (fotografi, fornitori, autonoleggi) con geolocalizzazione 140 km + servizi consigliati con referral link specifici per paese.
+- **Affiliate Program Influencer**: CPA (10% su vendita) per wedding blogger, fotografi, make-up artist, content creator. Nessun costo upfront, tracciato via referral code/link.
 
 ### ✔ Batch 2 — Giochi virali + Video Challenges
 - [x] **Admin marketplace**: `getAllSuppliers`, `approveSupplier`, `deleteSupplier` in service.ts; pagina `/admin/marketplace` con stats + table
