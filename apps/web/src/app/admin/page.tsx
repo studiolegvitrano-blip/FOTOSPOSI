@@ -51,6 +51,7 @@ export default function AdminPage() {
           <Button variant="outline" asChild><Link href="/admin/affiliates">Collaboratori</Link></Button>
           <Button variant="outline" asChild><Link href="/admin/analytics">Analytics</Link></Button>
           <Button variant="outline" asChild><Link href="/admin/marketplace">Fornitori</Link></Button>
+          <Button variant="outline" asChild><Link href="/admin/leads">Lead B2B</Link></Button>
           <Button variant="outline" asChild><Link href="/dashboard">Dashboard</Link></Button>
           <Button variant="ghost" onClick={handleLogout}>Esci</Button>
         </div>

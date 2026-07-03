@@ -17,10 +17,14 @@ export async function getTemplateById(id: string): Promise<{ template?: SiteTemp
 
 export async function createDraft(eventId: string, templateId?: string): Promise<{ draft?: SiteDraft; error?: string }> {
   const supabase = createClient();
+  const { data: event } = await supabase.from('events').select('couple_name, date').eq('id', eventId).single();
+  const content: Record<string, string> = {};
+  if (event?.couple_name) content.coupleNames = event.couple_name;
+  if (event?.date) content.date = event.date;
   const { data, error } = await supabase.from('site_drafts').insert({
     event_id: eventId,
     template_id: templateId ?? null,
-    content: {},
+    content,
   }).select().single();
   if (error) return { error: error.message };
   return { draft: data };

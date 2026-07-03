@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { getCurrentUser } from '@fotosposi/core';
+import { getCurrentUser, createClient } from '@fotosposi/core';
 import { getTemplates, getDraft, createDraft, updateDraft, updateDraftTemplate, publishSite } from '@fotosposi/site-builder';
 import type { SiteContent } from '@fotosposi/site-builder';
 import { SUGGESTED_PHRASES, generateIcsLink } from '@fotosposi/site-builder';
@@ -84,13 +84,23 @@ export default function SiteBuilderPage() {
   }, [id]);
 
   const loadData = async () => {
-    const [tRes, dRes] = await Promise.all([getTemplates(), getDraft(id)]);
+    const [tRes, dRes, eventRes] = await Promise.all([
+      getTemplates(),
+      getDraft(id),
+      createClient().from('events').select('couple_name, date').eq('id', id).single(),
+    ]);
     if (tRes.templates) setTemplates(tRes.templates);
+    const eventData = eventRes.data as { couple_name?: string; date?: string } | null;
+    const prefill: SiteContent = {};
+    if (eventData?.couple_name) prefill.coupleNames = eventData.couple_name;
+    if (eventData?.date) prefill.date = eventData.date;
     const d = dRes.draft;
     if (d) {
       setDraft(d);
       setSelectedTemplate(tRes.templates?.find((tpl: any) => tpl.id === d.template_id) ?? null);
-      setContent((prev: SiteContent) => ({ ...prev, ...(d.content as SiteContent) }));
+      setContent((prev: SiteContent) => ({ ...prev, ...prefill, ...(d.content as SiteContent) }));
+    } else {
+      setContent(prefill);
     }
   };
 

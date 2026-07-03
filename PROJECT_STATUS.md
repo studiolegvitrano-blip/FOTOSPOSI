@@ -163,7 +163,8 @@
 - [x] **Wow Walk** (`/events/[id]/wow-walk`): before/after walking video, side-by-side sync playback
 - [x] **Video Challenges Addio al Celibato** (`/events/[id]/video-challenges`): 21 sfide, prima=addio celibato / dopo=cerimonia, side-by-side, localStorage
 - [x] **21 nuovi test games**: photo_hunt (register, tasks, submit, leaderboard), dress_vote (cast, stats, my vote), ensureDefaultTasks
-- [x] **131 test totali (10 file)** — tutti verdi
+- [x] **194 test totali (16 file)** — tutti verdi
+- [x] **GTM Engineer integrato**: package `@fotosposi/gte`, 5 API routes (`/api/gte/*`), admin page `/admin/leads`, migration 00023 (6 nuove tabelle GTE), 7 test
 
 ## Log cronologico
 | Data | Modulo | Commit |
@@ -220,6 +221,8 @@
 | 02/07/2026 | tier | — **Tier System**: migration 00015 (free/premium/deluxe), `packages/core/src/tiers.ts`, games hub/gestione filtrano per tier, PRICING.md aggiornato 229€/375€ + geo-pricing 9 paesi |
 | 02/07/2026 | r2 | — **R2 Storage**: `packages/r2-storage/` (S3 client, presigned URL), API routes upload/delete, upload page riscritta: client→R2→Drive sync→cancella R2, niente più Supabase Storage |
 | 02/07/2026 | test | — Stress test `scripts/stress-test.mjs` + RPC `pg_database_size()` / `get_table_sizes()`, stima ~100k eventi in 500 MB |
+| 03/07/2026 | docs | — `GTM-ENGINEER-WEDDINGMOMENTS.md`: documento GTM Engineer integrato per WeddingMoments (4 workflow n8n, schema SQL, prompt AI, setup guide) |
+| 03/07/2026 | gte | — Migration 00023 (6 nuove tabelle GTE), package `@fotosposi/gte`, 5 API routes `/api/gte/*`, admin page `/admin/leads`, 7 test, **194 test totali** |
 
 ## Internazionalizzazione
 
@@ -285,3 +288,6 @@
 
 ### Rischio principale
 Mercato matrimoni Italia in contrazione (-5,9% annuo) ma valore medio per evento in crescita. La crescita deve venire da **quota di mercato sottratta a Google Drive/WhatsApp/soluzioni fai-da-te**, non dall'espansione del mercato.
+
+## Documenti di progetto
+- 📄 [GTM ENGINEER — WEDDINGMOMENTS](GTM-ENGINEER-WEDDINGMOMENTS.md) — Sistema di marketing automatizzato (n8n + Groq/Mistral + Telegram) a costo zero per content pipeline, B2B lead hunter, engagement triage, learning loop

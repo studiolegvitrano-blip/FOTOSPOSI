@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getCurrentUser } from '@fotosposi/core';
-import { getMessages, sendMessage, getAiResponse } from '@fotosposi/concierge';
+import { getMessages, sendMessage } from '@fotosposi/concierge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
@@ -38,11 +38,19 @@ export default function ConciergePage() {
     if (userMsg.message) setMessages(prev => [...prev, userMsg.message!]);
 
     const history = [...messages, { role: 'user', content: text }];
-    const aiRes = await getAiResponse(history.map(m => ({ role: m.role, content: m.content })));
+    const res = await fetch('/api/concierge/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: history.map(m => ({ role: m.role, content: m.content })) }),
+    });
+    const aiRes = await res.json();
 
     if (aiRes.content) {
       const aiMsg = await sendMessage({ event_id: id, user_id: user.id, role: 'assistant', content: aiRes.content });
       if (aiMsg.message) setMessages(prev => [...prev, aiMsg.message!]);
+    } else if (aiRes.error) {
+      const errMsg = await sendMessage({ event_id: id, user_id: user.id, role: 'assistant', content: `⚠️ ${aiRes.error}` });
+      if (errMsg.message) setMessages(prev => [...prev, errMsg.message!]);
     }
     setSending(false);
   };

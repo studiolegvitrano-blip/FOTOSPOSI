@@ -37,11 +37,11 @@ export default function LoginPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">{t('login_email_label')}</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('login_email_placeholder')} required />
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('login_email_placeholder')} autoComplete="email" required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">{t('login_password_label')}</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('login_password_placeholder')} required />
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('login_password_placeholder')} autoComplete="current-password" required />
             </div>
             {error && <p className="text-sm text-error">{error}</p>}
           </CardContent>

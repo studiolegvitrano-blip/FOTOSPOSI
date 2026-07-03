@@ -11,8 +11,14 @@ async function getDraft(draftId: string): Promise<SiteDraft | null> {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } },
   );
-  const { data } = await supabase.from('site_drafts').select('*').eq('id', draftId).single();
-  return data;
+  const { data } = await supabase.from('site_drafts').select('*, events!inner(couple_name, date)').eq('id', draftId).single();
+  if (!data) return null;
+  const event = data.events as { couple_name?: string; date?: string } | undefined;
+  const content = data.content as Record<string, any>;
+  if (event?.couple_name && !content.coupleNames) content.coupleNames = event.couple_name;
+  if (event?.date && !content.date) content.date = event.date;
+  delete (data as any).events;
+  return { ...data, content };
 }
 
 export default async function PublicSitePage({ params }: { params: Promise<{ id: string }> }) {
