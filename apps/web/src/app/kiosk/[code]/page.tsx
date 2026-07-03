@@ -11,29 +11,35 @@ import { Camera, Video } from 'lucide-react';
 
 function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, coupleName?: string, eventDate?: string) {
   ctx.save();
-  // Sfondo semitrasparente in basso
-  const barH = 80;
-  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  const barH = Math.max(80, Math.round(h / 12));
+  const fontSizeName = Math.max(22, Math.round(w / 22));
+  const fontSizeDate = Math.max(16, Math.round(w / 32));
+
+  // Sfondo con gradiente in basso
+  const grad = ctx.createLinearGradient(0, h - barH, 0, h);
+  grad.addColorStop(0, 'rgba(0,0,0,0.0)');
+  grad.addColorStop(0.3, 'rgba(0,0,0,0.5)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.82)');
+  ctx.fillStyle = grad;
   ctx.fillRect(0, h - barH, w, barH);
 
-  // Nome coppia + "Sposi"  es. "Marco & Giulia Sposi"
-  ctx.fillStyle = '#ffffff';
+  // Nome coppia
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.font = 'bold 26px Georgia, "Times New Roman", serif';
-  ctx.fillText(`${coupleName || 'Gli Sposi'} Sposi`, w / 2, h - 40);
+  ctx.font = `bold ${fontSizeName}px Georgia, "Times New Roman", serif`;
+  ctx.fillText(`${coupleName || 'Gli Sposi'}`, w / 2, h - barH + Math.round(barH * 0.38));
 
-  // Data evento  es. "02/07/2026"
-  ctx.font = '15px Georgia, "Times New Roman", serif';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText(eventDate || '', w / 2, h - 14);
+  // Data evento
+  ctx.font = `${fontSizeDate}px Georgia, "Times New Roman", serif`;
+  ctx.fillText(eventDate || '', w / 2, h - barH + Math.round(barH * 0.38) + fontSizeName + 6);
 
-  // Brand FotoSposi in alto a destra
-  ctx.globalAlpha = 0.35;
+  // Brand FotoSposi in basso a destra (sopra la barra)
+  ctx.globalAlpha = 0.50;
   ctx.textAlign = 'right';
-  ctx.textBaseline = 'top';
-  ctx.font = 'bold 18px sans-serif';
-  ctx.fillText('FotoSposi', w - 12, 12);
+  ctx.textBaseline = 'bottom';
+  ctx.font = `${Math.max(14, Math.round(fontSizeDate * 0.9))}px Georgia, sans-serif`;
+  ctx.fillText('FotoSposi', w - 16, h - 16);
   ctx.restore();
 }
 

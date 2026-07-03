@@ -16,21 +16,32 @@ async function applyWatermark(
     const w = meta.width || 1200;
     const h = meta.height || 900;
 
-    const fontSizeName = Math.max(18, Math.round(w / 28));
-    const fontSizeDate = Math.max(13, Math.round(w / 40));
-    const fontSizeLogo = Math.max(14, Math.round(w / 48));
+    const barHeight = Math.max(80, Math.round(h / 12));
+    const fontSizeName = Math.max(22, Math.round(w / 22));
+    const fontSizeDate = Math.max(16, Math.round(w / 32));
+    const fontSizeLogo = Math.max(16, Math.round(w / 40));
+
+    const nameY = h - barHeight + Math.round(barHeight * 0.38);
+    const dateY = nameY + fontSizeName + 6;
 
     const svgOverlay = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="${h - 80}" width="${w}" height="80" fill="rgba(0,0,0,0.45)" />
-      <text x="${w / 2}" y="${h - 42}" text-anchor="middle"
+      <defs>
+        <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="rgba(0,0,0,0.0)" />
+          <stop offset="30%" stop-color="rgba(0,0,0,0.5)" />
+          <stop offset="100%" stop-color="rgba(0,0,0,0.82)" />
+        </linearGradient>
+      </defs>
+      <rect x="0" y="${h - barHeight}" width="${w}" height="${barHeight}" fill="url(#barGrad)" />
+      <text x="${w / 2}" y="${nameY}" text-anchor="middle"
         font-family="Georgia, serif" font-weight="bold" font-size="${fontSizeName}"
-        fill="white">${coupleName}</text>
-      <text x="${w / 2}" y="${h - 16}" text-anchor="middle"
+        fill="rgba(255,255,255,0.95)">${coupleName}</text>
+      <text x="${w / 2}" y="${dateY}" text-anchor="middle"
         font-family="Georgia, serif" font-size="${fontSizeDate}"
-        fill="white">${eventDate}</text>
-      <text x="${w - 12}" y="28" text-anchor="end"
+        fill="rgba(255,255,255,0.85)">${eventDate}</text>
+      <text x="${w - 16}" y="${h - 16}" text-anchor="end"
         font-family="Georgia, serif" font-size="${fontSizeLogo}"
-        fill="rgba(255,255,255,0.35)">FotoSposi</text>
+        fill="rgba(255,255,255,0.50)">FotoSposi</text>
     </svg>`;
 
     return await sharp(buffer)
