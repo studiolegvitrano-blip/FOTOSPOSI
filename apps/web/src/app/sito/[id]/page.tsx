@@ -79,7 +79,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
             )}
           </div>
 
-          {c.weddingPartyEnabled && c.weddingPartyMembers?.length > 0 && (
+          {c.weddingPartyEnabled && (c.weddingPartyMembers?.length ?? 0) > 0 && (
             <div className="section" style={{ background: p3, color: p2 }}>
               <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>{tpl?.name ? 'Wedding Party' : 'Testimoni'}</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -208,7 +208,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
             </div>
           )}
 
-          {c.faqEnabled && c.faqEntries?.length > 0 && (
+          {c.faqEnabled && (c.faqEntries?.length ?? 0) > 0 && (
             <div className="section" style={{ background: p1, color: p2 }}>
               <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>FAQ</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

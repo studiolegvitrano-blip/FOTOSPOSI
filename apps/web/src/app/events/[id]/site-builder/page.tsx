@@ -630,7 +630,7 @@ export default function SiteBuilderPage() {
                 </div>
               )}
 
-              {content.faqEnabled && content.faqEntries?.length > 0 && (
+              {content.faqEnabled && (content.faqEntries?.length ?? 0) > 0 && (
                 <div className="p-8" style={{ background: palette[1], color: palette[2] }}>
                   <h3 className="text-xl font-semibold mb-4 flex items-center gap-2" style={{ color: palette[0] }}><HelpCircle className="w-5 h-5" /> FAQ</h3>
                   {(content.faqEntries as any[]).map((faq: any, i: number) => (
@@ -642,7 +642,7 @@ export default function SiteBuilderPage() {
                 </div>
               )}
 
-              {content.weddingPartyEnabled && content.weddingPartyMembers?.length > 0 && (
+              {content.weddingPartyEnabled && (content.weddingPartyMembers?.length ?? 0) > 0 && (
                 <div className="p-8" style={{ background: palette[3], color: palette[2] }}>
                   <h3 className="text-xl font-semibold mb-4 flex items-center gap-2" style={{ color: palette[0] }}><Users className="w-5 h-5" /> Wedding Party</h3>
                   {(content.weddingPartyMembers as any[]).map((m: any, i: number) => (

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@fotosposi/core';
-import { processQueueForEvent } from '../../r2/process-queue/route';
+import { processQueueForEvent } from '@/lib/process-queue';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
