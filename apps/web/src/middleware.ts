@@ -4,6 +4,10 @@ import type { NextRequest } from 'next/server';
 import { routing } from '../i18n/routing';
 
 function getLocale(request: NextRequest): string {
+  const host = request.headers.get('host') || '';
+  if (host.includes('sposi.live')) return 'it';
+  if (host.includes('justmarry.live')) return 'en-US';
+
   const cookieLocale = request.cookies.get('NEXT_LOCALE')?.value;
   if (cookieLocale && routing.locales.includes(cookieLocale as any)) return cookieLocale;
 

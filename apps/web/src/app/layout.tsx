@@ -1,13 +1,28 @@
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { NextIntlClientProvider } from 'next-intl';
 import { routing } from '../../i18n/routing';
 import './globals.css';
 
-export const metadata: Metadata = {
-  title: 'FotoSposi',
-  description: 'La piattaforma per il tuo matrimonio',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const h = await headers();
+  const host = h.get('host') || '';
+  const isIt = host.includes('sposi.live') || !host.includes('justmarry.live');
+  const brand = isIt ? 'Sposi.live' : 'JustMarry.live';
+  const desc = isIt ? 'La piattaforma per il tuo matrimonio' : 'Your wedding platform';
+  return {
+    title: brand,
+    description: desc,
+    manifest: '/manifest.webmanifest',
+    other: {
+      'mobile-web-app-capable': 'yes',
+      'apple-mobile-web-app-capable': 'yes',
+      'apple-mobile-web-app-status-bar-style': 'default',
+      'apple-mobile-web-app-title': brand,
+      'application-name': brand,
+    },
+  };
+}
 
 async function getLocale(): Promise<string> {
   const cookieStore = await cookies();
@@ -39,12 +54,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           style-src 'self' 'unsafe-inline';
           script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.instagram.com https://www.tiktok.com;
           connect-src 'self' https:;
+          worker-src 'self' blob:;
         " />
+        <meta name="theme-color" content="#d4a574" />
+        <link rel="apple-touch-icon" href="/icon-192.svg" />
       </head>
       <body suppressHydrationWarning>
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
         </NextIntlClientProvider>
+        <script dangerouslySetInnerHTML={{ __html: "if('serviceWorker' in navigator)navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(r){r.unregister()})})" }} />
       </body>
     </html>
   );

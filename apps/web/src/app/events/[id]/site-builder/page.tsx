@@ -10,7 +10,7 @@ import { SUGGESTED_PHRASES, generateIcsLink } from '@fotosposi/site-builder';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Heart, Church, GlassWater, Image, Gift, Mail, Shirt, Utensils, Hotel, Music, Hash, Clock, MapPin, Calendar, Bell, Sparkles, Save, Eye, Edit, Layout, Check, Settings, Phone } from 'lucide-react';
+import { Heart, Church, GlassWater, Image, Gift, Mail, Shirt, Utensils, Hotel, Music, Hash, Clock, MapPin, Calendar, Bell, Sparkles, Save, Eye, Edit, Layout, Check, Settings, Phone, HelpCircle, Users, Plus, Trash2 } from 'lucide-react';
 
 type SectionKey = keyof typeof SUGGESTED_PHRASES;
 
@@ -28,6 +28,8 @@ const SECTION_META: { key: string; sectionKey: string }[] = [
   { key: 'hashtagEnabled', sectionKey: 'hashtag' },
   { key: 'countdownEnabled', sectionKey: 'countdown' },
   { key: 'navettaEnabled', sectionKey: 'navetta' },
+  { key: 'faqEnabled', sectionKey: 'faq' },
+  { key: 'weddingPartyEnabled', sectionKey: 'wedding_party' },
 ];
 
 const SECTION_ICONS: Record<string, React.ReactNode> = {
@@ -44,6 +46,8 @@ const SECTION_ICONS: Record<string, React.ReactNode> = {
   hashtagEnabled: <Hash className="w-5 h-5" />,
   countdownEnabled: <Clock className="w-5 h-5" />,
   navettaEnabled: <MapPin className="w-5 h-5" />,
+  faqEnabled: <HelpCircle className="w-5 h-5" />,
+  weddingPartyEnabled: <Users className="w-5 h-5" />,
 };
 
 const SECTION_LABEL_KEYS: Record<string, string> = {
@@ -60,6 +64,8 @@ const SECTION_LABEL_KEYS: Record<string, string> = {
   hashtag: 'hashtag_section',
   countdown: 'countdown',
   navetta: 'navetta_section',
+  faq: 'faq_section',
+  wedding_party: 'wedding_party_section',
 };
 
 export default function SiteBuilderPage() {
@@ -406,6 +412,76 @@ export default function SiteBuilderPage() {
                 </Card>
               )}
 
+              {content.faqEnabled && (
+                <Card>
+                  <CardHeader><CardTitle className="text-base"><HelpCircle className="w-4 h-4 inline" /> FAQ</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    {((content.faqEntries as any[]) || []).map((entry: any, i: number) => (
+                      <div key={i} className="p-3 rounded-lg border border-border space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-text-muted">Domanda {i + 1}</span>
+                          <button onClick={() => {
+                            const entries = [...((content.faqEntries as any[]) || [])];
+                            entries.splice(i, 1);
+                            updateC('faqEntries', entries);
+                          }} className="text-red-500 hover:text-red-700">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={entry.question || ''} onChange={e => {
+                          const entries = [...((content.faqEntries as any[]) || [])];
+                          entries[i] = { ...entries[i], question: e.target.value };
+                          updateC('faqEntries', entries);
+                        }} placeholder="Domanda" />
+                        <textarea className="w-full min-h-[60px] rounded-md border border-border bg-surface px-3 py-2 text-sm" value={entry.answer || ''} onChange={e => {
+                          const entries = [...((content.faqEntries as any[]) || [])];
+                          entries[i] = { ...entries[i], answer: e.target.value };
+                          updateC('faqEntries', entries);
+                        }} placeholder="Risposta" />
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={() => updateC('faqEntries', [...((content.faqEntries as any[]) || []), { question: '', answer: '' }])}>
+                      <Plus className="w-4 h-4 mr-1" /> Aggiungi domanda
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {content.weddingPartyEnabled && (
+                <Card>
+                  <CardHeader><CardTitle className="text-base"><Users className="w-4 h-4 inline" /> Wedding Party</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    {((content.weddingPartyMembers as any[]) || []).map((member: any, i: number) => (
+                      <div key={i} className="p-3 rounded-lg border border-border space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-text-muted">Membro {i + 1}</span>
+                          <button onClick={() => {
+                            const members = [...((content.weddingPartyMembers as any[]) || [])];
+                            members.splice(i, 1);
+                            updateC('weddingPartyMembers', members);
+                          }} className="text-red-500 hover:text-red-700">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={member.name || ''} onChange={e => {
+                          const members = [...((content.weddingPartyMembers as any[]) || [])];
+                          members[i] = { ...members[i], name: e.target.value };
+                          updateC('weddingPartyMembers', members);
+                        }} placeholder="Nome" />
+                        <input className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={member.role || ''} onChange={e => {
+                          const members = [...((content.weddingPartyMembers as any[]) || [])];
+                          members[i] = { ...members[i], role: e.target.value };
+                          updateC('weddingPartyMembers', members);
+                        }} placeholder="Ruolo (es. Testimone, Damigella)" />
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={() => updateC('weddingPartyMembers', [...((content.weddingPartyMembers as any[]) || []), { name: '', role: '' }])}>
+                      <Plus className="w-4 h-4 mr-1" /> Aggiungi membro
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
               {content.navettaEnabled && (
                 <Card>
                   <CardHeader><CardTitle className="text-base"><MapPin className="w-4 h-4 inline" /> {t('navetta_section')}</CardTitle></CardHeader>
@@ -551,6 +627,33 @@ export default function SiteBuilderPage() {
                       <p className="opacity-70">{t('navetta_matchmaking_label')}</p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {content.faqEnabled && content.faqEntries?.length > 0 && (
+                <div className="p-8" style={{ background: palette[1], color: palette[2] }}>
+                  <h3 className="text-xl font-semibold mb-4 flex items-center gap-2" style={{ color: palette[0] }}><HelpCircle className="w-5 h-5" /> FAQ</h3>
+                  {(content.faqEntries as any[]).map((faq: any, i: number) => (
+                    <div key={i} className="mb-4">
+                      <p className="font-semibold text-sm mb-1">{faq.question}</p>
+                      <p className="text-sm opacity-70">{faq.answer}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {content.weddingPartyEnabled && content.weddingPartyMembers?.length > 0 && (
+                <div className="p-8" style={{ background: palette[3], color: palette[2] }}>
+                  <h3 className="text-xl font-semibold mb-4 flex items-center gap-2" style={{ color: palette[0] }}><Users className="w-5 h-5" /> Wedding Party</h3>
+                  {(content.weddingPartyMembers as any[]).map((m: any, i: number) => (
+                    <div key={i} className="flex items-center gap-3 mb-3">
+                      {m.photoUrl && <img src={m.photoUrl} alt={m.name} className="w-10 h-10 rounded-full object-cover" />}
+                      <div>
+                        <p className="text-sm font-medium">{m.name}</p>
+                        <p className="text-xs opacity-70">{m.role}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 

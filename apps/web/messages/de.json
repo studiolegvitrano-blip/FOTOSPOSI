@@ -1,8 +1,8 @@
 {
   "common": {
-    "brand_name": "WeddingMoments",
+    "brand_name": "JustMarry.live",
     "brand_subtitle": "Ihre Hochzeit, wunderschön festgehalten – Fotos, Spiele, Geschenke, alles an einem Ort",
-    "app_name": "WeddingMoments",
+    "app_name": "JustMarry.live",
     "save": "Speichern",
     "cancel": "Abbrechen",
     "delete": "Löschen",
@@ -11,7 +11,7 @@
     "search": "Suchen",
     "loading": "Wird geladen...",
     "error_generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
-    "error_network": "Verbindungsfehler. Bitte überprüfen Sie Ihre Internetverbindung.",
+    "or_continue_with": "oder weiter mit","error_network": "Verbindungsfehler. Bitte überprüfen Sie Ihre Internetverbindung.",
     "back": "Zurück",
     "next": "Weiter",
     "close": "Schließen",
@@ -53,7 +53,7 @@
     "settings": "Einstellungen"
   },
   "home": {
-    "hero_title": "WeddingMoments",
+    "hero_title": "JustMarry.live",
     "hero_subtitle": "Die All-in-One-Plattform für Ihren großen Tag. Teilen Sie Fotos, spielen Sie Spiele, sammeln Sie Geschenke und bewahren Sie jede Erinnerung an einem Ort – vom Junggesellenabschied bis zu den Flitterwochen.",
     "how_it_works": "So funktioniert es",
     "features": [
@@ -64,11 +64,24 @@
       "Print-on-Demand-Alben und Erinnerungsstücke"
     ],
     "cta_login": "Anmelden",
-    "cta_signup": "Jetzt starten"
+    "cta_signup": "Jetzt starten",
+    "badge": "Die Hochzeitsseite, die Ihre Gäste wirklich nutzen",
+    "plans_title": "Für jede Hochzeit der passende Plan",
+    "plan_free_name": "Free",
+    "plan_free_desc": "Event-Website, QR-Code, bis zu 100 Fotos in Standardqualität. Für immer kostenlos.",
+    "plan_premium_name": "Premium",
+    "plan_premium_desc": "Unbegrenzte Fotos & Videos in Originalqualität, alle Spiele, 6 Monate Time Capsule.",
+    "plan_deluxe_name": "Deluxe",
+    "plan_deluxe_desc": "Alles aus Premium plus exklusive Funktionen, 12 Monate Time Capsule, priorisierter Support.",
+    "plan_cta": "Pläne ansehen",
+    "plan_popular": "Am beliebtesten",
+    "final_cta_title": "Bereit für Ihre Hochzeitsseite?",
+    "final_cta_subtitle": "Dauert nur wenige Minuten. Kostenlos. Keine Kreditkarte nötig.",
+    "footer_tagline": "Fotos, Spiele und Erinnerungen Ihrer Hochzeit, an einem Ort."
   },
   "auth": {
     "login_title": "Willkommen zurück",
-    "login_subtitle": "Melden Sie sich bei Ihrem WeddingMoments-Konto an.",
+    "login_subtitle": "Melden Sie sich bei Ihrem JustMarry.live-Konto an.",
     "login_email_label": "E-Mail",
     "login_email_placeholder": "ihre@email.de",
     "login_password_label": "Passwort",
@@ -85,6 +98,13 @@
     "signup_email_placeholder": "ihre@email.de",
     "signup_password_label": "Passwort",
     "signup_password_placeholder": "Wählen Sie ein Passwort",
+    "signup_firstname_label": "Vorname",
+    "signup_lastname_label": "Nachname",
+    "signup_phone_label": "Mobiltelefon",
+    "signup_gdpr_label": "Ich habe die Verarbeitung meiner personenbezogenen Daten gelesen und akzeptiere sie (Datenschutzerklärung).",
+    "signup_privacy_link": "Datenschutzerklärung lesen",
+    "signup_marketing_label": "Ich stimme optional der Weitergabe meiner Daten an Partner und Anbieter zu Marketingzwecken zu.",
+    "signup_gdpr_required": "Sie müssen die Datenschutzerklärung akzeptieren, um sich zu registrieren.",
     "signup_submit": "Konto erstellen",
     "signup_has_account": "Bereits ein Konto?",
     "signup_login_link": "Anmelden",
@@ -124,6 +144,7 @@
     "detail_title": "Veranstaltungsdetails",
     "public_page": "Öffentliche Seite",
     "qr_code": "QR-Code",
+    "guests": "Gäste",
     "site_builder": "Hochzeitswebsite",
     "upload_media": "Fotos & Videos hochladen",
     "games": "Spiele",
@@ -245,7 +266,7 @@
     "publish_site": "Website veröffentlichen",
     "preview_heading": "Einladungsvorschau",
     "follow_us_hashtag": "Folgen Sie uns mit dem Hashtag",
-    "powered_by": "WeddingMoments · Digitale Einladung",
+    "powered_by": "JustMarry.live · Digitale Einladung",
     "site_published": "Website veröffentlicht:"
   },
   "wall": {
@@ -531,7 +552,7 @@
     "server_error_description": "Bitte versuchen Sie es später erneut."
   },
   "brand": {
-    "fotosposi": "FotoSposi",
-    "weddingmoments": "WeddingMoments"
+    "fotosposi": "Sposi.live",
+    "weddingmoments": "JustMarry.live"
   }
 }

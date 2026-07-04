@@ -1,12 +1,31 @@
 'use client';
 
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 
 interface VideoRecorderProps {
   onRecordingComplete: (blob: Blob) => void;
   maxDuration?: number;
   suggestedText?: string;
+}
+
+// iOS Safari does not support 'video/webm' — hardcoding it makes `new MediaRecorder(...)`
+// throw immediately on iPhone/iPad. Feature-detect a supported mimeType instead, with an
+// mp4/h264 fallback for Safari.
+function pickSupportedVideoMime(): string | undefined {
+  if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return undefined;
+  const candidates = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+    'video/mp4;codecs=h264,aac',
+    'video/mp4',
+  ];
+  return candidates.find(m => MediaRecorder.isTypeSupported(m));
+}
+
+function cameraSupported(): boolean {
+  return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
 }
 
 export function VideoRecorder({ onRecordingComplete, maxDuration = 30, suggestedText }: VideoRecorderProps) {
@@ -18,14 +37,30 @@ export function VideoRecorder({ onRecordingComplete, maxDuration = 30, suggested
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout>(undefined);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [unsupported, setUnsupported] = useState(false);
+
+  // Rilascia sempre la fotocamera allo smontaggio (evita che resti "accesa" su iOS/Android).
+  useEffect(() => () => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    clearInterval(timerRef.current);
+  }, []);
 
   const startRecording = useCallback(async () => {
+    if (!cameraSupported()) {
+      setUnsupported(true);
+      return;
+    }
+    const mime = pickSupportedVideoMime();
+    if (!mime) {
+      setUnsupported(true);
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
 
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      const recorder = new MediaRecorder(stream, { mimeType: mime });
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
 
@@ -34,7 +69,7 @@ export function VideoRecorder({ onRecordingComplete, maxDuration = 30, suggested
       };
 
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const blob = new Blob(chunksRef.current, { type: mime });
         setRecordedBlob(blob);
         setState('preview');
         if (videoRef.current) {
@@ -57,8 +92,15 @@ export function VideoRecorder({ onRecordingComplete, maxDuration = 30, suggested
           return prev - 1;
         });
       }, 1000);
-    } catch {
-      alert('Impossibile accedere alla fotocamera. Controlla i permessi.');
+    } catch (err) {
+      const name = (err as { name?: string })?.name;
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        alert('Permesso fotocamera/microfono negato. Abilitalo nelle impostazioni del browser per registrare un video.');
+      } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+        alert('Nessuna fotocamera trovata su questo dispositivo.');
+      } else {
+        alert('Impossibile accedere alla fotocamera. Controlla i permessi.');
+      }
     }
   }, [maxDuration]);
 
@@ -77,11 +119,21 @@ export function VideoRecorder({ onRecordingComplete, maxDuration = 30, suggested
     setState('idle');
     setTimeLeft(maxDuration);
     setRecordedBlob(null);
+    setUnsupported(false);
     if (videoRef.current) {
       videoRef.current.srcObject = null;
       videoRef.current.src = '';
     }
   }, [maxDuration]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const handleFileFallback = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setRecordedBlob(file);
+    setState('preview');
+    if (videoRef.current) videoRef.current.src = URL.createObjectURL(file);
+  }, []);
 
   return (
     <div className="space-y-3">
@@ -106,13 +158,35 @@ export function VideoRecorder({ onRecordingComplete, maxDuration = 30, suggested
           </div>
         )}
       </div>
-      <div className="flex justify-center gap-2">
-        {state === 'idle' && <Button onClick={startRecording}>Registra video</Button>}
-        {state === 'recording' && <Button variant="destructive" onClick={stopRecording}>Ferma</Button>}
-        {state === 'preview' && (
+      <div className="flex flex-col items-center gap-2">
+        <div className="flex justify-center gap-2">
+          {state === 'idle' && !unsupported && <Button onClick={startRecording}>Registra video</Button>}
+          {state === 'recording' && <Button variant="destructive" onClick={stopRecording}>Ferma</Button>}
+          {state === 'preview' && (
+            <>
+              <Button onClick={confirmAndSend}>Invia messaggio</Button>
+              <Button variant="outline" onClick={reset}>Riprova</Button>
+            </>
+          )}
+        </div>
+        {state === 'idle' && (
           <>
-            <Button onClick={confirmAndSend}>Invia messaggio</Button>
-            <Button variant="outline" onClick={reset}>Riprova</Button>
+            {unsupported && (
+              <p className="text-xs text-text-muted text-center max-w-xs">
+                Registrazione live non disponibile su questo browser: carica un video dalla galleria.
+              </p>
+            )}
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+              Carica video dalla galleria
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*"
+              capture="user"
+              className="hidden"
+              onChange={handleFileFallback}
+            />
           </>
         )}
       </div>

@@ -145,8 +145,11 @@ export async function deleteFromStorage(
 export async function createVideoMessage(params: {
   event_id: string;
   from_user: string;
+  from_name?: string;
   type: 'welcome' | 'guestbook';
   url: string;
+  r2_key?: string;
+  is_public?: boolean;
 }): Promise<{ message?: VideoMessage; error?: string }> {
   const supabase = createServiceClient();
   const { data, error } = await supabase

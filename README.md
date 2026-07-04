@@ -1,6 +1,6 @@
-# FotoSposi / WeddingMoments
+# Sposi.live / JustMarry.live
 
-Piattaforma SaaS per la gestione digitale di matrimoni. Un modular monolith Next.js + Supabase con brand duale: **FotoSposi** (Italia) e **WeddingMoments** (internazionale).
+Piattaforma SaaS per la gestione digitale di matrimoni. Un modular monolith Next.js + Supabase con brand duale: **Sposi.live** (Italia) e **JustMarry.live** (internazionale).
 
 ---
 
@@ -24,7 +24,7 @@ Piattaforma SaaS per la gestione digitale di matrimoni. Un modular monolith Next
 - **RSVP**: conferma presenza via email, telefono o WhatsApp
 - **Upload foto**: direttamente dal telefono nella galleria dell'evento
 - **Partecipazione giochi**: vota foto, scrivi barzellette, registra video
-- **Selfie kiosk** (prossimamente): chiosco con filtri WeddingMoments
+- **Selfie kiosk** (prossimamente): chiosco con filtri JustMarry.live
 
 ### Per il team (B2B)
 - **Admin panel**: gestione multi-evento, ruolo manager

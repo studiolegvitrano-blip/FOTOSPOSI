@@ -13,7 +13,9 @@ export async function GET(req: NextRequest) {
 
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/google/callback`;
+  const host = req.headers.get('host') || 'localhost:3000';
+  const proto = req.headers.get('x-forwarded-proto') || 'http';
+  const redirectUri = `${proto}://${host}/api/auth/google/callback`;
   if (!clientId || !clientSecret) return NextResponse.json({ error: 'OAuth not configured' }, { status: 500 });
 
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {

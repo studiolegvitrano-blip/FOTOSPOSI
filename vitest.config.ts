@@ -9,7 +9,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
-    include: ['packages/*/src/**/*.test.ts', 'packages/*/src/**/*.test.tsx', 'apps/web/src/**/*.test.ts', 'apps/web/src/**/*.test.tsx'],
+    include: ['packages/*/src/**/*.test.ts', 'packages/*/src/**/*.test.tsx', 'apps/web/src/**/*.test.ts', 'apps/web/src/**/*.test.tsx', 'tests/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/.*/**', '**/AppData/**', '**/Impostazioni**'],
     env: {
       NEXT_PUBLIC_SUPABASE_URL: 'https://test.supabase.co',

@@ -1,4 +1,4 @@
-# PRICING — FotoSposi / WeddingMoments
+# PRICING — Sposi.live / JustMarry.live
 
 ## Tier (prezzi Italia)
 
@@ -211,14 +211,14 @@ Ogni paese parla la **propria lingua**, con **tono professionale** (mai slang, m
 
 | Paese | Lingua | Tono | Brand |
 |:-----:|:------:|:----:|-------|
-| 🇮🇹 Italia | Italiano | Professionale, elegante | **FotoSposi** |
-| 🇪🇸 Spagna | Spagnolo (castigliano) | Profesional, cálido | **WeddingMoments ES** |
-| 🇫🇷 Francia | Francese | Professionnel, raffiné | **WeddingMoments FR** |
-| 🇩🇪 Germania | Tedesco | Professionell, klar | **WeddingMoments DE** |
-| 🇬🇧 UK | Inglese UK | Professional, warm | **WeddingMoments** |
-| 🇺🇸 USA | Inglese US | Professional, friendly | **WeddingMoments** |
-| 🇨🇭 Svizzera | Tedesco/Francese/Italiano | Professionale | **WeddingMoments CH** |
-| 🇦🇺 Australia | Inglese AU | Professional, casual | **WeddingMoments** |
+| 🇮🇹 Italia | Italiano | Professionale, elegante | **Sposi.live** |
+| 🇪🇸 Spagna | Spagnolo (castigliano) | Profesional, cálido | **JustMarry.live ES** |
+| 🇫🇷 Francia | Francese | Professionnel, raffiné | **JustMarry.live FR** |
+| 🇩🇪 Germania | Tedesco | Professionell, klar | **JustMarry.live DE** |
+| 🇬🇧 UK | Inglese UK | Professional, warm | **JustMarry.live** |
+| 🇺🇸 USA | Inglese US | Professional, friendly | **JustMarry.live** |
+| 🇨🇭 Svizzera | Tedesco/Francese/Italiano | Professionale | **JustMarry.live CH** |
+| 🇦🇺 Australia | Inglese AU | Professional, casual | **JustMarry.live** |
 
 > **Regola**: mai "slang" o "frasi da ragazzi". Il matrimonio è un evento formale/
 > elegante. Il tono deve ispirare fiducia, non sembrare una startup hipster.
@@ -228,8 +228,8 @@ Ogni paese parla la **propria lingua**, con **tono professionale** (mai slang, m
 - Tutti i testi in file JSON `/packages/core/src/i18n/{locale}.json`
 - Rilevamento automatico: `Accept-Language` header + URL path (`/it/`, `/es/`, ecc.)
 - Fallback: Inglese UK (default)
-- Brand name "WeddingMoments" rimane invariato in tutti i paesi (brand globale)
-- Solo Italia ha nome locale "FotoSposi" (brand duale)
+- Brand name "JustMarry.live" rimane invariato in tutti i paesi (brand globale)
+- Solo Italia ha nome locale "Sposi.live" (brand duale)
 
 ## GEO-PRICING (prezzo commisurato allo stipendio medio)
 

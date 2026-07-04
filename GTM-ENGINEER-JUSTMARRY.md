@@ -1,9 +1,9 @@
-# GTM ENGINEER — WEDDINGMOMENTS
-## Sistema di Marketing Automatizzato per WeddingMoments
+# GTM ENGINEER — JUSTMARRY.LIVE
+## Sistema di Marketing Automatizzato per JustMarry.live
 ## Luglio 2026
 
 **Versione:** 1.0  
-**Obiettivo:** Integrare il GTM Engineer nel progetto WeddingMoments per automatizzare marketing, lead generation B2B e ottimizzazione continua  
+**Obiettivo:** Integrare il GTM Engineer nel progetto JustMarry.live per automatizzare marketing, lead generation B2B e ottimizzazione continua  
 **Costo mensile:** ~€0 (AI gratuita + self-hosted)  
 **Stack:** Supabase Free + n8n Self-Hosted + Groq/Mistral + Telegram
 
@@ -29,7 +29,7 @@
 ## 1. Visione & Architettura
 
 ### Obiettivo
-Integrare il GTM Engineer nel progetto WeddingMoments per:
+Integrare il GTM Engineer nel progetto JustMarry.live per:
 - **Automatizzare la generazione di contenuti social** dagli UGC degli invitati
 - **Generare lead B2B** (wedding planner, fotografi, location) per il marketplace
 - **Ottimizzare continuamente** i contenuti basandosi sulle performance

@@ -1,8 +1,8 @@
 {
   "common": {
-    "brand_name": "WeddingMoments",
+    "brand_name": "JustMarry.live",
     "brand_subtitle": "Your wedding, beautifully captured — photos, games, gifts, all in one place",
-    "app_name": "WeddingMoments",
+    "app_name": "JustMarry.live",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -11,7 +11,7 @@
     "search": "Search",
     "loading": "Loading...",
     "error_generic": "Something went wrong. Try again.",
-    "error_network": "Can't connect. Check your internet and try again.",
+    "or_continue_with": "or continue with","error_network": "Can't connect. Check your internet and try again.",
     "back": "Back",
     "next": "Next",
     "close": "Close",
@@ -53,7 +53,7 @@
     "settings": "Settings"
   },
   "home": {
-    "hero_title": "WeddingMoments",
+    "hero_title": "JustMarry.live",
     "hero_subtitle": "The all-in-one platform for your big day. Share photos, play games, collect gifts, and keep every memory in one place — from the engagement party to the honeymoon.",
     "how_it_works": "How it works",
     "features": [
@@ -64,11 +64,24 @@
       "Print-on-demand albums and keepsakes"
     ],
     "cta_login": "Sign in",
-    "cta_signup": "Get started"
+    "cta_signup": "Get started",
+    "badge": "The wedding site your guests will actually use",
+    "plans_title": "A plan for every wedding",
+    "plan_free_name": "Free",
+    "plan_free_desc": "Event site, QR code, up to 100 standard-quality photos. Free forever.",
+    "plan_premium_name": "Premium",
+    "plan_premium_desc": "Unlimited full-quality photos & video, full games suite, 6-month Time Capsule.",
+    "plan_deluxe_name": "Deluxe",
+    "plan_deluxe_desc": "Everything in Premium plus exclusive features, 12-month Time Capsule, priority support.",
+    "plan_cta": "See plans",
+    "plan_popular": "Most popular",
+    "final_cta_title": "Ready to build your wedding site?",
+    "final_cta_subtitle": "Takes a few minutes. Free. No card required.",
+    "footer_tagline": "Photos, games and memories from your wedding, all in one place."
   },
   "auth": {
     "login_title": "Welcome back",
-    "login_subtitle": "Sign in to your WeddingMoments account.",
+    "login_subtitle": "Sign in to your JustMarry.live account.",
     "login_email_label": "Email",
     "login_email_placeholder": "you@example.com",
     "login_password_label": "Password",
@@ -85,6 +98,13 @@
     "signup_email_placeholder": "you@example.com",
     "signup_password_label": "Password",
     "signup_password_placeholder": "Choose a password",
+    "signup_firstname_label": "First name",
+    "signup_lastname_label": "Last name",
+    "signup_phone_label": "Mobile phone",
+    "signup_gdpr_label": "I have read and accept the processing of my personal data (privacy policy).",
+    "signup_privacy_link": "Read the privacy policy",
+    "signup_marketing_label": "I optionally consent to sharing my data with partners and suppliers for marketing purposes.",
+    "signup_gdpr_required": "You must accept the privacy policy to sign up.",
     "signup_submit": "Create account",
     "signup_has_account": "Already have an account?",
     "signup_login_link": "Sign in",
@@ -124,6 +144,7 @@
     "detail_title": "Event details",
     "public_page": "Public page",
     "qr_code": "QR Code",
+    "guests": "Guests",
     "site_builder": "Wedding website",
     "upload_media": "Upload photos & videos",
     "games": "Games",
@@ -245,7 +266,7 @@
     "publish_site": "Publish site",
     "preview_heading": "Invitation preview",
     "follow_us_hashtag": "Follow us with the hashtag",
-    "powered_by": "WeddingMoments · Digital invitation",
+    "powered_by": "JustMarry.live · Digital invitation",
     "site_published": "Site published:"
   },
   "wall": {
@@ -531,7 +552,7 @@
     "server_error_description": "Please try again later."
   },
   "brand": {
-    "fotosposi": "FotoSposi",
-    "weddingmoments": "WeddingMoments"
+    "fotosposi": "Sposi.live",
+    "weddingmoments": "JustMarry.live"
   }
 }

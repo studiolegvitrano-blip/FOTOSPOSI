@@ -1,8 +1,8 @@
 {
   "common": {
-    "brand_name": "WeddingMoments",
+    "brand_name": "JustMarry.live",
     "brand_subtitle": "Tu boda, capturada de forma preciosa — fotos, juegos, regalos, todo en un solo lugar",
-    "app_name": "WeddingMoments",
+    "app_name": "JustMarry.live",
     "save": "Guardar",
     "cancel": "Cancelar",
     "delete": "Eliminar",
@@ -11,7 +11,7 @@
     "search": "Buscar",
     "loading": "Cargando...",
     "error_generic": "Algo salió mal. Inténtalo de nuevo.",
-    "error_network": "Error de conexión. Revisa tu red.",
+    "or_continue_with": "o continuar con","error_network": "Error de conexión. Revisa tu red.",
     "back": "Volver",
     "next": "Siguiente",
     "close": "Cerrar",
@@ -53,7 +53,7 @@
     "settings": "Ajustes"
   },
   "home": {
-    "hero_title": "WeddingMoments",
+    "hero_title": "JustMarry.live",
     "hero_subtitle": "La plataforma todo-en-uno para tu gran día. Comparte fotos, juega, recoge regalos y guarda cada recuerdo en un solo lugar — desde la pedida hasta la luna de miel.",
     "how_it_works": "Cómo funciona",
     "features": [
@@ -64,11 +64,24 @@
       "Álbumes y recuerdos impresos bajo demanda"
     ],
     "cta_login": "Iniciar sesión",
-    "cta_signup": "Empezar"
+    "cta_signup": "Empezar",
+    "badge": "La web de boda que vuestros invitados sí van a usar",
+    "plans_title": "Un plan para cada boda",
+    "plan_free_name": "Free",
+    "plan_free_desc": "Web del evento, código QR, hasta 100 fotos en calidad estándar. Gratis para siempre.",
+    "plan_premium_name": "Premium",
+    "plan_premium_desc": "Fotos y vídeos ilimitados en calidad original, todos los juegos, Time Capsule de 6 meses.",
+    "plan_deluxe_name": "Deluxe",
+    "plan_deluxe_desc": "Todo lo de Premium más funciones exclusivas, Time Capsule de 12 meses, soporte prioritario.",
+    "plan_cta": "Ver planes",
+    "plan_popular": "El más elegido",
+    "final_cta_title": "¿Listos para crear vuestra web de boda?",
+    "final_cta_subtitle": "Solo unos minutos. Gratis. Sin tarjeta de crédito.",
+    "footer_tagline": "Fotos, juegos y recuerdos de vuestra boda, en un solo lugar."
   },
   "auth": {
     "login_title": "Bienvenido de nuevo",
-    "login_subtitle": "Inicia sesión en tu cuenta de WeddingMoments.",
+    "login_subtitle": "Inicia sesión en tu cuenta de JustMarry.live.",
     "login_email_label": "Email",
     "login_email_placeholder": "tu@email.es",
     "login_password_label": "Contraseña",
@@ -85,6 +98,13 @@
     "signup_email_placeholder": "tu@email.es",
     "signup_password_label": "Contraseña",
     "signup_password_placeholder": "Elige una contraseña",
+    "signup_firstname_label": "Nombre",
+    "signup_lastname_label": "Apellidos",
+    "signup_phone_label": "Móvil",
+    "signup_gdpr_label": "He leído y acepto el tratamiento de mis datos personales (política de privacidad).",
+    "signup_privacy_link": "Leer la política de privacidad",
+    "signup_marketing_label": "Consiento opcionalmente en compartir mis datos con socios y proveedores con fines de marketing.",
+    "signup_gdpr_required": "Debes aceptar la política de privacidad para registrarte.",
     "signup_submit": "Crear cuenta",
     "signup_has_account": "¿Ya tienes cuenta?",
     "signup_login_link": "Inicia sesión",
@@ -124,6 +144,7 @@
     "detail_title": "Detalles del evento",
     "public_page": "Página pública",
     "qr_code": "Código QR",
+    "guests": "Invitados",
     "site_builder": "Web de boda",
     "upload_media": "Subir fotos y vídeos",
     "games": "Juegos",
@@ -245,7 +266,7 @@
     "publish_site": "Publicar web",
     "preview_heading": "Vista previa de la invitación",
     "follow_us_hashtag": "Síguenos con el hashtag",
-    "powered_by": "WeddingMoments · Invitación digital",
+    "powered_by": "JustMarry.live · Invitación digital",
     "site_published": "Web publicada:"
   },
   "wall": {
@@ -531,7 +552,7 @@
     "server_error_description": "Inténtalo de nuevo más tarde."
   },
   "brand": {
-    "fotosposi": "FotoSposi",
-    "weddingmoments": "WeddingMoments"
+    "fotosposi": "Sposi.live",
+    "weddingmoments": "JustMarry.live"
   }
 }

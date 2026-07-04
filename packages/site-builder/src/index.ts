@@ -3,8 +3,20 @@ export interface SiteTemplate {
   name: string;
   palette: string[];
   font_family: string;
+  category: string;
   preview_url: string;
   created_at: string;
+}
+
+export interface FaqEntry {
+  question: string;
+  answer: string;
+}
+
+export interface WeddingPartyMember {
+  name: string;
+  role: string;
+  photoUrl?: string;
 }
 
 export interface SiteContent {
@@ -40,6 +52,7 @@ export interface SiteContent {
   rsvpWhatsapp?: string;
   rsvpDeadline?: string;
   rsvpMessage?: string;
+  rsvpFormEnabled?: boolean;
   dressCodeEnabled?: boolean;
   dressCodeText?: string;
   menuEnabled?: boolean;
@@ -57,6 +70,10 @@ export interface SiteContent {
   navettaNote?: string;
   navettaContatti?: string;
   navettaMatchmaking?: boolean;
+  faqEnabled?: boolean;
+  faqEntries?: FaqEntry[];
+  weddingPartyEnabled?: boolean;
+  weddingPartyMembers?: WeddingPartyMember[];
 }
 
 export interface SiteDraft {
@@ -151,6 +168,22 @@ export const SUGGESTED_PHRASES = {
     'Parcheggio gratuito disponibile presso la chiesa',
     'Parcheggio custodito presso il ricevimento',
     'Consigliamo di parcheggiare presso la chiesa e usare il servizio navetta',
+  ],
+  faqQuestion: [
+    'A che ora inizia la cerimonia?',
+    'Dove si trova il ricevimento?',
+    'Cosa devo indossare?',
+    'C\'è un parcheggio?',
+    'Posso portare un accompagnatore?',
+    'Ci sono intolleranze alimentari?',
+  ],
+  faqAnswer: [
+    'La cerimonia inizierà puntuale alle ore...',
+    'Il ricevimento si terrà presso...',
+    'Il codice abbigliamento è elegante',
+    'Sì, il parcheggio è disponibile presso la sede',
+    'Sì, ti chiediamo di indicarlo nella conferma',
+    'Il menu prevede opzioni per ogni esigenza',
   ],
 };
 

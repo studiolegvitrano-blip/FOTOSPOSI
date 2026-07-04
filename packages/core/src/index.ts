@@ -38,6 +38,7 @@ export {
   signIn,
   signOut,
   getCurrentUser,
+  signInWithOAuth,
   validateQrToken,
   createQrToken,
 } from './auth';
@@ -56,3 +57,11 @@ export type { Tier, TierInfo } from './tiers';
 export { TIERS } from './tiers';
 
 export { rateLimit } from './rate-limit';
+
+export {
+  getEventGuests,
+  updateGuestStatus,
+  registerGuest,
+  updateGuestApprovalMode,
+} from './guests';
+export type { EventGuest } from './guests';

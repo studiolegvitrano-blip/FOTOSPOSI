@@ -144,17 +144,17 @@ create policy "Admin full access content_performance" on content_performance for
 create policy "Admin full access b2b_leads" on b2b_leads for all to authenticated using (true);
 create policy "Admin full access lead_to_supplier_conversion" on lead_to_supplier_conversion for all to authenticated using (true);
 
--- Inserimento brand WeddingMoments
+-- Inserimento brand JustMarry.live
 insert into public.brand_config (slug, name, description, tone_of_voice, target_audience, primary_language, supported_languages, hashtag_pool, social_accounts, risk_policy)
 values (
-    'weddingmoments',
-    'WeddingMoments',
+    'justmarrylive',
+    'JustMarry.live',
     'Photo e video degli invitati con QR code per matrimoni',
     'emotivo, romantico, autentico, celebrativo',
     '{"age": "25-45", "interests": ["wedding", "photography", "events"]}',
-    'it',
+    'en',
     array['it', 'en', 'de', 'fr', 'es'],
-    array['#weddingmoments', '#sposi', '#matrimonio', '#weddingphotography', '#love', '#weddingday', '#instamatrimonio', '#weddinginspiration', '#bridetobe', '#weddingplanner'],
+    array['#justmarrylive', '#justmarried', '#wedding', '#weddingphotography', '#love', '#weddingday', '#weddinginspiration', '#bridetobe', '#weddingplanner', '#marriage'],
     '{"instagram": {"page_id": "", "access_token": ""}, "facebook": {"page_id": "", "access_token": ""}, "tiktok": {"token": ""}}',
     'standard'
 ) on conflict (slug) do nothing;

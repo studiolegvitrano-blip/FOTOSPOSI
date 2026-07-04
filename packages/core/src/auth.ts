@@ -1,12 +1,28 @@
 import { createClient, createServiceClient } from './supabase';
 import type { AuthToken } from './index';
 
-export async function signUp(email: string, password: string, name: string) {
+export async function signInWithOAuth(provider: 'google' | 'facebook' | 'apple') {
+  const supabase = createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: { redirectTo: `${window.location.origin}/auth/callback` },
+  });
+  return { data, error };
+}
+
+export interface SignUpExtra {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  marketingConsent?: boolean;
+}
+
+export async function signUp(email: string, password: string, name: string, extra?: SignUpExtra) {
   const supabase = createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { name } },
+    options: { data: { name, ...extra } },
   });
   return { data, error };
 }

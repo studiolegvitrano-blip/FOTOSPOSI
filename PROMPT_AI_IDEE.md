@@ -1,4 +1,4 @@
-# PROMPT PER AI — FotoSposi / WeddingMoments
+# PROMPT PER AI — Sposi.live / JustMarry.live
 
 Copia e incolla questo testo in ChatGPT, Claude, Gemini o qualsiasi AI:
 
@@ -8,7 +8,7 @@ Sei un product strategist esperto in SaaS, wedding tech, e-commerce e growth hac
 
 ## PIATTAFORMA
 
-**FotoSposi** (Italia) / **WeddingMoments** (internazionale) è un SaaS per la gestione digitale di matrimoni.
+**Sposi.live** (Italia) / **JustMarry.live** (internazionale) è un SaaS per la gestione digitale di matrimoni.
 
 ### Stack
 - Frontend: Next.js 15 + TypeScript + Tailwind v4 + shadcn/ui
@@ -63,7 +63,7 @@ Sei un product strategist esperto in SaaS, wedding tech, e-commerce e growth hac
 6. Reel Riassunto — video AI (Claude + FFmpeg) con foto/giochi, 49€ per invitati (max 4 persone), incluso in Deluxe per sposi
 7. Hashtag Generator — AI suggerisce hashtag basati su nomi sposi, tema, location
 8. Navetta Ospiti — sezione sito-evento con orari navetta, mappa parcheggi, contatti tassisti, matchmaking passaggio
-9. Tavolo Selfie — chiosco selfie con filtri/logo WeddingMoments, upload diretto su Drive
+9. Tavolo Selfie — chiosco selfie con filtri/logo JustMarry.live, upload diretto su Drive
 10. Prima Notte di Sposi — amici regalano scherzi o "cose hot" dal nostro shop
 11. App & Sito contenitore di tutto
 

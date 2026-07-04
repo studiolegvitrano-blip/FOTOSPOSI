@@ -1,4 +1,4 @@
-# i18n Validation — WeddingMoments / FotoSposi
+# i18n Validation — JustMarry.live / Sposi.live
 
 Template per validazione madrelingua dei 4 file messaggio.
 

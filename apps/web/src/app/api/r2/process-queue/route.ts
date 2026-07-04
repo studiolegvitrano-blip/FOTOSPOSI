@@ -6,6 +6,12 @@ import sharp from 'sharp';
 
 const FONT_PATH = 'https://fonts.gstatic.com/s/georgia/v39/1.woff2';
 
+function getBrandFromHost(): string {
+  const host = process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+  if (host.includes('justmarry')) return 'JustMarry.live';
+  return 'Sposi.live';
+}
+
 async function applyWatermark(
   buffer: Buffer,
   coupleName: string,
@@ -16,10 +22,10 @@ async function applyWatermark(
     const w = meta.width || 1200;
     const h = meta.height || 900;
 
-    const barHeight = Math.max(80, Math.round(h / 12));
-    const fontSizeName = Math.max(22, Math.round(w / 22));
-    const fontSizeDate = Math.max(16, Math.round(w / 32));
-    const fontSizeLogo = Math.max(16, Math.round(w / 40));
+    const barHeight = Math.max(160, Math.round(h / 6));
+    const fontSizeName = Math.max(44, Math.round(w / 11));
+    const fontSizeDate = Math.max(32, Math.round(w / 16));
+    const fontSizeLogo = Math.max(24, Math.round(w / 22));
 
     const nameY = h - barHeight + Math.round(barHeight * 0.38);
     const dateY = nameY + fontSizeName + 6;
@@ -41,7 +47,7 @@ async function applyWatermark(
         fill="rgba(255,255,255,0.85)">${eventDate}</text>
       <text x="${w - 16}" y="${h - 16}" text-anchor="end"
         font-family="Georgia, serif" font-size="${fontSizeLogo}"
-        fill="rgba(255,255,255,0.50)">FotoSposi</text>
+        fill="rgba(255,255,255,0.50)">${getBrandFromHost()}</text>
     </svg>`;
 
     return await sharp(buffer)

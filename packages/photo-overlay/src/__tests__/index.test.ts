@@ -22,7 +22,7 @@ describe('applyOverlay', () => {
     coupleNames: 'Mario & Lucia',
     date: '15 Giugno 2026',
     primaryColor: '#d4a574',
-    wordmark: 'WeddingMoments',
+    wordmark: 'JustMarry.live',
   };
 
   beforeEach(() => {

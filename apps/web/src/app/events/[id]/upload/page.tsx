@@ -5,6 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { createMediaRecord, enqueueUpload, getPendingQueue, updateQueueItem, getQueueStats, compressImage, type QueueItem } from '@fotosposi/media';
 import { getCurrentUser, getEventTier, type Tier } from '@fotosposi/core';
 import { getEventById, getEventWindow } from '@fotosposi/events';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Camera, Upload, Image, Video, CheckCircle2, XCircle, Clock, Loader2 } from 'lucide-react';
 
 export default function UploadPage() {
   const params = useParams();
@@ -20,6 +24,7 @@ export default function UploadPage() {
   const [skipVideos, setSkipVideos] = useState(0);
   const [limitReached, setLimitReached] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   const FREE_MAX_PHOTOS = 100;
@@ -36,37 +41,30 @@ export default function UploadPage() {
         const ctx = canvas.getContext('2d');
         if (!ctx) { resolve(blob); return; }
         ctx.drawImage(img, 0, 0);
-        drawWatermark(ctx, canvas.width, canvas.height, coupleName, eventDate);
+        const h = canvas.height;
+        const w = canvas.width;
+        const barH = Math.max(160, Math.round(h / 6));
+        const fontSizeName = Math.max(44, Math.round(w / 11));
+        const fontSizeDate = Math.max(32, Math.round(w / 16));
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(0, h - barH, w, barH);
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.font = `bold ${fontSizeName}px Georgia, serif`;
+        ctx.fillText(coupleName, w / 2, h - barH + Math.round(barH * 0.38));
+        ctx.font = `${fontSizeDate}px Georgia, serif`;
+        ctx.fillText(eventDate, w / 2, h - barH + Math.round(barH * 0.38) + fontSizeName + 6);
+        ctx.font = `${Math.max(24, Math.round(w / 22))}px Georgia, serif`;
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.textAlign = 'right';
+        ctx.fillText((typeof window !== 'undefined' && window.location.hostname.includes('justmarry') ? 'JustMarry.live' : 'Sposi.live'), w - 12, 28);
+        ctx.restore();
         canvas.toBlob(b => { if (b) resolve(b); else resolve(blob); }, blob.type, 0.92);
       };
       img.onerror = () => resolve(blob);
       img.src = URL.createObjectURL(blob);
     });
-  }
-
-  function drawWatermark(
-    ctx: CanvasRenderingContext2D,
-    w: number, h: number,
-    coupleName: string, eventDate: string,
-  ) {
-    ctx.save();
-    // barra nera 45% trasparente in basso 80px
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.fillRect(0, h - 80, w, 80);
-    // coppia
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.max(18, Math.round(w / 28))}px Georgia, serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText(coupleName, w / 2, h - 42);
-    // data
-    ctx.font = `${Math.max(13, Math.round(w / 40))}px Georgia, serif`;
-    ctx.fillText(eventDate, w / 2, h - 16);
-    // logo in alto a destra
-    ctx.font = `${Math.max(14, Math.round(w / 48))}px Georgia, serif`;
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.textAlign = 'right';
-    ctx.fillText('FotoSposi', w - 12, 28);
-    ctx.restore();
   }
 
   const loadQueue = useCallback(async () => {
@@ -112,25 +110,20 @@ export default function UploadPage() {
           }
         }
       }
-
       const { tier: evTier } = await getEventTier(eventId);
       if (evTier) setTier(evTier);
-
       if (evTier === 'free') {
         const s = await getQueueStats(eventId);
         const totalExisting = s.synced + s.pending + s.processing;
         if (totalExisting >= FREE_MAX_PHOTOS) setLimitReached(true);
       }
-
       setEventReady(true);
       const hasPending = await loadQueue();
       if (hasPending) {
         triggerServerProcessing();
         pollRef.current = setInterval(async () => {
           const stillPending = await loadQueue();
-          if (!stillPending) {
-            clearInterval(pollRef.current);
-          }
+          if (!stillPending) clearInterval(pollRef.current);
         }, 3000);
       }
     };
@@ -142,19 +135,13 @@ export default function UploadPage() {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       const stillPending = await loadQueue();
-      if (!stillPending) {
-        clearInterval(pollRef.current);
-        pollRef.current = undefined;
-      }
+      if (!stillPending) { clearInterval(pollRef.current); pollRef.current = undefined; }
     }, 3000);
   };
 
-  const handleSelectFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files;
-    if (!selected || selected.length === 0) return;
-
+  const processFiles = async (selected: FileList) => {
     const { user } = await getCurrentUser();
-    if (!user) return;
+    if (!user || !selected.length) return;
 
     const isFree = tier === 'free';
     let skippedVideos = 0;
@@ -167,7 +154,6 @@ export default function UploadPage() {
       if (isFree && f.type.startsWith('video/')) { skippedVideos++; continue; }
       files.push(f);
     }
-
     setSkipVideos(skippedVideos);
 
     const s = await getQueueStats(eventId);
@@ -176,7 +162,6 @@ export default function UploadPage() {
     const allowed = files.slice(0, slotsLeft);
     if (allowed.length < files.length) reachedLimit = true;
     setLimitReached(reachedLimit);
-
     if (allowed.length === 0) { setPhase('idle'); return; }
 
     setPhase('queueing');
@@ -195,9 +180,7 @@ export default function UploadPage() {
           try { uploadFile = await compressImage(file, 1200); compressed = true; } catch { }
         }
         if (eventMeta) {
-          try {
-            uploadFile = await applyWatermark(uploadFile, eventMeta.couple_name, eventMeta.date);
-          } catch { }
+          try { uploadFile = await applyWatermark(uploadFile, eventMeta.couple_name, eventMeta.date); } catch { }
         }
       }
 
@@ -232,116 +215,161 @@ export default function UploadPage() {
         await updateQueueItem(id, { status: 'failed', error: 'Upload R2 fallito' });
         continue;
       }
-
       await updateQueueItem(id, { r2_key: r2Data.key });
-
       queued++;
       setQueue(prev => [...prev, {
         id, event_id: eventId, uploaded_by: user.id,
         file_name: file.name, file_type: file.type, file_size: uploadFile.size,
-        status: 'pending' as const,
-        storage_path: null, compressed_path: null, drive_file_id: null,
+        status: 'pending' as const, storage_path: null, compressed_path: null, drive_file_id: null,
         error: null, retry_count: 0, compressed, created_at: new Date().toISOString(), processed_at: null, r2_key: r2Data.key,
       } as QueueItem]);
     }
-
     setStats(prev => ({ ...prev, pending: prev.pending + queued }));
     setPhase('processing');
     if (inputRef.current) inputRef.current.value = '';
+    if (cameraRef.current) cameraRef.current.value = '';
 
     triggerServerProcessing();
     startPolling();
   };
 
-  if (!eventReady) return <main style={{ maxWidth: 600, margin: '2rem auto', padding: '0 1rem' }}><p>Caricamento...</p></main>;
+  const handleSelectFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) processFiles(e.target.files);
+  };
+
+  if (!eventReady) return (
+    <main className="max-w-2xl mx-auto p-4 flex items-center justify-center min-h-[60vh]">
+      <Loader2 className="w-6 h-6 animate-spin text-brand" />
+    </main>
+  );
 
   const allDone = phase === 'idle' && (stats.synced + stats.failed) > 0 && stats.pending + stats.processing === 0;
 
   return (
-    <main style={{ maxWidth: 700, margin: '2rem auto', padding: '0 1rem' }}>
-      <h1 style={{ marginBottom: '0.5rem' }}>Carica foto e video</h1>
-      <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '1.5rem' }}>
-        Seleziona tutti i file che vuoi. L'elaborazione continua anche se chiudi la pagina.
-      </p>
+    <main className="max-w-2xl mx-auto p-4 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Carica foto e video</h1>
+        <p className="text-text-muted text-sm mt-1">
+          Seleziona file dal telefono o scatta direttamente con la fotocamera.
+        </p>
+      </div>
 
       {tier === 'free' && (
-        <div style={{ fontSize: '0.85rem', color: '#c00', marginBottom: '1rem', padding: '0.5rem', border: '1px solid #fcc', borderRadius: 6, background: '#fff5f5' }}>
-          <strong>Piano Free</strong> — max {FREE_MAX_PHOTOS} foto, compresse. Nessun video.{' '}
-          <a href={`/events/${eventId}/tier`} style={{ color: '#d4a574' }}>Passa a Premium</a> per foto originali, video illimitati e backup Drive. O in 3 rate con Klarna.
-        </div>
+        <Card className="border-error/30 bg-error/5">
+          <CardContent className="py-3 text-sm text-error">
+            <strong>Piano Free</strong> — max {FREE_MAX_PHOTOS} foto compresse. Nessun video.
+            <Button variant="link" className="text-brand p-0 h-auto ml-1" asChild>
+              <a href={`/events/${eventId}/tier`}>Passa a Premium</a>
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {limitReached && (
-        <p style={{ fontSize: '0.85rem', color: '#c00', marginBottom: '0.5rem' }}>
-          Hai raggiunto il limite di {FREE_MAX_PHOTOS} foto del piano Free.
-        </p>
+        <Card className="border-error/30 bg-error/5">
+          <CardContent className="py-3 text-sm text-error">
+            Hai raggiunto il limite di {FREE_MAX_PHOTOS} foto del piano Free.
+          </CardContent>
+        </Card>
       )}
 
-      <div style={{ marginBottom: '1rem' }}>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept={tier === 'free' ? 'image/*' : 'image/*,video/*'}
-          onChange={handleSelectFiles}
-          disabled={phase === 'queueing' || phase === 'processing'}
-          style={{ width: '100%', padding: '0.5rem' }}
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <Card className="hover:border-brand/50 transition-colors cursor-pointer" onClick={() => inputRef.current?.click()}>
+          <CardContent className="py-8 text-center space-y-2">
+            <Image className="w-8 h-8 mx-auto text-brand" />
+            <p className="font-medium">Galleria</p>
+            <p className="text-xs text-text-muted">Scegli foto e video dal telefono</p>
+          </CardContent>
+        </Card>
+        <Card className="hover:border-brand/50 transition-colors cursor-pointer" onClick={() => cameraRef.current?.click()}>
+          <CardContent className="py-8 text-center space-y-2">
+            <Camera className="w-8 h-8 mx-auto text-brand" />
+            <p className="font-medium">Fotocamera</p>
+            <p className="text-xs text-text-muted">Scatta una foto ora</p>
+          </CardContent>
+        </Card>
       </div>
 
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept={tier === 'free' ? 'image/*' : 'image/*,video/*'}
+        onChange={handleSelectFiles}
+        disabled={phase === 'queueing' || phase === 'processing'}
+        className="hidden"
+      />
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleSelectFiles}
+        disabled={phase === 'queueing' || phase === 'processing'}
+        className="hidden"
+      />
+
       {phase === 'queueing' && (
-        <p style={{ marginBottom: '1rem', color: '#555', fontSize: '0.9rem' }}>
-          Accodamento file in corso... {queueProgress.current}/{queueProgress.total}
-        </p>
+        <Card>
+          <CardContent className="py-3 flex items-center gap-2 text-sm">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Accodamento file... {queueProgress.current}/{queueProgress.total}
+          </CardContent>
+        </Card>
       )}
 
       {skipVideos > 0 && (
-        <p style={{ fontSize: '0.85rem', color: '#c00', marginBottom: '0.5rem' }}>
-          {skipVideos} video skippati (non disponibili nel piano Free).
-        </p>
+        <p className="text-sm text-error">{skipVideos} video saltati (non disponibili nel piano Free).</p>
       )}
 
       {(stats.synced + stats.failed + stats.pending + stats.processing > 0) && (
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', fontSize: '0.9rem' }}>
-          <span style={{ color: '#090' }}>✔ {stats.synced} completati</span>
-          <span style={{ color: '#c00' }}>✘ {stats.failed} falliti</span>
-          <span style={{ color: '#888' }}>⏳ {stats.pending + stats.processing} in coda</span>
+        <div className="flex gap-4 text-sm">
+          <span className="flex items-center gap-1 text-success"><CheckCircle2 className="w-4 h-4" /> {stats.synced}</span>
+          <span className="flex items-center gap-1 text-error"><XCircle className="w-4 h-4" /> {stats.failed}</span>
+          <span className="flex items-center gap-1 text-muted-foreground"><Clock className="w-4 h-4" /> {stats.pending + stats.processing}</span>
         </div>
       )}
 
       {queue.length > 0 && (
-        <div style={{ marginBottom: '1rem' }}>
-          <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: '#444' }}>Coda file</h3>
-          <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #ddd', borderRadius: 6, padding: '0.5rem' }}>
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Coda file</CardTitle></CardHeader>
+          <CardContent className="space-y-2 max-h-72 overflow-y-auto">
             {queue.map(item => (
-              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.25rem 0', fontSize: '0.85rem' }}>
-                <span style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, background: item.status === 'synced' ? '#090' : item.status === 'failed' ? '#c00' : item.status === 'processing' ? '#f90' : '#ccc' }} />
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.file_name}</span>
-                <span style={{ color: '#888', flexShrink: 0 }}>{(item.file_size / (1024 * 1024)).toFixed(1)} MB</span>
-                <span style={{ color: item.status === 'failed' ? '#c00' : '#666', flexShrink: 0, fontSize: '0.8rem' }}>
-                  {item.status === 'synced' ? 'Fatto' : item.status === 'processing' ? 'In corso...' : item.status === 'failed' ? `Fallito${item.error ? ': ' + item.error : ''}` : 'In attesa'}
-                </span>
+              <div key={item.id} className="flex items-center gap-3 text-sm">
+                {item.status === 'synced' ? <CheckCircle2 className="w-4 h-4 text-success shrink-0" /> :
+                 item.status === 'failed' ? <XCircle className="w-4 h-4 text-error shrink-0" /> :
+                 item.status === 'processing' ? <Loader2 className="w-4 h-4 animate-spin text-brand shrink-0" /> :
+                 <Clock className="w-4 h-4 text-muted-foreground shrink-0" />}
+                <span className="flex-1 truncate">{item.file_name}</span>
+                <span className="text-muted-foreground text-xs">{(item.file_size / (1024 * 1024)).toFixed(1)} MB</span>
+                <Badge variant={item.status === 'synced' ? 'default' : item.status === 'failed' ? 'destructive' : 'secondary'} className="text-xs">
+                  {item.status === 'synced' ? 'Fatto' : item.status === 'failed' ? `Errore` : item.status === 'processing' ? 'In corso' : 'Attesa'}
+                </Badge>
               </div>
             ))}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
       {phase === 'processing' && (
-        <p style={{ marginTop: '0.5rem', color: '#555', fontSize: '0.9rem' }}>
+        <p className="text-sm text-muted-foreground flex items-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin" />
           Elaborazione lato server in corso... puoi chiudere la pagina e tornare dopo.
         </p>
       )}
 
       {allDone && (
-        <p style={{ marginTop: '0.5rem', color: '#090', fontSize: '0.9rem' }}>
-          Tutti i file sono stati elaborati! {stats.synced} completati{stats.failed > 0 ? `, ${stats.failed} con errori.` : '.'}
-        </p>
+        <Card className="border-success/30 bg-success/5">
+          <CardContent className="py-3 text-sm text-success flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5" />
+            Tutti i file elaborati! {stats.synced} completati{stats.failed > 0 ? `, ${stats.failed} con errori.` : '.'}
+          </CardContent>
+        </Card>
       )}
 
-      <p style={{ marginTop: '1.5rem' }}>
-        <a href={`/events/${eventId}`} style={{ color: '#d4a574' }}>← Torna all'evento</a>
-      </p>
+      <Button variant="link" asChild>
+        <a href={`/events/${eventId}`}>Torna all'evento</a>
+      </Button>
     </main>
   );
 }

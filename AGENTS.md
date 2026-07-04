@@ -1,6 +1,6 @@
-# AGENTS.md — FotoSposi / WeddingMoments
+# AGENTS.md — Sposi.live / JustMarry.live
 
-Questo è un modular monolith Next.js + Supabase per una piattaforma di gestione matrimoni (brand: FotoSposi/IT, WeddingMoments/INT).
+Questo è un modular monolith Next.js + Supabase per una piattaforma di gestione matrimoni (brand: Sposi.live/IT, JustMarry.live/INT).
 
 ## Stack tecnologico
 - **Frontend**: Next.js (React, TypeScript)

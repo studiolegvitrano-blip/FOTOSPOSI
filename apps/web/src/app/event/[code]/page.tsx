@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { validateQrToken } from '@fotosposi/core';
+import { validateQrToken, getCurrentUser, registerGuest } from '@fotosposi/core';
 import { getEventById, getSubEvents } from '@fotosposi/events';
 import { getMediaByEvent } from '@fotosposi/media';
 import { getEventWindow } from '@fotosposi/events';
@@ -52,6 +52,16 @@ export default function GuestEventPage() {
         return;
       }
       await loadData(eid);
+      getCurrentUser().then(u => {
+        if (u.user?.id) {
+          registerGuest({
+            event_id: eid,
+            user_id: u.user.id,
+            name: u.user.user_metadata?.full_name || u.user.user_metadata?.name || u.user.email || 'Ospite',
+            email: u.user.email,
+          });
+        }
+      });
       const interval = setInterval(() => loadData(eid), 15000);
       return () => clearInterval(interval);
     });
@@ -71,8 +81,8 @@ export default function GuestEventPage() {
   const handleShare = useCallback(async (mediaId: string, coupleName: string, brand: string) => {
     if (!event) return;
     const hashtag = makeHashtag(coupleName);
-    const appTag = brand === 'fotosposi' ? '@fotosposi' : '@weddingmoments';
-    const shareText = `Che meraviglia! 💍 ${coupleName}\n\n${hashtag} ${appTag}`;
+    const appTag = brand === 'fotosposi' ? '@sposilive' : '@justmarrylive';
+    const shareText = `${coupleName}\n\n${hashtag} ${appTag}`;
 
     setShareLoading(mediaId);
     try {

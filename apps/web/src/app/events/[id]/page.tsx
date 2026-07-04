@@ -8,6 +8,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ShareButton, Countdown } from '@fotosposi/ui';
+import { shareMedia } from '@fotosposi/social-sharing';
+import { Share2, Download, Church, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -74,12 +76,12 @@ export default function EventDetailPage() {
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-text-muted mt-1">
                 {event.church && (
                   <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.church + (event.location ? ', ' + event.location : ''))}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-brand transition-colors no-underline text-text-muted">
-                    ⛪ {event.church} <span className="text-xs opacity-60">↗</span>
+                    <Church className="w-4 h-4" /> {event.church}
                   </a>
                 )}
                 {event.venue && (
                   <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue + (event.location ? ', ' + event.location : ''))}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-brand transition-colors no-underline text-text-muted">
-                    🏛️ {event.venue} <span className="text-xs opacity-60">↗</span>
+                    <Building2 className="w-4 h-4" /> {event.venue}
                   </a>
                 )}
               </div>
@@ -89,10 +91,11 @@ export default function EventDetailPage() {
               <Button variant="default" asChild><Link href={`/events/${eventId}/upload`}>{c('upload')}</Link></Button>
               <Button variant="secondary" asChild><Link href={`/events/${eventId}/games`}>{t('games')}</Link></Button>
               <Button variant="secondary" asChild><Link href={`/events/${eventId}/shop`}>{t('shop')}</Link></Button>
-              <Button variant="secondary" asChild><Link href={`/events/${eventId}/gift`}>{t('gift_registry')}</Link></Button>
+              {/* gift_registry rimosso */}
               <Button variant="outline" asChild><Link href={`/events/${eventId}/guestbook`}>{t('guestbook')}</Link></Button>
               <Button variant="outline" asChild><Link href={`/events/${eventId}/notifications`}>{t('notifications')}</Link></Button>
               <Button variant="outline" asChild><Link href={`/events/${eventId}/concierge`}>{t('concierge')}</Link></Button>
+              <Button variant="outline" asChild><Link href={`/events/${eventId}/guests`}>{t('guests')}</Link></Button>
               <Button variant="outline" asChild><Link href={`/events/${eventId}/privacy`}>{t('privacy')}</Link></Button>
               <Button variant="outline" asChild><Link href={`/events/${eventId}/drive`}>{t('drive')}</Link></Button>
               <Button variant="outline" asChild><Link href={`/events/${eventId}/site-builder`}>{t('site_builder')}</Link></Button>
@@ -100,9 +103,7 @@ export default function EventDetailPage() {
               <Button variant="outline" asChild><Link href={`/events/${eventId}/video-challenges`}>{t('video_challenges')}</Link></Button>
               <Button variant="outline" asChild><Link href={`/events/${eventId}/wow-walk`}>{t('wow_walk')}</Link></Button>
               <Button variant="outline" asChild><Link href={`/kiosk/${event.code || eventId}`}>{t('kiosk')}</Link></Button>
-              <Button variant="outline" asChild><Link href={`/events/${eventId}/social-wall`}>
-                {event?.hashtag ? `#${event.hashtag}` : 'Social Wall'}
-              </Link></Button>
+              {/* social-wall rimosso */}
               <Button variant="outline" asChild><Link href={`/events/${eventId}/qr`}>{t('qr_code')}</Link></Button>
             </div>
           </div>
@@ -125,10 +126,18 @@ export default function EventDetailPage() {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                   {media.slice(0, 12).map((m) => (
-                    <div key={m.id} className="rounded-md overflow-hidden border border-border">
+                    <div key={m.id} className="relative group rounded-md overflow-hidden border border-border">
                       {m.type === 'photo'
                         ? <img src={mediaUrl(m)} alt="" className="w-full h-28 object-cover" loading="lazy" />
                         : <video src={mediaUrl(m)} className="w-full h-28 object-cover" />}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                        <button onClick={() => shareMedia(mediaUrl(m), `${event?.couple_name} — ${typeof window !== 'undefined' && window.location.hostname.includes('justmarry') ? 'JustMarry.live' : 'Sposi.live'}`)} className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors" title="Condividi">
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                        <a href={mediaUrl(m)} download className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors" title="Scarica">
+                          <Download className="w-4 h-4" />
+                        </a>
+                      </div>
                     </div>
                   ))}
                 </div>

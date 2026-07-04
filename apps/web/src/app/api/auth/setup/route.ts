@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
-  const { userId, email, name } = await req.json();
+  const { userId, email, name, firstName, lastName, phone, gdprConsent, marketingConsent } = await req.json();
   if (!userId || !email || !name) {
     return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 });
+  }
+  if (!gdprConsent) {
+    return NextResponse.json({ error: 'Consenso privacy obbligatorio mancante' }, { status: 400 });
   }
 
   const { createClient } = await import('@supabase/supabase-js');
@@ -34,6 +37,11 @@ export async function POST(req: NextRequest) {
       id: userId,
       email,
       name,
+      first_name: firstName ?? null,
+      last_name: lastName ?? null,
+      phone: phone ?? null,
+      gdpr_consent_at: new Date().toISOString(),
+      marketing_consent: !!marketingConsent,
       role: 'sposo',
       tenant_id: userId,
     });

@@ -1,4 +1,4 @@
-# PROJECT STATUS — FotoSposi / WeddingMoments
+# PROJECT STATUS — Sposi.live / JustMarry.live
 
 ## Stato attuale: FASE 5 — Tutte le fasi completate (1-5) ✓
 

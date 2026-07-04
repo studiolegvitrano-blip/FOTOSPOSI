@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn } from '@fotosposi/core';
+import { signIn, signInWithOAuth } from '@fotosposi/core';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,12 @@ export default function LoginPage() {
     else router.push('/dashboard');
   };
 
+  const handleOAuth = async (provider: 'google' | 'facebook' | 'apple') => {
+    setError('');
+    const { error: err } = await signInWithOAuth(provider);
+    if (err) setError(t('error_invalid_credentials'));
+  };
+
   return (
     <main className="min-h-screen flex items-center justify-center p-4 relative">
       <div className="absolute top-4 right-4"><LanguageSwitcher /></div>
@@ -47,6 +53,15 @@ export default function LoginPage() {
           </CardContent>
           <CardFooter className="flex flex-col gap-3">
             <Button type="submit" className="w-full">{t('login_submit')}</Button>
+            <div className="relative w-full">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+              <div className="relative flex justify-center text-xs"><span className="bg-surface px-2 text-text-muted">{c('or_continue_with')}</span></div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 w-full">
+              <Button type="button" variant="outline" onClick={() => handleOAuth('google')} className="w-full">Google</Button>
+              <Button type="button" variant="outline" onClick={() => handleOAuth('facebook')} className="w-full">Facebook</Button>
+              <Button type="button" variant="outline" onClick={() => handleOAuth('apple')} className="w-full">Apple</Button>
+            </div>
             <p className="text-sm text-text-muted text-center">
               {t('login_no_account')} <a href="/signup" className="text-brand hover:underline">{t('login_signup_link')}</a>
             </p>

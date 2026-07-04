@@ -61,7 +61,7 @@ export async function sendNotification(params: {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { Authorization: `Bearer ${channelKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: 'noreply@fotosposi.it', to: params.recipient, subject: params.subject, text: params.body }),
+        body: JSON.stringify({ from: 'noreply@sposi.live', to: params.recipient, subject: params.subject, text: params.body }),
       });
       if (!res.ok) { status = 'failed'; errorMsg = `Email error: ${res.statusText}`; }
       else status = 'sent';

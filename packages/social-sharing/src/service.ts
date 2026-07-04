@@ -8,7 +8,7 @@ export interface WatermarkConfig {
 
 export function defaultWatermark(brand: 'fotosposi' | 'weddingmoments'): WatermarkConfig {
   return {
-    text: brand === 'fotosposi' ? 'FotoSposi' : 'WeddingMoments',
+    text: brand === 'fotosposi' ? 'Sposi.live' : 'JustMarry.live',
     position: 'bottom-right',
     opacity: 0.5,
     fontSize: 24,

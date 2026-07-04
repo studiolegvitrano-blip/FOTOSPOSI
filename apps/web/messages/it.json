@@ -1,8 +1,8 @@
 {
   "common": {
-    "brand_name": "FotoSposi",
+    "brand_name": "Sposi.live",
     "brand_subtitle": "La piattaforma per il tuo matrimonio",
-    "app_name": "FotoSposi",
+    "app_name": "Sposi.live",
     "save": "Salva",
     "cancel": "Annulla",
     "delete": "Elimina",
@@ -11,7 +11,7 @@
     "search": "Cerca",
     "loading": "Caricamento...",
     "error_generic": "Qualcosa è andato storto. Riprova.",
-    "error_network": "Errore di connessione. Controlla la tua rete.",
+    "or_continue_with": "o continua con","error_network": "Errore di connessione. Controlla la tua rete.",
     "back": "Indietro",
     "next": "Avanti",
     "close": "Chiudi",
@@ -53,7 +53,7 @@
     "settings": "Impostazioni"
   },
   "home": {
-    "hero_title": "FotoSposi",
+    "hero_title": "Sposi.live",
     "hero_subtitle": "La piattaforma che accompagna sposi e invitati per tutta la settimana dell'evento. Raccolta foto, video, giochi e regali in un unico posto.",
     "how_it_works": "Come funziona",
     "features": [
@@ -64,10 +64,23 @@
       "Stampe e gadget print-on-demand"
     ],
     "cta_login": "Accedi",
-    "cta_signup": "Registrati"
+    "cta_signup": "Registrati",
+    "badge": "Il sito matrimoniale che gli invitati usano davvero",
+    "plans_title": "Un piano per ogni matrimonio",
+    "plan_free_name": "Free",
+    "plan_free_desc": "Sito evento, QR code, fino a 100 foto in qualità standard. Gratis per sempre.",
+    "plan_premium_name": "Premium",
+    "plan_premium_desc": "Foto e video illimitati in qualità originale, giochi completi, Time Capsule 6 mesi.",
+    "plan_deluxe_name": "Deluxe",
+    "plan_deluxe_desc": "Tutto Premium + funzioni esclusive, Time Capsule 12 mesi, assistenza prioritaria.",
+    "plan_cta": "Vedi i piani",
+    "plan_popular": "Più scelto",
+    "final_cta_title": "Pronti a creare il vostro sito matrimoniale?",
+    "final_cta_subtitle": "In pochi minuti, gratis, senza carta di credito.",
+    "footer_tagline": "Foto, giochi e ricordi del vostro matrimonio, in un unico posto."
   },
   "auth": {
-    "login_title": "Accedi a FotoSposi",
+    "login_title": "Accedi a Sposi.live",
     "login_subtitle": "Bentornato! Inserisci le tue credenziali.",
     "login_email_label": "Email",
     "login_email_placeholder": "la.tua@email.com",
@@ -85,6 +98,13 @@
     "signup_email_placeholder": "la.tua@email.com",
     "signup_password_label": "Password",
     "signup_password_placeholder": "Scegli una password",
+    "signup_firstname_label": "Nome",
+    "signup_lastname_label": "Cognome",
+    "signup_phone_label": "Cellulare",
+    "signup_gdpr_label": "Ho letto e accetto il trattamento dei dati personali (GDPR).",
+    "signup_privacy_link": "Leggi l'informativa privacy",
+    "signup_marketing_label": "Acconsento facoltativamente alla condivisione dei miei dati con partner e fornitori per finalità di marketing.",
+    "signup_gdpr_required": "Devi accettare il trattamento dei dati personali per registrarti.",
     "signup_submit": "Registrati",
     "signup_has_account": "Hai già un account?",
     "signup_login_link": "Accedi",
@@ -124,6 +144,7 @@
     "detail_title": "Dettaglio evento",
     "public_page": "Pagina pubblica",
     "qr_code": "QR Code",
+    "guests": "Ospiti",
     "site_builder": "Sito evento",
     "upload_media": "Carica foto/video",
     "games": "Giochi",
@@ -188,7 +209,7 @@
     "navetta_orari": "Orari navetta",
     "navetta_mappa": "Mappa parcheggi",
     "navetta_contatti": "Contatti tassisti",
-    "navetta_matchmaking": "Passaggio in auto",
+    "navetta_matchmaking": "Auto Amica",
     "template_preview": "Anteprima template",
     "back_to_event": "← Evento",
     "select_template_first": "Seleziona prima un template per iniziare.",
@@ -213,7 +234,7 @@
     "playlist_desc": "Link Spotify o richieste",
     "hashtag_desc": "Hashtag social dell'evento",
     "countdown_desc": "Quanto manca al grande giorno",
-    "navetta_desc": "Orari, parcheggi, matchmaking passaggi",
+    "navetta_desc": "Orari, parcheggi, Auto Amica (passaggi in auto)",
     "ceremony_title_ph": "Titolo (es. Chiesa SS Mediatrice)",
     "ceremony_address_ph": "Indirizzo completo",
     "ceremony_note_ph": "Note sulla cerimonia...",
@@ -247,7 +268,7 @@
     "publish_site": "Pubblica sito",
     "preview_heading": "Anteprima sito invito",
     "follow_us_hashtag": "Seguici con l'hashtag",
-    "powered_by": "FotoSposi · Sito invito digitale",
+    "powered_by": "Sposi.live · Sito invito digitale",
     "site_published": "Sito pubblicato:"
   },
   "wall": {
@@ -533,7 +554,7 @@
     "server_error_description": "Riprova più tardi."
   },
   "brand": {
-    "fotosposi": "FotoSposi",
-    "weddingmoments": "WeddingMoments"
+    "fotosposi": "Sposi.live",
+    "weddingmoments": "JustMarry.live"
   }
 }

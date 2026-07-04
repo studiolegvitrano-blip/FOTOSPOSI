@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="64" fill="#d4a574"/>
+  <path d="M256 420c-64-52-148-128-148-212 0-64 52-108 108-108 32 0 64 16 84 42 12-14 28-26 44-34l-22-16c-4-2-6-8-4-12s8-6 12-4l32 20c6 4 8 12 4 18l-22 22c-20-10-42-16-64-16-42 0-76 28-76 76 0 64 52 116 96 148l16 14 16-14c44-32 96-84 96-148 0-32-14-58-40-76l18-16c36 26 58 64 58 108 0 84-84 160-148 212z" fill="#fff"/>
+  <text x="256" y="390" text-anchor="middle" font-family="Arial,sans-serif" font-weight="bold" font-size="64" fill="#fff">FotoSposi</text>
+</svg>

@@ -7,13 +7,18 @@ import { useTranslations } from 'next-intl';
 import { getEventByCode } from '@fotosposi/events';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Camera, Video } from 'lucide-react';
+import { Camera, Video, Upload } from 'lucide-react';
+
+function brandName(): string {
+  if (typeof window !== 'undefined' && window.location.hostname.includes('justmarry')) return 'JustMarry.live';
+  return 'Sposi.live';
+}
 
 function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, coupleName?: string, eventDate?: string) {
   ctx.save();
-  const barH = Math.max(80, Math.round(h / 12));
-  const fontSizeName = Math.max(22, Math.round(w / 22));
-  const fontSizeDate = Math.max(16, Math.round(w / 32));
+  const barH = Math.max(160, Math.round(h / 6));
+  const fontSizeName = Math.max(44, Math.round(w / 11));
+  const fontSizeDate = Math.max(32, Math.round(w / 16));
 
   // Sfondo con gradiente in basso
   const grad = ctx.createLinearGradient(0, h - barH, 0, h);
@@ -34,17 +39,40 @@ function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, coup
   ctx.font = `${fontSizeDate}px Georgia, "Times New Roman", serif`;
   ctx.fillText(eventDate || '', w / 2, h - barH + Math.round(barH * 0.38) + fontSizeName + 6);
 
-  // Brand FotoSposi in basso a destra (sopra la barra)
+  // Brand in basso a destra (sopra la barra)
   ctx.globalAlpha = 0.50;
   ctx.textAlign = 'right';
   ctx.textBaseline = 'bottom';
-  ctx.font = `${Math.max(14, Math.round(fontSizeDate * 0.9))}px Georgia, sans-serif`;
-  ctx.fillText('FotoSposi', w - 16, h - 16);
+  ctx.font = `${Math.max(24, Math.round(w / 22))}px Georgia, sans-serif`;
+  ctx.fillText(brandName(), w - 16, h - 16);
   ctx.restore();
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise(resolve => canvas.toBlob(b => resolve(b ?? new Blob()), 'image/jpeg', 0.92));
+}
+
+// iOS Safari does not support 'video/webm' (throws NotSupportedError on `new MediaRecorder`).
+// Feature-detect a supported mimeType instead of hardcoding webm, so recording also works on
+// iPhone/iPad (Safari) and Android WebViews that only support mp4/h264.
+function pickSupportedVideoMime(): string | undefined {
+  if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return undefined;
+  const candidates = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+    'video/mp4;codecs=h264,aac',
+    'video/mp4',
+  ];
+  return candidates.find(m => MediaRecorder.isTypeSupported(m));
+}
+
+function cameraSupported(): boolean {
+  return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
+}
+
+function extFromMime(mime: string): string {
+  return mime.includes('mp4') ? 'mp4' : 'webm';
 }
 
 export default function KioskPage() {
@@ -73,6 +101,7 @@ export default function KioskPage() {
   const [recording, setRecording] = useState(false);
   const [count, setCount] = useState(0);
   const [error, setError] = useState('');
+  const uploadRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!code) return;
@@ -93,7 +122,15 @@ export default function KioskPage() {
     stream?.getTracks().forEach(t => t.stop());
   };
 
+  // Rilascia sempre la fotocamera quando il componente si smonta (evita che resti
+  // "accesa" su iOS/Android se l'ospite naviga via mentre la preview è attiva).
+  useEffect(() => stopStream, []);
+
   const startCamera = async () => {
+    if (!cameraSupported()) {
+      setError('Fotocamera non disponibile su questo browser. Usa "Carica foto" per inviare uno scatto dalla galleria.');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1920 } },
@@ -101,7 +138,17 @@ export default function KioskPage() {
       });
       if (videoRef.current) videoRef.current.srcObject = stream;
       setStep('camera');
-    } catch { setError(c('error_generic')); }
+      setError('');
+    } catch (err) {
+      const name = (err as { name?: string })?.name;
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setError('Permesso fotocamera negato. Abilita fotocamera e microfono nelle impostazioni del browser, oppure usa "Carica foto".');
+      } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+        setError('Nessuna fotocamera trovata su questo dispositivo. Usa "Carica foto".');
+      } else {
+        setError(c('error_generic'));
+      }
+    }
   };
 
   const doCountdown = (cb: () => void) => {
@@ -161,17 +208,24 @@ export default function KioskPage() {
       if (stream?.getAudioTracks().length) canvasStream.addTrack(stream.getAudioTracks()[0]!.clone());
 
       chunksRef.current = [];
-      const recorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm;codecs=vp9,opus' });
+      const mime = pickSupportedVideoMime();
+      if (!mime) {
+        setError('Registrazione video non supportata su questo browser. Usa "Carica foto" per inviare un video dalla galleria.');
+        stopStream();
+        return;
+      }
+      const recorder = new MediaRecorder(canvasStream, { mimeType: mime });
       recorderRef.current = recorder;
       recorder.ondataavailable = e => { if (e.data.size) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
         cancelAnimationFrame(rafRef.current);
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const ext = extFromMime(mime);
+        const blob = new Blob(chunksRef.current, { type: mime });
         setMediaBlob(blob);
         const url = URL.createObjectURL(blob);
         setMediaUrl(url);
-        autoSave(url, 'webm');
-        if (eventId && guestName.trim()) autoUpload(blob, eventId, guestName, 'video/webm', 'webm');
+        autoSave(url, ext);
+        if (eventId && guestName.trim()) autoUpload(blob, eventId, guestName, mime, ext);
         setRecording(false);
         setStep('preview');
         stopStream();
@@ -193,7 +247,7 @@ export default function KioskPage() {
   const autoSave = (url: string, ext: string) => {
     if (downloadRef.current) {
       downloadRef.current.href = url;
-      downloadRef.current.download = `fotosposi_${Date.now()}.${ext}`;
+      downloadRef.current.download = `${brandName().toLowerCase().replace(/[^a-z0-9]/g,'')}_${Date.now()}.${ext}`;
       downloadRef.current.click();
     }
   };
@@ -213,6 +267,30 @@ export default function KioskPage() {
     } catch {}
   };
 
+  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !eventId || !guestName.trim()) return;
+    const contentType = file.type || 'image/jpeg';
+    const ext = contentType.includes('video') ? 'webm' : 'jpg';
+    const blob = file;
+    if (contentType.startsWith('image/')) {
+      const canvas = document.createElement('canvas');
+      const img = new Image();
+      img.onload = async () => {
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) { ctx.drawImage(img, 0, 0); drawWatermark(ctx, canvas.width, canvas.height, coupleName, eventDate); }
+        canvas.toBlob(async (b) => { if (b) await autoUpload(b, eventId, guestName, 'image/jpeg', 'jpg'); }, 'image/jpeg', 0.92);
+      };
+      img.src = URL.createObjectURL(blob);
+    } else {
+      await autoUpload(blob, eventId, guestName, contentType, ext);
+    }
+    setStep('done');
+    if (uploadRef.current) uploadRef.current.value = '';
+  };
+
   const retake = () => { setMediaUrl(null); setMediaBlob(null); stopStream(); startCamera(); };
 
   const cleanup = () => { setMediaUrl(null); setMediaBlob(null); stopStream(); setStep('intro'); };
@@ -230,7 +308,7 @@ export default function KioskPage() {
         <Card className="w-full max-w-md bg-gray-900 border-gray-700 text-white">
           <CardHeader><CardTitle className="text-center">{t('title')}</CardTitle></CardHeader>
           <CardContent className="space-y-4 text-center">
-            <p className="text-6xl">🤳</p>
+            <Camera className="w-16 h-16 mx-auto text-amber-400" />
             <p className="text-gray-300">{t('instructions')}</p>
             <div className="flex gap-2 justify-center">
               <Button variant={mode === 'photo' ? 'default' : 'outline'} size="sm" onClick={() => setMode('photo')}>
@@ -246,6 +324,12 @@ export default function KioskPage() {
             <Button className="w-full" onClick={startCamera} disabled={!guestName.trim()}>
               {c('next')}
             </Button>
+            <div className="pt-2">
+              <Button variant="outline" className="w-full" onClick={() => uploadRef.current?.click()} disabled={!guestName.trim()}>
+                <Upload className="w-4 h-4 mr-2" /> Carica foto
+              </Button>
+            </div>
+            <input ref={uploadRef} type="file" accept="image/*,video/*" onChange={handleUploadFile} className="hidden" />
           </CardContent>
         </Card>
       )}
@@ -276,6 +360,9 @@ export default function KioskPage() {
           {recording && <p className="text-center text-sm text-red-400 mt-2 animate-pulse">Registrazione in corso...</p>}
           <div className="text-center mt-2 text-sm text-gray-500">
             <p>{c('gallery')}: {count}</p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => uploadRef.current?.click()}>
+              <Upload className="w-4 h-4 mr-1" /> Carica foto
+            </Button>
           </div>
         </div>
       )}
@@ -292,7 +379,7 @@ export default function KioskPage() {
             <Button variant="outline" onClick={cleanup}>Nuovo {mode === 'photo' ? 'selfie' : 'video'}</Button>
           </div>
           <p className="text-xs text-gray-500 text-center">
-            {mode === 'photo' ? 'Foto' : 'Video'} salvato con logo FotoSposi
+            {mode === 'photo' ? 'Foto' : 'Video'} salvato con logo {brandName()}
           </p>
         </div>
       )}
@@ -300,7 +387,7 @@ export default function KioskPage() {
       {step === 'done' && (
         <Card className="w-full max-w-md bg-gray-900 border-gray-700 text-white">
           <CardContent className="text-center space-y-4 py-8">
-            <div className="text-6xl">🎉</div>
+            <Camera className="w-16 h-16 mx-auto text-amber-400" />
             <p className="text-xl">Grazie, {guestName}!</p>
             <p className="text-gray-400">{t('success')}</p>
             <Button onClick={cleanup}>Un altro {mode === 'photo' ? 'selfie' : 'video'}</Button>

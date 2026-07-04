@@ -1,4 +1,4 @@
-# SPEC — Feature Virali WeddingMoments/FotoSposi (Fase Costo-Zero)
+# SPEC — Feature Virali JustMarry.live/Sposi.live (Fase Costo-Zero)
 
 > Contesto per l'agente: monorepo Turborepo esistente, Next.js 15 + TypeScript + Tailwind v4 + shadcn/ui, Supabase (Postgres 17, RLS, Auth, Storage), hosting Vercel. Tutte le feature qui sotto DEVONO usare solo librerie gratuite/self-hosted (no chiamate a pagamento) finché non indicato "Fase 2 — richiede budget API". Riusare tabelle/edge function esistenti (foto upload, giochi, QR auth) invece di crearne di nuove dove possibile.
 

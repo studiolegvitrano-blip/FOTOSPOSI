@@ -66,7 +66,7 @@ export interface DriveFolderMap {
 const DRIVE_FOLDERS = ['Foto', 'Video', 'Ricevimento', 'Cerimonia'];
 
 export async function ensureDriveFolders(accessToken: string): Promise<{ folders?: DriveFolderMap; error?: string }> {
-  const brand = 'WeddingMoments';
+  const brand = 'Sposi.live';
   const folders: DriveFolderMap = {};
 
   try {

@@ -31,7 +31,7 @@ describe('GTE Service', () => {
 
   describe('getBrandConfig', () => {
     it('returns config on success', async () => {
-      const fake = { id: '1', slug: 'weddingmoments', name: 'WeddingMoments' };
+      const fake = { id: '1', slug: 'justmarrylive', name: 'JustMarry.live' };
       mockFrom.mockReturnValue(makeQuery({ data: fake, error: null }));
       const { config, error } = await getBrandConfig('weddingmoments');
       expect(config).toEqual(fake);
