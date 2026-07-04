@@ -59,20 +59,14 @@ async function applyWatermark(
   }
 }
 
-export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for') || 'unknown';
-  const rl = rateLimit(`process-queue:${ip}`, 30, 60000);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: 'Troppe richieste' },
-      { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetIn / 1000)) } },
-    );
-  }
-
-  try {
-    const { eventId } = await request.json();
-    if (!eventId) return NextResponse.json({ error: 'eventId richiesto' }, { status: 400 });
-
+/**
+ * Processes up to `limit` pending/failed upload_queue items for a single event: downloads the
+ * raw file from R2, watermarks photos, re-uploads, creates the media_uploads record, and syncs
+ * to Drive when connected. Shared by the client-triggered route below (called while a guest has
+ * the upload page open) and by the autonomous cron sweep (`/api/cron/maintenance`), which is the
+ * safety net that keeps processing queues even when nobody has a tab open for that event.
+ */
+export async function processQueueForEvent(eventId: string, limit = 5): Promise<{ processed: number; remaining: number }> {
     const supabase = createServiceClient();
 
     const [{ data: event }, { data: items }] = await Promise.all([
@@ -83,11 +77,11 @@ export async function POST(request: NextRequest) {
         .eq('event_id', eventId)
         .in('status', ['pending', 'failed'])
         .order('created_at', { ascending: true })
-        .limit(5),
+        .limit(limit),
     ]);
 
     if (!items || items.length === 0) {
-      return NextResponse.json({ done: true, processed: 0 });
+      return { processed: 0, remaining: 0 };
     }
 
     const coupleName = event?.couple_name || '';
@@ -205,7 +199,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ done: false, processed, remaining: items.length - processed });
+    return { processed, remaining: items.length - processed };
+}
+
+export async function POST(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for') || 'unknown';
+  const rl = rateLimit(`process-queue:${ip}`, 30, 60000);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Troppe richieste' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetIn / 1000)) } },
+    );
+  }
+
+  try {
+    const { eventId } = await request.json();
+    if (!eventId) return NextResponse.json({ error: 'eventId richiesto' }, { status: 400 });
+
+    const { processed, remaining } = await processQueueForEvent(eventId, 5);
+    return NextResponse.json({ done: remaining === 0, processed, remaining });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Errore interno' },
