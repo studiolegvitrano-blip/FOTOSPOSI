@@ -61,7 +61,8 @@ export async function GET(req: NextRequest) {
     status = 'error';
     notes.push(`Lettura upload_queue fallita: ${eventsErr.message}`);
   } else {
-    const distinctEventIds = Array.from(new Set((pendingEvents ?? []).map((r: { event_id: string }) => r.event_id))).slice(0, MAX_EVENTS_PER_RUN);
+    const eventIds: string[] = (pendingEvents ?? []).map((r: { event_id: string }) => r.event_id);
+    const distinctEventIds: string[] = Array.from(new Set(eventIds)).slice(0, MAX_EVENTS_PER_RUN);
     for (const eventId of distinctEventIds) {
       try {
         const { processed } = await processQueueForEvent(eventId, ITEMS_PER_EVENT);

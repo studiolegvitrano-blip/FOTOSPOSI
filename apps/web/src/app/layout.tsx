@@ -14,6 +14,12 @@ export async function generateMetadata(): Promise<Metadata> {
     title: brand,
     description: desc,
     manifest: '/manifest.webmanifest',
+    icons: {
+      icon: [
+        { url: '/favicon.svg', type: 'image/svg+xml' },
+      ],
+      apple: '/icon-192.svg',
+    },
     other: {
       'mobile-web-app-capable': 'yes',
       'apple-mobile-web-app-capable': 'yes',
@@ -57,7 +63,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           worker-src 'self' blob:;
         " />
         <meta name="theme-color" content="#d4a574" />
-        <link rel="apple-touch-icon" href="/icon-192.svg" />
       </head>
       <body suppressHydrationWarning>
         <NextIntlClientProvider locale={locale} messages={messages}>
