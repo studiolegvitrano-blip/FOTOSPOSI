@@ -17,7 +17,7 @@ export default function LeaderboardPage() {
 
   const [categories, setCategories] = useState<GameCategory[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [leaderboard, setLeaderboard] = useState<{ media_id: string; url: string; r2_key: string | null; media_id_fk: string; votes: number }[]>([]);
+  const [leaderboard, setLeaderboard] = useState<{ media_id: string; url: string; r2_key: string | null; media_id_fk?: string; votes: number }[]>([]);
 
   useEffect(() => {
     getCategories(eventId).then((r) => {

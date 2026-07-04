@@ -4,6 +4,11 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
+  // sharp ships native bindings; letting webpack try to bundle it (via the
+  // @fotosposi/photo-overlay workspace package) makes it go looking for
+  // @img/sharp-libvips-dev/* files that don't exist in the Vercel build image.
+  // Keeping it external forces Node's normal require() at runtime instead.
+  serverExternalPackages: ['sharp'],
   transpilePackages: [
     '@fotosposi/core',
     '@fotosposi/events',

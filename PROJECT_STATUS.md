@@ -1,5 +1,27 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 05/07/2026 — Deploy Vercel + DNS live (IN CORSO)
+- [x] **Bug turbo.json**: chiave `"pipeline"` (Turborepo v1) non compatibile con `turbo ^2.5.0` installato → rinominata in `"tasks"`. Pushato (`fa23e6e`), risolto il primo build fallito.
+- [x] **Bug import mancante**: `apps/web/src/app/events/[id]/guests/page.tsx` importava `getEventById` da `@fotosposi/core`, funzione mai implementata (file lasciato a metà da una sessione precedente). Aggiunta `getEventById()` in `packages/core/src/guests.ts` + esportata in `index.ts`.
+- [x] **Bug bundling sharp**: webpack tentava di impacchettare i binari nativi di `sharp` (usato da `@fotosposi/photo-overlay` per il watermark) causando errori `Module not found '@img/sharp-libvips-dev/*'`. Fix: `serverExternalPackages: ['sharp']` in `apps/web/next.config.ts`.
+- [x] **Bug tipo TS**: `apps/web/src/app/events/[id]/games/leaderboard/page.tsx` dichiarava `media_id_fk: string` (obbligatorio) nello state, ma `getLeaderboard()` in `packages/games/src/service.ts` lo restituisce come opzionale (`media_id_fk?: string`) → allineato lo state a opzionale.
+- [ ] **Da pushare**: le 4 fix sopra (guests.ts, index.ts, next.config.ts, leaderboard/page.tsx) sono corrette sul disco ma NON ancora committate/pushate — servono `git add`, `git commit`, `git push` dal terminale utente, poi verificare il nuovo build su Vercel.
+- [x] **Domini Vercel aggiunti**: `sposi.live`, `www.sposi.live`, `justmarry.live`, `www.justmarry.live` aggiunti al progetto `fotosposi-web` (apex→www redirect 308 configurato su entrambi).
+- [x] **DNS propagato e verificato**: utente ha aggiornato i record su Register.it (A `@`→`216.198.79.1`, CNAME `www`→`5c8792472ce406eb.vercel-dns-017.com.`) per sposi.live — confermato "Valid Configuration" su Vercel per tutti e 4 i domini. Justmarry.live risultava già propagato anch'esso al momento della verifica (DNS records esistenti — record mail/PEC su Register.it non toccati).
+- [ ] **Attenzione**: nessun deployment è ancora andato a buon fine → i domini mostrano "No Deployment" su Vercel finché il prossimo push non supera il build.
+- [ ] Da fare dopo il build OK: verifica finale (test, sicurezza chiavi, rotazione PAT GitHub esposto in `ECCOLO FOTOSPOSI.txt`), PWA runtime per Deluxe (task 15, non ancora iniziato).
+
+## Sessione 04/07/2026 — Go-live: homepage, camera fix, watermark video, autonomia
+- [x] Homepage JustMarry riscritta (design originale ispirato a Zola, non copiato): hero, badge, sezione piani (Free/Premium/Deluxe), CTA finale
+- [x] Sito pubblico invito (`/sito/[id]`): aggiunta sezione "Foto & Giochi" con link a Wall e hub giochi/challenge (prima mancava il collegamento)
+- [x] **Fix bug reale**: registrazione video in kiosk e video-recorder forzava `video/webm` → crash su iOS Safari (`NotSupportedError`). Ora rileva il mimeType supportato (webm/mp4) con fallback upload-da-galleria universale su tutte le piattaforme (iOS/Android/desktop)
+- [x] Cleanup automatico stream fotocamera allo smontaggio componente (niente più "fotocamera accesa" residua)
+- [x] **Watermark video**: nuovo package `packages/video-overlay` (ffmpeg+sharp) esteso a `/api/photos/[id]/share` — prima il watermark su condivisione funzionava solo per le foto. Nota: testare su Vercel per limiti dimensione funzione/durata (vedi sotto)
+- [x] Form registrazione: nome, cognome, cellulare con prefisso internazionale (default IT +39, selezionabile per altri paesi), checkbox GDPR obbligatoria + checkbox facoltativa condivisione terze parti — migration `00028_user_contact_consent.sql`
+- [x] Verificata sessione persistente (Supabase SSR + cookie): autenticazione singola, nessun re-login continuo
+- [x] **Autonomia/manutenzione**: `/api/cron/backup` (snapshot JSON tabelle critiche su R2) + `/api/cron/maintenance` (recupero job upload_queue bloccati, sweep autonomo code di TUTTI gli eventi non solo quello con tab aperta, health check) — `vercel.json` con cron alle 04:00/04:20 UTC (dopo le 4:40 locale), log in `system_health_log` — migration `00029_system_health_log.sql`. Richiede `CRON_SECRET` impostata anche nelle Environment Variables Vercel
+- [ ] **Da fare**: deploy Vercel + collegamento DNS justmarry.live, PWA personalizzata a runtime per app matrimonio (Deluxe), decisione confermata: PWA unica invece di app nativa per coppia (vedi motivazioni Apple 4.2.6)
+
 ## Stato attuale: FASE 5 — Tutte le fasi completate (1-5) ✓
 
 ### Checklist Fase 1 (Core + Events)

@@ -62,3 +62,12 @@ export async function updateGuestApprovalMode(
   if (error) return { error: error.message };
   return {};
 }
+
+export async function getEventById(
+  eventId: string,
+): Promise<{ event?: Record<string, unknown>; error?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.from('events').select('*').eq('id', eventId).single();
+  if (error) return { error: error.message };
+  return { event: data ?? undefined };
+}

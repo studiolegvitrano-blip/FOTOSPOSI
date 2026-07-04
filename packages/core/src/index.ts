@@ -63,5 +63,6 @@ export {
   updateGuestStatus,
   registerGuest,
   updateGuestApprovalMode,
+  getEventById,
 } from './guests';
 export type { EventGuest } from './guests';
