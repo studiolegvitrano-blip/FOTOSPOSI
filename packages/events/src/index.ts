@@ -10,14 +10,17 @@ export interface WeddingEvent {
   date: string;
   location: string;
   church?: string;
+  church_address?: string;
   church_city?: string;
   venue?: string;
+  venue_address?: string;
   venue_city?: string;
   brand: 'fotosposi' | 'weddingmoments';
   tier: Tier;
   created_at: string;
   code?: string;
   hashtag?: string;
+  allow_guest_media: boolean;
 }
 
 export interface SubEvent {

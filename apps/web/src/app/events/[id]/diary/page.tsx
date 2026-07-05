@@ -35,7 +35,7 @@ export default function WorkDiaryPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
-    getCurrentUser().then(({ user }) => { if (!user) router.push('/login'); });
+    getCurrentUser().then(({ user }) => { if (!user) router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); });
     load();
   }, [id]);
 

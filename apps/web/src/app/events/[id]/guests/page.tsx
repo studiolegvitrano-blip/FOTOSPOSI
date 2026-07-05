@@ -18,7 +18,7 @@ export default function GuestsPage() {
 
   useEffect(() => {
     getCurrentUser().then(({ user, error }) => {
-      if (error || !user) { router.push('/login'); return; }
+      if (error || !user) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       loadData();
     });
   }, [eventId]);

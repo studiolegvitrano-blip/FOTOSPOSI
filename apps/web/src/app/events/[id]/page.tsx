@@ -8,7 +8,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ShareButton, Countdown } from '@fotosposi/ui';
-import { shareMedia } from '@fotosposi/social-sharing';
+import { shareWatermarkedMedia } from '@/lib/share-watermarked';
 import { Share2, Download, Church, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -75,13 +75,25 @@ export default function EventDetailPage() {
               </p>
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-text-muted mt-1">
                 {event.church && (
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.church + ', ' + (event.church_city || event.location || ''))}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-brand transition-colors no-underline text-text-muted">
-                    <Church className="w-4 h-4" /> {event.church}
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([event.church, event.church_address, event.church_city || event.location].filter(Boolean).join(', '))}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 hover:text-brand transition-colors no-underline text-text-muted"
+                    title="Apri nel navigatore"
+                  >
+                    <Church className="w-4 h-4" /> {event.church}{event.church_address ? ` — ${event.church_address}` : ''}
                   </a>
                 )}
                 {event.venue && (
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue + ', ' + (event.venue_city || event.location || ''))}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-brand transition-colors no-underline text-text-muted">
-                    <Building2 className="w-4 h-4" /> {event.venue}
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([event.venue, event.venue_address, event.venue_city || event.location].filter(Boolean).join(', '))}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 hover:text-brand transition-colors no-underline text-text-muted"
+                    title="Apri nel navigatore"
+                  >
+                    <Building2 className="w-4 h-4" /> {event.venue}{event.venue_address ? ` — ${event.venue_address}` : ''}
                   </a>
                 )}
               </div>
@@ -130,11 +142,17 @@ export default function EventDetailPage() {
                       {m.type === 'photo'
                         ? <img src={mediaUrl(m)} alt="" className="w-full h-28 object-cover" loading="lazy" />
                         : <video src={mediaUrl(m)} className="w-full h-28 object-cover" />}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                        <button onClick={() => shareMedia(mediaUrl(m), `${event?.couple_name} — ${typeof window !== 'undefined' && window.location.hostname.includes('justmarry') ? 'JustMarry.live' : 'Sposi.live'}`)} className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors" title="Condividi">
+                      {/* Sempre visibili (non solo on-hover): su mobile/touch non esiste hover,
+                          quindi i pulsanti per-foto restavano invisibili e inutilizzabili. */}
+                      <div className="absolute bottom-1 right-1 flex items-center gap-1.5">
+                        <button
+                          onClick={() => shareWatermarkedMedia(m.id, eventId, m.type !== 'photo', `${event?.couple_name} — ${typeof window !== 'undefined' && window.location.hostname.includes('justmarry') ? 'JustMarry.live' : 'Sposi.live'}`)}
+                          className="p-1.5 bg-white/90 rounded-full shadow hover:bg-white transition-colors"
+                          title="Condividi"
+                        >
                           <Share2 className="w-4 h-4" />
                         </button>
-                        <a href={mediaUrl(m)} download className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors" title="Scarica">
+                        <a href={mediaUrl(m)} download className="p-1.5 bg-white/90 rounded-full shadow hover:bg-white transition-colors" title="Scarica">
                           <Download className="w-4 h-4" />
                         </a>
                       </div>

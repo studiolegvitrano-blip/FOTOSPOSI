@@ -31,7 +31,7 @@ export default function CapsuleManagerPage() {
   const [messages, setMessages] = useState<CapsuleMessage[]>([]);
 
   useEffect(() => {
-    getCurrentUser().then(({ user }) => { if (!user) router.push('/login'); });
+    getCurrentUser().then(({ user }) => { if (!user) router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); });
     load();
   }, [id]);
 

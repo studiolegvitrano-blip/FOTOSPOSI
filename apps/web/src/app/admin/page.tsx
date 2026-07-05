@@ -19,7 +19,7 @@ export default function AdminPage() {
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user: u } }) => {
-      if (!u) { router.push('/login'); return; }
+      if (!u) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       setUser(u);
       Promise.all([
         supabase.from('events').select('*').order('created_at', { ascending: false }).limit(50),
@@ -34,7 +34,7 @@ export default function AdminPage() {
 
   const handleLogout = async () => {
     await signOut();
-    router.push('/login');
+    router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
   };
 
   if (loading) return <p className="text-center mt-8">Caricamento...</p>;

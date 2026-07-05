@@ -32,7 +32,7 @@ export default function TierPage() {
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) { router.push('/login'); return; }
+      if (!user) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       getEventTier(eventId).then(({ tier }) => { if (tier) setCurrentTier(tier); });
     });
   }, [eventId, router]);

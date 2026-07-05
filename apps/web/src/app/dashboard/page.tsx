@@ -24,7 +24,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     getCurrentUser().then(({ user: u, error }) => {
-      if (error || !u) { router.push('/login'); return; }
+      if (error || !u) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       setUser(u);
       getEventsByUser(u.id).then((r) => {
         if (r.events) setEvents(r.events);
@@ -35,7 +35,7 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     await signOut();
-    router.push('/login');
+    router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
   };
 
   if (loading) return <p className="text-center mt-8">{c('loading')}</p>;

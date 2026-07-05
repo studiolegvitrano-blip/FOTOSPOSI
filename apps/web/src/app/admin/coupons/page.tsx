@@ -23,7 +23,7 @@ export default function AdminCouponsPage() {
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user: u } }) => {
-      if (!u) { router.push('/login'); return; }
+      if (!u) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       setUser(u);
       loadCoupons();
     });

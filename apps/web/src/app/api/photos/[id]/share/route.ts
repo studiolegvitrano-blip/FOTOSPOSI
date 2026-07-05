@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@fotosposi/core';
+import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
 
 // Video watermarking shells out to ffmpeg and can take longer than the default 10s —
 // needs the Node.js runtime (not Edge) and a higher time budget.
@@ -23,11 +24,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const supabase = createServiceClient();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
-  const { data: media } = await supabase
+  let { data: media } = await supabase
     .from('media_uploads')
-    .select('url, type')
+    .select('url, type, r2_key')
     .eq('id', id)
-    .single();
+    .maybeSingle();
+
+  // I video del Video Guestbook non sono in `media_uploads` ma in `video_messages` — senza
+  // questo fallback il watermark non era mai raggiungibile per quei video (404 sempre).
+  let isGuestbookVideo = false;
+  if (!media) {
+    const { data: videoMessage } = await supabase
+      .from('video_messages')
+      .select('url, r2_key')
+      .eq('id', id)
+      .maybeSingle();
+    if (videoMessage) {
+      media = { url: videoMessage.url, type: 'video', r2_key: videoMessage.r2_key };
+      isGuestbookVideo = true;
+    }
+  }
 
   if (!media) {
     return new NextResponse('Media not found', { status: 404 });
@@ -36,7 +52,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const isVideo = media.type === 'video';
   const cacheExt = isVideo ? 'mp4' : 'jpg';
   const contentType = isVideo ? 'video/mp4' : 'image/jpeg';
-  const cachePath = `overlays/${eventId}/${id}_${format}.${cacheExt}`;
+  const cacheNamespace = isGuestbookVideo ? 'guestbook' : 'photos';
+  const cachePath = `overlays/${eventId}/${cacheNamespace}/${id}_${format}.${cacheExt}`;
 
   const { data: cached } = await supabase.storage.from('media').getPublicUrl(cachePath);
   if (cached?.publicUrl) {
@@ -53,9 +70,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
   }
 
-  const mediaUrl = media.url.startsWith('http')
-    ? media.url
-    : `${supabaseUrl}/storage/v1/object/public/media/${media.url}`;
+  // File caricati dopo la migrazione a R2 hanno `r2_key` valorizzato — serve un presigned URL,
+  // il vecchio path via Supabase Storage pubblico non funziona più per quelli.
+  const mediaUrl = media.r2_key
+    ? await getPresignedDownloadUrl(media.r2_key, 300)
+    : media.url.startsWith('http')
+      ? media.url
+      : `${supabaseUrl}/storage/v1/object/public/media/${media.url}`;
+
+  if (!mediaUrl) {
+    return new NextResponse('Media URL not available', { status: 500 });
+  }
 
   const srcResp = await fetch(mediaUrl);
   if (!srcResp.ok) {

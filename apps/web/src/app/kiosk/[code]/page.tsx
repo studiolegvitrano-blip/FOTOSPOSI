@@ -87,6 +87,7 @@ export default function KioskPage() {
   const rafRef = useRef<number>(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const [eventName, setEventName] = useState('');
   const [coupleName, setCoupleName] = useState('');
@@ -118,13 +119,24 @@ export default function KioskPage() {
 
   const stopStream = () => {
     cancelAnimationFrame(rafRef.current);
-    const stream = videoRef.current?.srcObject as MediaStream | null;
-    stream?.getTracks().forEach(t => t.stop());
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
   };
 
   // Rilascia sempre la fotocamera quando il componente si smonta (evita che resti
   // "accesa" su iOS/Android se l'ospite naviga via mentre la preview è attiva).
   useEffect(() => stopStream, []);
+
+  // Il <video> con ref={videoRef} esiste nel DOM solo quando step === 'camera'. Prima di questo
+  // fix, in startCamera si assegnava `videoRef.current.srcObject = stream` PRIMA di passare a
+  // step 'camera': in quel momento il tag <video> non era ancora montato, quindi videoRef.current
+  // era null e lo stream non veniva mai collegato — risultato: permesso fotocamera concesso ma
+  // nessuna immagine (la videocamera "non partiva"). Ora lo stream si ricollega qui, dopo il mount.
+  useEffect(() => {
+    if (step === 'camera' && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [step]);
 
   const startCamera = async () => {
     if (!cameraSupported()) {
@@ -136,7 +148,7 @@ export default function KioskPage() {
         video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1920 } },
         audio: mode === 'video',
       });
-      if (videoRef.current) videoRef.current.srcObject = stream;
+      streamRef.current = stream;
       setStep('camera');
       setError('');
     } catch (err) {
@@ -202,7 +214,7 @@ export default function KioskPage() {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const stream = videoRef.current?.srcObject as MediaStream | null;
+      const stream = streamRef.current;
       drawFrames(ctx, canvas, video);
       const canvasStream = canvas.captureStream(30);
       if (stream?.getAudioTracks().length) canvasStream.addTrack(stream.getAudioTracks()[0]!.clone());

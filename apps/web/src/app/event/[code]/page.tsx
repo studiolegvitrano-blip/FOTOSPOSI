@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { getCurrentUser } from '@fotosposi/core';
+import { rememberLastEventCode } from '@/components/pwa-event-redirect';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { WeddingEvent, SubEvent, EventWindow } from '@fotosposi/events';
@@ -47,6 +48,9 @@ export default function GuestEventPage() {
     setMedia(data.media ?? []);
     setWindow(data.window ?? null);
     setLoading(false);
+    // Se l'ospite installa l'app da qui ("Aggiungi a schermata Home"), la prossima apertura in
+    // modalità standalone deve portare dritto a questo evento — vedi pwa-event-redirect.tsx.
+    rememberLastEventCode(code);
   };
 
   useEffect(() => {
@@ -143,9 +147,11 @@ export default function GuestEventPage() {
               Live ({photos.length})
             </Button>
           )}
-          {canUpload
-            ? <Button variant="outline" asChild><a href={`/events/${event.id}/upload`}>Carica</a></Button>
-            : <Button variant="outline" disabled>Carica (finestra chiusa)</Button>}
+          {event.allow_guest_media === false
+            ? null
+            : canUpload
+              ? <Button variant="outline" asChild><a href={`/events/${event.id}/upload`}>Carica</a></Button>
+              : <Button variant="outline" disabled>Carica (finestra chiusa)</Button>}
           <Button variant="outline" asChild><a href={`/events/${event.id}/games/jokes`}>Scherzi</a></Button>
           <Button variant="outline" asChild><a href={`/events/${event.id}/guestbook`}>Video</a></Button>
         </div>

@@ -23,7 +23,7 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     getCurrentUser().then(({ user: u, error }) => {
-      if (error || !u) { router.push('/login'); return; }
+      if (error || !u) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       setUser(u);
       loadData();
     });
@@ -61,7 +61,7 @@ export default function NotificationsPage() {
                 onClick={() => toggle(c.id)}
                 className={`w-12 h-6 rounded-full transition-colors relative ${prefs[c.id] !== false ? 'bg-brand' : 'bg-border'}`}
               >
-                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${prefs[c.id] !== false ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform transform ${prefs[c.id] !== false ? 'translate-x-6' : 'translate-x-0.5'}`} />
               </button>
             </div>
           ))}
@@ -88,6 +88,4 @@ export default function NotificationsPage() {
           )}
         </CardContent>
       </Card>
-    </main>
-  );
-}
+    </mai

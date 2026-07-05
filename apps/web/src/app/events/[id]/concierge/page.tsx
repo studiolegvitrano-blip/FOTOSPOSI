@@ -18,7 +18,7 @@ export default function ConciergePage() {
 
   useEffect(() => {
     getCurrentUser().then(({ user: u, error }) => {
-      if (error || !u) { router.push('/login'); return; }
+      if (error || !u) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       setUser(u);
       getMessages(id, u.id).then(r => { if (r.messages) setMessages(r.messages); });
     });

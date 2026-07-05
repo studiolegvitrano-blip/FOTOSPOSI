@@ -83,7 +83,7 @@ export default function SiteBuilderPage() {
 
   useEffect(() => {
     getCurrentUser().then(({ user: u, error }) => {
-      if (error || !u) { router.push('/login'); return; }
+      if (error || !u) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       setUser(u);
       loadData();
     });
@@ -675,6 +675,4 @@ export default function SiteBuilderPage() {
           </CardContent>
         </Card>
       )}
-    </main>
-  );
-}
+    <

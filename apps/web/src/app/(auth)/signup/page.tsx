@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { signUp, signInWithOAuth } from '@fotosposi/core';
-import { useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,16 @@ export default function SignupPage() {
   const [marketingConsent, setMarketingConsent] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const searchParams = useSearchParams();
+  // Se si arriva qui da una pagina che richiedeva login (es. l'evento di un invito QR), la
+  // conferma email e l'OAuth devono riportare l'utente lì, non su /dashboard.
+  const redirect = searchParams.get('redirect') || '';
+  const loginHref = redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login';
+  // Se il redirect punta a un evento specifico (es. /events/<id>/upload, arrivato da un QR/invito),
+  // questo utente è un invitato, non uno sposo che crea il proprio evento — serve a /api/auth/setup
+  // per creare il core_users giusto (role 'invitato' + event_id) invece di quello di default.
+  const eventIdMatch = redirect.match(/^\/events\/([^/]+)\//);
+  const inviteEventId = eventIdMatch ? eventIdMatch[1] : undefined;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +51,7 @@ export default function SignupPage() {
       lastName: lastName.trim(),
       phone,
       marketingConsent,
-    });
+    }, redirect || undefined);
     if (err) {
       setError(t('error_email_taken'));
     } else if (data?.user) {
@@ -57,6 +67,7 @@ export default function SignupPage() {
           phone,
           gdprConsent,
           marketingConsent,
+          eventId: inviteEventId,
         }),
       });
       setSuccess(true);
@@ -67,7 +78,7 @@ export default function SignupPage() {
 
   const handleOAuth = async (provider: 'google' | 'facebook' | 'apple') => {
     setError('');
-    const { error: err } = await signInWithOAuth(provider);
+    const { error: err } = await signInWithOAuth(provider, redirect || undefined);
     if (err) setError(t('error_email_taken'));
   };
 
@@ -83,7 +94,7 @@ export default function SignupPage() {
             <p className="text-text-muted">{t('confirm_message')}</p>
           </CardContent>
           <CardFooter className="justify-center">
-            <a href="/login" className="text-brand hover:underline text-sm">{t('signup_login_link')}</a>
+            <a href={loginHref} className="text-brand hover:underline text-sm">{t('signup_login_link')}</a>
           </CardFooter>
         </Card>
       </main>
@@ -159,7 +170,7 @@ export default function SignupPage() {
               </Button>
             </div>
             <p className="text-sm text-text-muted text-center">
-              {t('signup_has_account')} <a href="/login" className="text-brand hover:underline">{t('signup_login_link')}</a>
+              {t('signup_has_account')} <a href={loginHref} className="text-brand hover:underline">{t('signup_login_link')}</a>
             </p>
           </CardFooter>
         </form>

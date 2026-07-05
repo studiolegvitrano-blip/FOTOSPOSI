@@ -17,7 +17,7 @@ export default function PrivacyPage() {
 
   useEffect(() => {
     getCurrentUser().then(({ user: u, error }) => {
-      if (error || !u) { router.push('/login'); return; }
+      if (error || !u) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       setUser(u);
       getConsent(id, u.id).then(r => { if (r.consent) setConsented(r.consent.consented); });
       getConsentList(id).then(r => { if (r.consents) setConsentList(r.consents); });

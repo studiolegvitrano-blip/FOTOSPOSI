@@ -41,6 +41,8 @@ export {
   signInWithOAuth,
   validateQrToken,
   createQrToken,
+  requestPasswordReset,
+  updatePassword,
 } from './auth';
 
 export {

@@ -33,7 +33,7 @@ export default function AdminMarketplacePage() {
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user: u } }) => {
-      if (!u) { router.push('/login'); return; }
+      if (!u) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       setUser(u);
       load().then(() => setLoading(false));
     });
@@ -56,7 +56,7 @@ export default function AdminMarketplacePage() {
 
   const handleLogout = async () => {
     await signOut();
-    router.push('/login');
+    router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
   };
 
   const total = suppliers.length;

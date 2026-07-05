@@ -95,7 +95,9 @@ export default function UploadPage() {
   useEffect(() => {
     const init = async () => {
       const { user } = await getCurrentUser();
-      if (!user) { router.push('/login'); return; }
+      // Passa la pagina corrente come `redirect` così, dopo login/registrazione/conferma email,
+      // l'ospite torna qui a caricare le foto invece di finire su /dashboard e perdere l'invito.
+      if (!user) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       const { event } = await getEventById(eventId);
       if (!event) return;
       setEventMeta({ couple_name: event.couple_name, date: event.date });

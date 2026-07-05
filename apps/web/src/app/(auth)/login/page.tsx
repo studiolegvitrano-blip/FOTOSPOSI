@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { signIn, signInWithOAuth } from '@fotosposi/core';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,18 +18,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Se si arriva qui da una pagina che richiedeva login (es. l'evento di un invito QR), torna lì
+  // dopo il login invece di finire sempre su /dashboard — vedi apps/web/src/app/events/[id]/upload.
+  const redirect = searchParams.get('redirect') || '';
+  const signupHref = redirect ? `/signup?redirect=${encodeURIComponent(redirect)}` : '/signup';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     const { error: err } = await signIn(email, password);
     if (err) setError(t('error_invalid_credentials'));
-    else router.push('/dashboard');
+    else router.push(redirect || '/dashboard');
   };
 
   const handleOAuth = async (provider: 'google' | 'facebook' | 'apple') => {
     setError('');
-    const { error: err } = await signInWithOAuth(provider);
+    const { error: err } = await signInWithOAuth(provider, redirect || undefined);
     if (err) setError(t('error_invalid_credentials'));
   };
 
@@ -47,7 +52,10 @@ export default function LoginPage() {
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('login_email_placeholder')} autoComplete="email" required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">{t('login_password_label')}</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">{t('login_password_label')}</Label>
+                <a href="/forgot-password" className="text-xs text-brand hover:underline">Password dimenticata?</a>
+              </div>
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('login_password_placeholder')} autoComplete="current-password" required />
             </div>
             {error && <p className="text-sm text-error">{error}</p>}
@@ -70,7 +78,7 @@ export default function LoginPage() {
               </Button>
             </div>
             <p className="text-sm text-text-muted text-center">
-              {t('login_no_account')} <a href="/signup" className="text-brand hover:underline">{t('login_signup_link')}</a>
+              {t('login_no_account')} <a href={signupHref} className="text-brand hover:underline">{t('login_signup_link')}</a>
             </p>
           </CardFooter>
         </form>

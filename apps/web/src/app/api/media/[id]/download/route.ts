@@ -16,13 +16,25 @@ export async function GET(
     }
 
     const svc = createServiceClient();
-    const { data: media, error: mediaError } = await svc
+    let { data: media } = await svc
       .from('media_uploads')
       .select('id, event_id, r2_key, url')
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
-    if (mediaError || !media) {
+    // I video del Video Guestbook vivono nella tabella `video_messages`, non `media_uploads` —
+    // senza questo fallback questo endpoint restituiva sempre 404 per quei video (si vedeva la
+    // card nella lista ma il player non aveva mai un src valido da caricare).
+    if (!media) {
+      const { data: videoMessage } = await svc
+        .from('video_messages')
+        .select('id, event_id, r2_key, url')
+        .eq('id', id)
+        .maybeSingle();
+      media = videoMessage;
+    }
+
+    if (!media) {
       return NextResponse.json({ error: 'Media non trovato' }, { status: 404 });
     }
 

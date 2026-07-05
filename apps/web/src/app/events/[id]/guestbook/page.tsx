@@ -6,7 +6,8 @@ import { getCurrentUser } from '@fotosposi/core';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { VideoRecorder } from '@/components/video-recorder';
-import { Upload, Globe, Lock } from 'lucide-react';
+import { Upload, Globe, Lock, Share2 } from 'lucide-react';
+import { shareWatermarkedMedia } from '@/lib/share-watermarked';
 
 export default function GuestbookPage() {
   const params = useParams();
@@ -24,7 +25,7 @@ export default function GuestbookPage() {
 
   useEffect(() => {
     getCurrentUser().then(({ user: u, error }) => {
-      if (error || !u) { router.push('/login'); return; }
+      if (error || !u) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       setUser(u);
       setName(u.user_metadata?.name || u.email || '');
     });
@@ -203,20 +204,4 @@ export default function GuestbookPage() {
                   <CardContent className="p-3">
                     <video src={msgSrc(m)} controls className="w-full rounded-md aspect-[4/3] object-cover bg-black" />
                     <div className="flex items-center justify-between mt-2">
-                      <p className="text-sm font-medium">{m.from_name || m.from_user}</p>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        {m.is_public ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-                        {m.is_public ? 'Pubblico' : 'Privato'}
-                      </div>
-                    </div>
-                    <p className="text-xs text-text-muted">{new Date(m.created_at).toLocaleDateString('it-IT')}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </main>
-  );
-}
+                      <p className="text-sm font-medium">{m.from_name || m.from_user}

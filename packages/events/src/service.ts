@@ -10,11 +10,14 @@ export async function createEvent(params: {
   date: string;
   location: string;
   church?: string;
+  church_address?: string;
   church_city?: string;
   venue?: string;
+  venue_address?: string;
   venue_city?: string;
   brand: 'fotosposi' | 'weddingmoments';
   tier?: Tier;
+  allow_guest_media?: boolean;
 }): Promise<{ event?: WeddingEvent; error?: string }> {
   const supabase = createClient();
 
@@ -27,11 +30,14 @@ export async function createEvent(params: {
       date: params.date,
       location: params.location,
       church: params.church,
+      church_address: params.church_address,
       church_city: params.church_city,
       venue: params.venue,
+      venue_address: params.venue_address,
       venue_city: params.venue_city,
       brand: params.brand,
       tier: params.tier ?? 'free',
+      allow_guest_media: params.allow_guest_media ?? true,
     })
     .select()
     .single();

@@ -23,7 +23,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     getCurrentUser().then(({ user: u, error }) => {
-      if (error || !u) { router.push('/login'); return; }
+      if (error || !u) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       setUser(u);
       const supabase = createClient();
       supabase.from('core_users').select('tenant_id').eq('id', u.id).single().then(({ data: ud }) => {
