@@ -8,7 +8,7 @@ import { getEventById, getEventWindow } from '@fotosposi/events';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Camera, Upload, Image, Video, CheckCircle2, XCircle, Clock, Loader2 } from 'lucide-react';
+import { Camera, Upload, Image as ImageIcon, Video, CheckCircle2, XCircle, Clock, Loader2 } from 'lucide-react';
 
 export default function UploadPage() {
   const params = useParams();
@@ -276,7 +276,7 @@ export default function UploadPage() {
       <div className="grid grid-cols-2 gap-4">
         <Card className="hover:border-brand/50 transition-colors cursor-pointer" onClick={() => inputRef.current?.click()}>
           <CardContent className="py-8 text-center space-y-2">
-            <Image className="w-8 h-8 mx-auto text-brand" />
+            <ImageIcon className="w-8 h-8 mx-auto text-brand" />
             <p className="font-medium">Galleria</p>
             <p className="text-xs text-text-muted">Scegli foto e video dal telefono</p>
           </CardContent>
