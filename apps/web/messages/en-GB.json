@@ -53,31 +53,62 @@
     "settings": "Settings"
   },
   "home": {
-    "hero_title": "JustMarry.live",
-    "hero_subtitle": "The all-in-one platform for your big day. Share photos, play games, collect gifts, and keep every memory in one place — from the engagement party to the honeymoon.",
-    "how_it_works": "How it works",
-    "features": [
-      "Custom wedding website with beautiful templates",
-      "QR code for easy photo sharing (9 days before + 1 after)",
-      "Live photo & video wall for guests",
-      "Fun games, polls, and a leaderboard",
-      "Print-on-demand albums and keepsakes"
-    ],
+    "badge": "The wedding website your guests will actually use",
+    "hero_title": "Digital entertainment for your wedding",
+    "hero_subtitle": "Invitation website, interactive games, photo and video collection via QR, and an AI concierge — all in one place, from the first invite to the last memory.",
+    "hero_note": "Free, no card required",
+    "cta_signup": "Create your free invitation site",
     "cta_login": "Sign in",
-    "cta_signup": "Get started",
-    "badge": "The wedding site your guests will actually use",
-    "plans_title": "A plan for every wedding",
+    "platform_title": "One single platform",
+    "platform_subtitle": "Four tools working together, with nothing for your guests to install.",
+    "platform_items": [
+      { "title": "Invitation website", "desc": "An elegant site with dates, venues, RSVP, and everything your guests need — ready in minutes." },
+      { "title": "Interactive games", "desc": "Quizzes, photo challenges, and real-time leaderboards that light up the reception." },
+      { "title": "Photos & videos via QR", "desc": "Guests scan the QR code and upload their shots in real time — the gallery fills itself." },
+      { "title": "AI concierge", "desc": "An assistant that answers guests' questions: schedules, addresses, dress code, parking." }
+    ],
+    "how_title": "How it works",
+    "how_steps": [
+      { "title": "Create your event", "desc": "Sign up, pick a plan, and personalise your invitation site with your names, dates, and venues." },
+      { "title": "Share the QR code", "desc": "Print the QR on the tables or send it to guests — one scan and they're in." },
+      { "title": "Relive the memories", "desc": "Photos, videos, and video messages stay collected and organised, ready to download and share." }
+    ],
+    "games_title": "The games that make the party",
+    "games_subtitle": "Designed to engage every table, from grandparents to the best man.",
+    "games": [
+      { "title": "Wall", "desc": "Your event's social wall: guests' photos and messages live on the big screen." },
+      { "title": "Couple Quiz", "desc": "Who knows the couple best? Personalised questions and a real-time leaderboard." },
+      { "title": "Photo Hunt", "desc": "Photo missions for every table — the challenge that fills your gallery with candid shots." },
+      { "title": "Video Guestbook", "desc": "Video wishes with a countdown, automatically saved to your archive." },
+      { "title": "Selfie Kiosk", "desc": "A self-service selfie station: guests snap and the photo goes straight to the gallery." }
+    ],
+    "watermark_kicker": "MAX Watermark",
+    "watermark_title": "Every shared photo carries your logo",
+    "watermark_desc": "Your wedding monogram is automatically applied to every photo and video your guests share. A signed memory, wherever it goes.",
+    "drive_kicker": "Automatic backup",
+    "drive_title": "Your photos safe on Google Drive",
+    "drive_desc": "Everything uploaded is automatically copied to your Google Drive — nothing to do, nothing to lose.",
+    "drive_caption": "Continuous backup, in original quality",
+    "pricing_title": "A plan for every wedding",
+    "pricing_subtitle": "Start free. Upgrade only if you need to.",
     "plan_free_name": "Free",
-    "plan_free_desc": "Event site, QR code, up to 100 standard-quality photos. Free forever.",
     "plan_premium_name": "Premium",
-    "plan_premium_desc": "Unlimited full-quality photos & video, full games suite, 6-month Time Capsule.",
     "plan_deluxe_name": "Deluxe",
-    "plan_deluxe_desc": "Everything in Premium plus exclusive features, 12-month Time Capsule, priority support.",
-    "plan_cta": "See plans",
+    "plan_free_features": ["Invitation site & QR code", "Up to 100 photos (standard quality)", "Wall & basic games", "1 event per account"],
+    "plan_premium_features": ["Unlimited photos & videos in original quality", "All games included", "Google Drive backup", "Time Capsule", "Branded event site"],
+    "plan_deluxe_features": ["Everything in Premium", "AI concierge", "Selfie Kiosk", "Branded mobile app", "Priority support"],
+    "plan_games_badge": "Games included",
     "plan_popular": "Most popular",
-    "final_cta_title": "Ready to build your wedding site?",
-    "final_cta_subtitle": "Takes a few minutes. Free. No card required.",
-    "footer_tagline": "Photos, games and memories from your wedding, all in one place."
+    "plan_cta": "Start free",
+    "stats": [
+      { "value": "10,000+", "label": "photos collected" },
+      { "value": "150+", "label": "events hosted" },
+      { "value": "5", "label": "interactive games" },
+      { "value": "6", "label": "languages available" }
+    ],
+    "final_cta_title": "Create your free invitation site",
+    "final_cta_subtitle": "Ready in minutes. No card required.",
+    "footer_tagline": "Your wedding's photos, games and memories — all in one place."
   },
   "auth": {
     "login_title": "Welcome back",

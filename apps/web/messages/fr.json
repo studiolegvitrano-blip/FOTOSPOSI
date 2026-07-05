@@ -53,31 +53,62 @@
     "settings": "Paramètres"
   },
   "home": {
-    "hero_title": "JustMarry.live",
-    "hero_subtitle": "La plateforme tout-en-un pour votre grand jour. Partagez des photos, jouez à des jeux, collectez des cadeaux et conservez chaque souvenir en un seul endroit — des fiançailles à la lune de miel.",
-    "how_it_works": "Comment ça marche",
-    "features": [
-      "Site web de mariage personnalisé avec de superbes templates",
-      "Code QR pour partager facilement les photos (9 jours avant + 1 après)",
-      "Mur de photos et vidéos en direct pour les invités",
-      "Jeux amusants, sondages et un classement",
-      "Albums et souvenirs imprimés à la demande"
-    ],
-    "cta_login": "Connexion",
-    "cta_signup": "Commencer",
     "badge": "Le site de mariage que vos invités utiliseront vraiment",
-    "plans_title": "Une formule pour chaque mariage",
+    "hero_title": "Le divertissement digital de votre mariage",
+    "hero_subtitle": "Site d'invitation, jeux interactifs, photos et vidéos collectées par QR code et concierge IA : tout au même endroit, de la première invitation au dernier souvenir.",
+    "hero_note": "Gratuit, sans carte bancaire",
+    "cta_signup": "Créez votre site d'invitation gratuit",
+    "cta_login": "Connexion",
+    "platform_title": "Une plateforme unique",
+    "platform_subtitle": "Quatre outils qui travaillent ensemble, sans rien à installer pour vos invités.",
+    "platform_items": [
+      { "title": "Site d'invitation", "desc": "Un site élégant avec dates, lieux, RSVP et toutes les informations pour vos invités, prêt en quelques minutes." },
+      { "title": "Jeux interactifs", "desc": "Quiz, défis photo et classements en temps réel qui animent la réception." },
+      { "title": "Photos et vidéos par QR", "desc": "Les invités scannent le QR code et téléversent leurs photos en temps réel : la galerie se remplit toute seule." },
+      { "title": "Concierge IA", "desc": "Un assistant qui répond aux questions des invités : horaires, adresses, dress code, parking." }
+    ],
+    "how_title": "Comment ça marche",
+    "how_steps": [
+      { "title": "Créez l'événement", "desc": "Inscrivez-vous, choisissez une formule et personnalisez le site d'invitation avec vos noms, dates et lieux." },
+      { "title": "Partagez le QR code", "desc": "Imprimez le QR sur les tables ou envoyez-le aux invités : un scan et ils sont dans l'événement." },
+      { "title": "Revivez les souvenirs", "desc": "Photos, vidéos et messages vidéo restent rassemblés et organisés, prêts à télécharger et à partager." }
+    ],
+    "games_title": "Les jeux qui font la fête",
+    "games_subtitle": "Pensés pour impliquer toutes les tables, des grands-parents aux témoins.",
+    "games": [
+      { "title": "Wall", "desc": "Le mur social de l'événement : photos et messages des invités en direct sur grand écran." },
+      { "title": "Quiz des Mariés", "desc": "Qui connaît le mieux les mariés ? Questions personnalisées et classement en temps réel." },
+      { "title": "Chasse à la Photo", "desc": "Des missions photo pour les tables : le défi qui remplit la galerie de clichés spontanés." },
+      { "title": "Video Guestbook", "desc": "Des messages vidéo de vœux avec compte à rebours, enregistrés automatiquement dans vos archives." },
+      { "title": "Borne Selfie", "desc": "Une borne selfie en libre-service : les invités déclenchent et la photo rejoint aussitôt la galerie." }
+    ],
+    "watermark_kicker": "Filigrane MAX",
+    "watermark_title": "Chaque photo partagée porte votre logo",
+    "watermark_desc": "Le monogramme de votre mariage est appliqué automatiquement à chaque photo et vidéo partagée par vos invités. Un souvenir signé, où qu'il aille.",
+    "drive_kicker": "Sauvegarde automatique",
+    "drive_title": "Vos photos en sécurité sur Google Drive",
+    "drive_desc": "Chaque contenu téléversé est copié automatiquement sur votre Google Drive : rien à faire, rien à perdre.",
+    "drive_caption": "Sauvegarde continue, en qualité originale",
+    "pricing_title": "Une formule pour chaque mariage",
+    "pricing_subtitle": "On commence gratuitement. On évolue seulement si besoin.",
     "plan_free_name": "Free",
-    "plan_free_desc": "Site de l'événement, code QR, jusqu'à 100 photos en qualité standard. Gratuit à vie.",
     "plan_premium_name": "Premium",
-    "plan_premium_desc": "Photos et vidéos illimitées en qualité originale, tous les jeux, Time Capsule 6 mois.",
     "plan_deluxe_name": "Deluxe",
-    "plan_deluxe_desc": "Tout Premium plus des fonctionnalités exclusives, Time Capsule 12 mois, support prioritaire.",
-    "plan_cta": "Voir les formules",
+    "plan_free_features": ["Site d'invitation et QR code", "Jusqu'à 100 photos (qualité standard)", "Wall et jeux de base", "1 événement par compte"],
+    "plan_premium_features": ["Photos et vidéos illimitées en qualité originale", "Tous les jeux inclus", "Sauvegarde Google Drive", "Time Capsule", "Site d'événement personnalisé"],
+    "plan_deluxe_features": ["Tout Premium", "Concierge IA", "Borne Selfie", "Application mobile personnalisée", "Assistance prioritaire"],
+    "plan_games_badge": "Jeux inclus",
     "plan_popular": "Le plus choisi",
-    "final_cta_title": "Prêts à créer votre site de mariage ?",
-    "final_cta_subtitle": "Quelques minutes suffisent. Gratuit. Sans carte bancaire.",
-    "footer_tagline": "Photos, jeux et souvenirs de votre mariage, en un seul endroit."
+    "plan_cta": "Commencer gratuitement",
+    "stats": [
+      { "value": "10 000+", "label": "photos collectées" },
+      { "value": "150+", "label": "événements gérés" },
+      { "value": "5", "label": "jeux interactifs" },
+      { "value": "6", "label": "langues disponibles" }
+    ],
+    "final_cta_title": "Créez votre site d'invitation gratuit",
+    "final_cta_subtitle": "Prêt en quelques minutes. Sans carte bancaire.",
+    "footer_tagline": "Les photos, jeux et souvenirs de votre mariage, au même endroit."
   },
   "auth": {
     "login_title": "Bon retour parmi nous",

@@ -53,31 +53,62 @@
     "settings": "Einstellungen"
   },
   "home": {
-    "hero_title": "JustMarry.live",
-    "hero_subtitle": "Die All-in-One-Plattform für Ihren großen Tag. Teilen Sie Fotos, spielen Sie Spiele, sammeln Sie Geschenke und bewahren Sie jede Erinnerung an einem Ort – vom Junggesellenabschied bis zu den Flitterwochen.",
-    "how_it_works": "So funktioniert es",
-    "features": [
-      "Individuelle Hochzeitswebsite mit schönen Vorlagen",
-      "QR-Code zum einfachen Teilen von Fotos (9 Tage vorher + 1 Tag nachher)",
-      "Live-Foto- und Videowand für Gäste",
-      "Unterhaltsame Spiele, Umfragen und eine Bestenliste",
-      "Print-on-Demand-Alben und Erinnerungsstücke"
-    ],
+    "badge": "Die Hochzeitswebsite, die Ihre Gäste wirklich nutzen",
+    "hero_title": "Die digitale Unterhaltung Ihrer Hochzeit",
+    "hero_subtitle": "Einladungswebsite, interaktive Spiele, Foto- und Videosammlung per QR-Code und KI-Concierge: alles an einem Ort, von der ersten Einladung bis zur letzten Erinnerung.",
+    "hero_note": "Kostenlos, ohne Kreditkarte",
+    "cta_signup": "Erstellen Sie Ihre kostenlose Einladungsseite",
     "cta_login": "Anmelden",
-    "cta_signup": "Jetzt starten",
-    "badge": "Die Hochzeitsseite, die Ihre Gäste wirklich nutzen",
-    "plans_title": "Für jede Hochzeit der passende Plan",
+    "platform_title": "Eine einzige Plattform",
+    "platform_subtitle": "Vier Werkzeuge, die zusammenarbeiten – Ihre Gäste müssen nichts installieren.",
+    "platform_items": [
+      { "title": "Einladungswebsite", "desc": "Eine elegante Website mit Terminen, Orten, RSVP und allen Infos für Ihre Gäste – fertig in wenigen Minuten." },
+      { "title": "Interaktive Spiele", "desc": "Quiz, Foto-Challenges und Echtzeit-Ranglisten, die die Feier beleben." },
+      { "title": "Fotos & Videos per QR", "desc": "Gäste scannen den QR-Code und laden ihre Aufnahmen in Echtzeit hoch – die Galerie füllt sich von selbst." },
+      { "title": "KI-Concierge", "desc": "Ein Assistent, der Gästefragen beantwortet: Zeiten, Adressen, Dresscode, Parken." }
+    ],
+    "how_title": "So funktioniert es",
+    "how_steps": [
+      { "title": "Event erstellen", "desc": "Registrieren Sie sich, wählen Sie einen Tarif und gestalten Sie die Einladungsseite mit Ihren Namen, Terminen und Orten." },
+      { "title": "QR-Code teilen", "desc": "Drucken Sie den QR-Code auf die Tische oder senden Sie ihn den Gästen: Ein Scan und sie sind dabei." },
+      { "title": "Erinnerungen erleben", "desc": "Fotos, Videos und Videobotschaften bleiben gesammelt und geordnet – bereit zum Herunterladen und Teilen." }
+    ],
+    "games_title": "Die Spiele, die die Party machen",
+    "games_subtitle": "Gemacht, um jeden Tisch einzubeziehen – von den Großeltern bis zu den Trauzeugen.",
+    "games": [
+      { "title": "Wall", "desc": "Die soziale Wand des Events: Fotos und Nachrichten der Gäste live auf der großen Leinwand." },
+      { "title": "Brautpaar-Quiz", "desc": "Wer kennt das Brautpaar am besten? Persönliche Fragen und Echtzeit-Rangliste." },
+      { "title": "Foto-Jagd", "desc": "Foto-Missionen für die Tische: die Challenge, die Ihre Galerie mit spontanen Aufnahmen füllt." },
+      { "title": "Video-Gästebuch", "desc": "Video-Glückwünsche mit Countdown, automatisch in Ihrem Archiv gespeichert." },
+      { "title": "Selfie-Kiosk", "desc": "Eine Selfie-Station zur Selbstbedienung: Gäste knipsen und das Foto landet direkt in der Galerie." }
+    ],
+    "watermark_kicker": "MAX-Wasserzeichen",
+    "watermark_title": "Jedes geteilte Foto trägt Ihr Logo",
+    "watermark_desc": "Das Monogramm Ihrer Hochzeit wird automatisch auf jedes Foto und Video angewendet, das Ihre Gäste teilen. Eine signierte Erinnerung, wohin sie auch geht.",
+    "drive_kicker": "Automatisches Backup",
+    "drive_title": "Ihre Fotos sicher auf Google Drive",
+    "drive_desc": "Alles Hochgeladene wird automatisch auf Ihr Google Drive kopiert: nichts zu tun, nichts zu verlieren.",
+    "drive_caption": "Kontinuierliches Backup in Originalqualität",
+    "pricing_title": "Für jede Hochzeit der passende Plan",
+    "pricing_subtitle": "Kostenlos starten. Nur bei Bedarf upgraden.",
     "plan_free_name": "Free",
-    "plan_free_desc": "Event-Website, QR-Code, bis zu 100 Fotos in Standardqualität. Für immer kostenlos.",
     "plan_premium_name": "Premium",
-    "plan_premium_desc": "Unbegrenzte Fotos & Videos in Originalqualität, alle Spiele, 6 Monate Time Capsule.",
     "plan_deluxe_name": "Deluxe",
-    "plan_deluxe_desc": "Alles aus Premium plus exklusive Funktionen, 12 Monate Time Capsule, priorisierter Support.",
-    "plan_cta": "Pläne ansehen",
+    "plan_free_features": ["Einladungsseite & QR-Code", "Bis zu 100 Fotos (Standardqualität)", "Wall & Basis-Spiele", "1 Event pro Konto"],
+    "plan_premium_features": ["Unbegrenzte Fotos & Videos in Originalqualität", "Alle Spiele inklusive", "Google-Drive-Backup", "Time Capsule", "Gebrandete Event-Website"],
+    "plan_deluxe_features": ["Alles aus Premium", "KI-Concierge", "Selfie-Kiosk", "Gebrandete Mobile-App", "Prioritäts-Support"],
+    "plan_games_badge": "Spiele inklusive",
     "plan_popular": "Am beliebtesten",
-    "final_cta_title": "Bereit für Ihre Hochzeitsseite?",
-    "final_cta_subtitle": "Dauert nur wenige Minuten. Kostenlos. Keine Kreditkarte nötig.",
-    "footer_tagline": "Fotos, Spiele und Erinnerungen Ihrer Hochzeit, an einem Ort."
+    "plan_cta": "Kostenlos starten",
+    "stats": [
+      { "value": "10.000+", "label": "gesammelte Fotos" },
+      { "value": "150+", "label": "betreute Events" },
+      { "value": "5", "label": "interaktive Spiele" },
+      { "value": "6", "label": "verfügbare Sprachen" }
+    ],
+    "final_cta_title": "Erstellen Sie Ihre kostenlose Einladungsseite",
+    "final_cta_subtitle": "Fertig in wenigen Minuten. Ohne Kreditkarte.",
+    "footer_tagline": "Fotos, Spiele und Erinnerungen Ihrer Hochzeit – an einem Ort."
   },
   "auth": {
     "login_title": "Willkommen zurück",

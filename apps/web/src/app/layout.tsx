@@ -1,8 +1,14 @@
 import type { Metadata } from 'next';
 import { cookies, headers } from 'next/headers';
 import { NextIntlClientProvider } from 'next-intl';
+import { Inter, Playfair_Display } from 'next/font/google';
 import { routing } from '../../i18n/routing';
 import './globals.css';
+
+// Tipografia del redesign: serif elegante per i titoli, sans pulita per il corpo.
+// next/font self-hosta i file: nessuna richiesta a Google a runtime (ok CSP e GDPR).
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
+const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair', display: 'swap' });
 
 export async function generateMetadata(): Promise<Metadata> {
   const h = await headers();
@@ -51,7 +57,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const messages = await loadMessages(locale);
 
   return (
-    <html lang={locale}>
+    <html lang={locale} className={`${inter.variable} ${playfair.variable}`}>
       <head>
         <meta httpEquiv="Content-Security-Policy" content="
           default-src 'self';
@@ -63,7 +69,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           connect-src 'self' https:;
           worker-src 'self' blob:;
         " />
-        <meta name="theme-color" content="#d4a574" />
+        <meta name="theme-color" content="#c4956a" />
       </head>
       <body suppressHydrationWarning>
         <NextIntlClientProvider locale={locale} messages={messages}>
