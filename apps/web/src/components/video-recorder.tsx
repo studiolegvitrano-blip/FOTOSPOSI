@@ -138,7 +138,10 @@ export function VideoRecorder({ onRecordingComplete, maxDuration = 30, suggested
   return (
     <div className="space-y-3">
       <div className="relative rounded-lg overflow-hidden bg-black aspect-[4/3]">
-        <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
+        {/* muted only during idle/recording (avoids mic feedback from the live camera preview) —
+            during 'preview' the same <video> plays back the recorded blob and must NOT be muted,
+            otherwise guests always see the review silent even though audio was captured fine. */}
+        <video ref={videoRef} autoPlay muted={state !== 'preview'} controls={state === 'preview'} playsInline className="w-full h-full object-cover" />
         {state === 'recording' && (
           <>
             <div className="absolute top-2 right-2 flex items-center gap-2 bg-black/60 text-white px-3 py-1 rounded-full text-sm z-10">

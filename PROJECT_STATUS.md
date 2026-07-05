@@ -1,6 +1,6 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
-## Sessione 05/07/2026 — Deploy Vercel + DNS live (IN CORSO)
+## Sessione 05/07/2026 — Deploy Vercel + DNS live (BUILD RIUSCITO ✅)
 - [x] **Bug turbo.json**: chiave `"pipeline"` (Turborepo v1) non compatibile con `turbo ^2.5.0` installato → rinominata in `"tasks"`. Pushato (`fa23e6e`), risolto il primo build fallito.
 - [x] **Bug import mancante**: `apps/web/src/app/events/[id]/guests/page.tsx` importava `getEventById` da `@fotosposi/core`, funzione mai implementata (file lasciato a metà da una sessione precedente). Aggiunta `getEventById()` in `packages/core/src/guests.ts` + esportata in `index.ts`.
 - [x] **Bug bundling sharp**: webpack tentava di impacchettare i binari nativi di `sharp` (usato da `@fotosposi/photo-overlay` per il watermark) causando errori `Module not found '@img/sharp-libvips-dev/*'`. Fix: `serverExternalPackages: ['sharp']` in `apps/web/next.config.ts`.
@@ -22,9 +22,45 @@
 - [x] **Bug 9 — `Image` shadowing**: `apps/web/src/app/events/[id]/upload/page.tsx` importava l'icona `Image` da `lucide-react`, oscurando il costruttore DOM globale `Image` usato per il watermark (`new Image()` → "Expected 1 arguments, but got 0" perché TS risolveva `Image` come componente lucide, non `HTMLImageElement`). Fix: rinominato l'import in `Image as ImageIcon` + aggiornato l'uso JSX. Verificato `site-builder/page.tsx` (stesso import ma senza `new Image()`, innocuo).
 - [x] **Pushato Bug 9**: commit `38de6bd` — build ripartito ma fallito ancora (deployment `dpl_8TBEHYDFUskhqqkTjLTPQpRrsVgF`).
 - [x] **Bug 10 — manifest.ts purpose non valido**: `apps/web/src/app/manifest.ts:27`, `purpose: 'any maskable'` (stringa composta) non valido per il tipo Next.js (`"any" | "maskable" | "monochrome"`, valore singolo). Fix: split in due entry icona 512, una con `purpose: 'any'` e una con `purpose: 'maskable'`.
-- [ ] **Da pushare e verificare**: fix Bug 10 corretta sul disco, non ancora committata — poi ricontrollare il build su Vercel.
+- [x] **Pushato Bug 10**: commit `89cffad`.
+- [x] **🎉 BUILD RIUSCITO**: deployment `dpl_EZkzzbrzNZYcjKGmATH4kdsf9TNK` (commit `89cffad`) → stato **READY**. Tutti e 4 i domini ora serviti in produzione: `sposi.live`, `www.sposi.live`, `justmarry.live`, `www.justmarry.live`. In totale 10 bug risolti in questa sessione (4 iniziali + 6 emersi via type-check progressivo, scoperti e corretti con Vercel MCP senza bisogno di guardare la dashboard).
 - [ ] **Urgente — sicurezza**: `git remote -v` mostra il PAT GitHub in chiaro nell'URL remoto (`https://ghp_...@github.com/...`). Da revocare/rigenerare e da riconfigurare il remote senza token in chiaro nell'URL (usare credential manager o SSH).
-- [ ] Da fare dopo il build OK: verifica finale (test, sicurezza chiavi, rotazione PAT GitHub esposto anche in `ECCOLO FOTOSPOSI.txt`), PWA runtime per Deluxe (task 15, non ancora iniziato).
+
+## Sessione 05/07/2026 (continua) — Bug QR code segnalato dall'utente
+- [x] **Bug QR — dominio sbagliato**: `apps/web/src/app/events/[id]/qr/page.tsx` generava il link con `NEXT_PUBLIC_APP_URL || window.location.origin` — la env var (fissa su Vercel, puntava al dominio `*.vercel.app`) aveva precedenza sul dominio reale da cui l'admin genera il QR. Fix: invertita priorità, `window.location.origin` prima (riflette correttamente sposi.live o justmarry.live a seconda di dove l'admin sta navigando).
+- [x] **Bug grave — "Link non valido o scaduto" per TUTTI i guest reali**: root cause identificata: le tabelle `events`, `sub_events`, `event_windows`, `media_uploads`, `core_auth_tokens`, `event_guests` hanno RLS con policy limitate al solo proprietario evento (`auth.uid() = created_by`), **nessuna eccezione per lettura pubblica/ospite**. La pagina guest `/event/[code]` (e la generazione QR) chiamavano queste query lato client con la chiave anonima → RLS bloccava sempre i risultati per chiunque non fosse il proprietario, quindi ogni guest reale (non loggato come sposo) vedeva "Link non valido o scaduto" anche con token valido. Fix: creato nuovo endpoint server-side `apps/web/src/app/api/guest/event/route.ts` che usa la service role key (disponibile solo server-side) per validare il token e leggere evento/sotto-eventi/media/finestra/registrare l'ospite, bypassando RLS in modo controllato (il token valido è il gate di sicurezza). Riscritta `apps/web/src/app/event/[code]/page.tsx` per chiamare questo endpoint invece delle funzioni dirette (`validateQrToken`, `getEventById`, `getSubEvents`, `getMediaByEvent`, `getEventWindow`, `registerGuest`).
+- [x] **Bug minore correlato**: `apps/web/src/lib/process-queue.ts` determinava il brand per il watermark (`Sposi.live`/`JustMarry.live`) da `VERCEL_URL`/`NEXT_PUBLIC_APP_URL` (sempre il dominio vercel.app, mai "justmarry" → watermark sempre "Sposi.live" a prescindere dall'evento reale). Fix: usa `event.brand` dal DB (già disponibile), come già fa correttamente `/api/photos/[id]/share/route.ts`.
+- [x] **Favicon brandizzato**: generate `favicon-sposi-{32,192,512}.png` e `favicon-justmarry-{32,192,512}.png` in `apps/web/public/` ritagliando l'emblema (anelli) dai loghi esistenti `logo-sposi.png`/`logo-justmarry.png` (il logo intero non era adatto: sfondo scuro non trasparente + wordmark illeggibile a 32px). `layout.tsx` e `manifest.ts` ora servono l'icona giusta in base al dominio (`isIt`).
+- [ ] **Da pushare e testare**: tutte le fix di questa sotto-sessione sono corrette sul disco ma non ancora committate. Da testare bene dopo il deploy: scansionare un vero QR code da telefono su un evento reale e verificare che la galleria carichi correttamente.
+- [ ] **Da verificare separatamente**: `event_guests` non ha nessuna policy INSERT — anche con service role questo non è un problema (il service role bypassa RLS), ma se in futuro si vuole permettere INSERT diretto con anon/authenticated key va aggiunta una policy dedicata.
+
+## Sessione 05/07/2026 (continua 2) — Video Guestbook: audio muto + colonna mancante
+- [x] **Bug audio muto in anteprima**: `apps/web/src/components/video-recorder.tsx`, il tag `<video>` aveva `muted` fisso, usato sia per il live preview (durante registrazione) sia per la riproduzione del video registrato — quindi la review risultava SEMPRE senza audio anche se il microfono registrava correttamente. Fix: `muted={state !== 'preview'}` + aggiunti controlli nativi in fase di anteprima.
+- [x] **Bug "Could not find the 'from_name' column of 'video_messages'"**: causa reale — **la migration `00025_video_messages_r2.sql` (che aggiunge `r2_key`, `from_name`, `is_public`) non è mai stata applicata al database Supabase di produzione**, il codice è corretto. Stesso errore capita sia registrando un video sia caricandone uno già fatto (entrambi i percorsi passano dalla stessa insert). **Azione richiesta**: incollare questo SQL nell'SQL Editor di Supabase (dashboard progetto → SQL Editor):
+  ```sql
+  ALTER TABLE video_messages ADD COLUMN IF NOT EXISTS r2_key TEXT;
+  ALTER TABLE video_messages ADD COLUMN IF NOT EXISTS from_name TEXT;
+  ALTER TABLE video_messages ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT true;
+  ```
+- [x] **Bug correlato — stesso schema RLS-in-browser delle fix precedenti**: `createVideoMessage`/`getVideoMessages` in `packages/media/src/service.ts` usano `createServiceClient()`, ma venivano chiamate direttamente da `apps/web/src/app/events/[id]/guestbook/page.tsx` (`'use client'`) → nel browser degradano alla anon key, e `video_messages` non ha NESSUNA policy RLS di INSERT → il salvataggio avrebbe comunque fallito (con un errore diverso) anche dopo aver aggiunto la colonna. Fix: nuovo endpoint server-side `apps/web/src/app/api/guestbook/messages/route.ts` (GET lista, POST salva), guestbook/page.tsx riscritta per chiamarlo via fetch invece delle funzioni dirette.
+- [x] **Connesso Supabase MCP** (progetto `FOTOSPOSI`, ref `krgqyluuiltckmhbeuue`) — confermato il sospetto drift: `list_migrations` mostrava come applicate solo migration con nomi/numerazione diversi da quelli nei file del repo, fermandosi a `00015_event_tiers`. **Tutto da `00016` in poi non era mai stato applicato al DB reale** (14 migration di differenza).
+- [x] **Applicate le migration mancanti 00016→00029** (verificando prima via query dirette cosa esisteva già, per evitare doppioni/errori su colonne o policy già presenti):
+  - `00016` indici performance + realtime — applicata
+  - `00017` colonna `compressed` su media_uploads — **già presente** (skip)
+  - `00018` tabelle coupons/affiliates/referrals — applicata
+  - `00019` colonne partner + tabella partner_visits — applicata (**saltato** l'INSERT di 4 fornitori demo/placeholder "di Prova")
+  - `00020` colonne affiliate_link/commission_info — applicata (**saltato** l'INSERT di ~24 partner affiliate con link placeholder tipo Revolut/Booking/Amazon — da rivedere prima di popolarli con link reali)
+  - `00021` tabella social_posts — applicata
+  - `00022` indice r2_key — applicata
+  - `00023` tabelle GTE engine (brand_config, engagement_triage, ecc.) — applicata con una correzione: la FK verso `content_queue` è stata rimossa (quella tabella non è mai definita in nessuna migration del repo, probabilmente gestita da n8n esternamente) — content_id ora è UUID semplice
+  - `00024` **NON applicata**: fa `DROP TABLE gift_registry_transactions` e `DROP TABLE social_posts` — cancellazione permanente di dati, e `gift_registry_transactions` potrebbe contenere transazioni reali. Da decidere consapevolmente, non l'ho eseguita in autonomia.
+  - `00026` tabella event_guests — applicata (necessaria per la fix RLS guest di questa sessione)
+  - `00027` colonna category + 6 nuovi template sito — applicata
+  - `00028` colonne nome/cognome/telefono/consensi GDPR su core_users — applicata
+  - `00029` tabella system_health_log — applicata (necessaria per i cron backup/manutenzione deployati oggi)
+- [ ] **Da decidere**: i due INSERT saltati (fornitori demo in `00019`, partner affiliate placeholder in `00020`) — dimmi se/quando vuoi che li inserisca, con quali link reali per l'affiliate marketing.
+- [ ] **Da decidere**: `00024` (drop gift registry + social wall) — confermare se va ancora eseguita o se il gift registry è ancora in uso.
+- [x] **Da pushare**: fix audio + guestbook API route (vedi comandi git sotto). Il fix del database è già live, non serve più incollare SQL a mano.
 - [ ] **SEO + GEO (Generative Engine Optimization)**: non dimenticare, oltre alla SEO classica (meta tag, sitemap, dati strutturati), l'ottimizzazione per essere citati dai motori generativi/AI (ChatGPT, Perplexity, Gemini, AI Overviews di Google) quando gli utenti chiedono consigli per organizzare un matrimonio — contenuti chiari/strutturati, FAQ schema, risposte dirette citabili. Da affrontare prima del lancio pubblico.
 
 ## Sessione 04/07/2026 — Go-live: homepage, camera fix, watermark video, autonomia

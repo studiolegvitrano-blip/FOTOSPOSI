@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getCurrentUser } from '@fotosposi/core';
-import { getVideoMessages, createVideoMessage } from '@fotosposi/media';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { VideoRecorder } from '@/components/video-recorder';
@@ -33,8 +32,28 @@ export default function GuestbookPage() {
   }, [id]);
 
   const loadMessages = async () => {
-    const r = await getVideoMessages(id, 'guestbook');
+    const res = await fetch(`/api/guestbook/messages?eventId=${id}&type=guestbook`);
+    const r = await res.json();
     if (r.messages) setMessages(r.messages);
+  };
+
+  const saveMessage = async (payload: {
+    event_id: string;
+    from_user: string;
+    from_name: string;
+    type: 'guestbook';
+    url: string;
+    r2_key: string;
+    is_public: boolean;
+  }): Promise<{ error?: string }> => {
+    const res = await fetch('/api/guestbook/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error || 'Errore salvataggio' };
+    return {};
   };
 
   const handleTabRecord = async () => {
@@ -69,7 +88,7 @@ export default function GuestbookPage() {
     try {
       const r2Key = await uploadToR2(blob);
       if (r2Key) {
-        const { error } = await createVideoMessage({
+        const { error } = await saveMessage({
           event_id: id,
           from_user: user.id,
           from_name: name || 'Anonimo',
@@ -98,7 +117,7 @@ export default function GuestbookPage() {
       if (!file) continue;
       const r2Key = await uploadToR2(file);
       if (r2Key) {
-        const { error } = await createVideoMessage({
+        const { error } = await saveMessage({
           event_id: id,
           from_user: user.id,
           from_name: name || 'Anonimo',
