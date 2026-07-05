@@ -292,7 +292,9 @@ export default function UploadPage() {
         <Card
           className="hover:border-brand/50 transition-colors cursor-pointer"
           onClick={() => {
-            if (navigator.mediaDevices?.getUserMedia) setShowCamera(true);
+            // typeof === 'function' invece del semplice truthy check: TS strict segnala
+            // "condition always true" su un riferimento a metodo sempre tipizzato come definito.
+            if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') setShowCamera(true);
             else cameraRef.current?.click();
           }}
         >
