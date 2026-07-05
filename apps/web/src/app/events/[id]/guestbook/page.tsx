@@ -204,4 +204,31 @@ export default function GuestbookPage() {
                   <CardContent className="p-3">
                     <video src={msgSrc(m)} controls className="w-full rounded-md aspect-[4/3] object-cover bg-black" />
                     <div className="flex items-center justify-between mt-2">
-                      <p className="text-sm font-medium">{m.from_name || m.from_user}
+                      <p className="text-sm font-medium">{m.from_name || m.from_user}</p>
+                      <div className="flex items-center gap-1.5">
+                        {/* Condivide il file mp4 reale (watermarkato lato server) via Web Share API,
+                            non un semplice link — stesso comportamento della galleria evento. */}
+                        <button
+                          onClick={() => shareWatermarkedMedia(m.media_id || m.id, id, true, typeof window !== 'undefined' && window.location.hostname.includes('justmarry') ? 'JustMarry.live' : 'Sposi.live')}
+                          className="p-1.5 bg-white rounded-full border border-border shadow-sm hover:bg-muted transition-colors"
+                          title="Condividi video"
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          {m.is_public ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                          {m.is_public ? 'Pubblico' : 'Privato'}
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-text-muted">{new Date(m.created_at).toLocaleDateString('it-IT')}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </main>
+  );
+}
