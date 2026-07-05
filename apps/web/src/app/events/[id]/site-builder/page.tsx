@@ -675,4 +675,6 @@ export default function SiteBuilderPage() {
           </CardContent>
         </Card>
       )}
-    <
+    </main>
+  );
+}

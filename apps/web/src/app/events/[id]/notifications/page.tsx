@@ -88,4 +88,6 @@ export default function NotificationsPage() {
           )}
         </CardContent>
       </Card>
-    </mai
+    </main>
+  );
+}
