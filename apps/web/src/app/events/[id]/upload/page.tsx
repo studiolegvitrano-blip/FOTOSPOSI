@@ -8,6 +8,7 @@ import { getEventById, getEventWindow } from '@fotosposi/events';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PhotoCapture } from '@/components/photo-capture';
 import { Camera, Upload, Image as ImageIcon, Video, CheckCircle2, XCircle, Clock, Loader2 } from 'lucide-react';
 
 export default function UploadPage() {
@@ -23,6 +24,7 @@ export default function UploadPage() {
   const [tier, setTier] = useState<Tier>('free');
   const [skipVideos, setSkipVideos] = useState(0);
   const [limitReached, setLimitReached] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
@@ -141,7 +143,7 @@ export default function UploadPage() {
     }, 3000);
   };
 
-  const processFiles = async (selected: FileList) => {
+  const processFiles = async (selected: FileList | File[]) => {
     const { user } = await getCurrentUser();
     if (!user || !selected.length) return;
 
@@ -150,8 +152,7 @@ export default function UploadPage() {
     let reachedLimit = false;
 
     const files: File[] = [];
-    for (let i = 0; i < selected.length; i++) {
-      const f = selected.item(i);
+    for (const f of Array.from(selected as ArrayLike<File>)) {
       if (!f) continue;
       if (isFree && f.type.startsWith('video/')) { skippedVideos++; continue; }
       files.push(f);
@@ -194,7 +195,9 @@ export default function UploadPage() {
         file_size: uploadFile.size,
         compressed,
       });
-      if (error || !id) continue;
+      // Prima un errore qui veniva ignorato in silenzio (`continue`): l'utente vedeva la
+      // barra di caricamento ma il file spariva nel nulla, senza traccia in coda né in galleria.
+      if (error || !id) { alert(`"${file.name}" non accodato: ${error || 'errore sconosciuto'}`); continue; }
 
       const prefix = `events/${eventId}`;
       const r2Resp = await fetch('/api/r2/upload', {
@@ -283,7 +286,16 @@ export default function UploadPage() {
             <p className="text-xs text-text-muted">Scegli foto e video dal telefono</p>
           </CardContent>
         </Card>
-        <Card className="hover:border-brand/50 transition-colors cursor-pointer" onClick={() => cameraRef.current?.click()}>
+        {/* Fotocamera vera (getUserMedia): l'input con capture="environment" apre la camera
+            solo sui telefoni — su PC apriva il file picker, spiazzando l'utente. Se la camera
+            non è disponibile si torna al vecchio input come ripiego. */}
+        <Card
+          className="hover:border-brand/50 transition-colors cursor-pointer"
+          onClick={() => {
+            if (navigator.mediaDevices?.getUserMedia) setShowCamera(true);
+            else cameraRef.current?.click();
+          }}
+        >
           <CardContent className="py-8 text-center space-y-2">
             <Camera className="w-8 h-8 mx-auto text-brand" />
             <p className="font-medium">Fotocamera</p>
@@ -291,6 +303,13 @@ export default function UploadPage() {
           </CardContent>
         </Card>
       </div>
+
+      {showCamera && (
+        <PhotoCapture
+          onCapture={(file) => processFiles([file])}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
 
       <input
         ref={inputRef}

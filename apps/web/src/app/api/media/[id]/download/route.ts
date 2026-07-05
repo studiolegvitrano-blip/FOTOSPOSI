@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createServiceClient } from '@fotosposi/core';
+import { cookies } from 'next/headers';
+import { createServerSideClient, createServiceClient } from '@fotosposi/core';
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
 
 export async function GET(
@@ -9,7 +10,12 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const supabase = createClient();
+    // FIX: prima qui c'era `createClient()` (client BROWSER di Supabase) — in una route server
+    // non vede i cookie di sessione, quindi `getUser()` falliva SEMPRE → 401 per ogni richiesta.
+    // Risultato: né le foto in galleria né i video del guestbook si caricavano mai (img/video
+    // con src su questo endpoint restavano vuoti). Serve il client server-side coi cookie.
+    const cookieStore = await cookies();
+    const supabase = createServerSideClient(() => cookieStore.getAll());
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });

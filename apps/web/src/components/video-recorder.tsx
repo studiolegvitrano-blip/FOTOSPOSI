@@ -66,6 +66,22 @@ export function VideoRecorder({ onRecordingComplete, maxDuration = 30, suggested
     clearInterval(countdownRef.current);
   }, []);
 
+  // FIX schermo nero: quando `startRecording` ottiene lo stream, il tag <video> non esiste
+  // ANCORA nel DOM (viene montato solo quando lo stato passa a countdown/recording), quindi
+  // assegnare `srcObject` lì non ha effetto e la preview resta nera — anche se la registrazione
+  // funziona (lo stream è vivo, solo non mostrato). Questo effect gira DOPO il render che monta
+  // il <video> e collega lo stream al player. Stesso bug già visto nel Tavolo Selfie (kiosk).
+  useEffect(() => {
+    const el = videoRef.current;
+    const stream = streamRef.current;
+    if (!el || !stream) return;
+    if ((state === 'countdown' || state === 'recording') && el.srcObject !== stream) {
+      el.src = '';           // rimuove un eventuale blob della registrazione precedente ("Riprova")
+      el.srcObject = stream;
+      el.play().catch(() => { /* autoplay già gestito dall'attributo, ignora */ });
+    }
+  }, [state]);
+
   const beginRecordingOnStream = useCallback((stream: MediaStream, mime: string) => {
     const recorder = new MediaRecorder(stream, { mimeType: mime });
     mediaRecorderRef.current = recorder;

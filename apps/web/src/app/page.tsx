@@ -33,11 +33,14 @@ export default async function Home() {
   const n = await getTranslations('nav');
 
   // Stesso rilevamento brand già usato in layout.tsx (favicon) — sceglie il logo giusto
-  // in base al dominio da cui si sta navigando.
+  // in base al dominio da cui si sta navigando. Da questa versione i loghi sono PNG a sfondo
+  // TRASPARENTE (generati dal file originale a sfondo navy pieno): "onlight" per sfondi chiari
+  // (scritta .Live in navy) e "trans" per sfondi scuri o foto (scritta .Live in bianco).
   const h = await headers();
   const host = h.get('host') || '';
   const isIt = host.includes('sposi.live') || !host.includes('justmarry.live');
-  const logoSrc = isIt ? '/logo-sposi.png' : '/logo-justmarry.png';
+  const logoLight = isIt ? '/logo-sposi-onlight.png' : '/logo-justmarry-onlight.png';
+  const logoDark = isIt ? '/logo-sposi-trans.png' : '/logo-justmarry-trans.png';
 
   const platformItems = t.raw('platform_items') as Item[];
   const howSteps = t.raw('how_steps') as Item[];
@@ -54,14 +57,13 @@ export default async function Home() {
       <AppDownloadBadges />
 
       {/* ── Nav ─────────────────────────────────────────────────────────── */}
-      <nav className="fixed top-0 inset-x-0 z-40 bg-bg/80 backdrop-blur-md border-b border-border/60">
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-3.5">
-          {/* Il file logo ha uno sfondo blu scuro pieno (non trasparente) — su nav chiara
-              va dentro un badge scuro, altrimenti sembra un rettangolo per errore. */}
-          <span className="bg-[#0d1420] rounded-lg px-2 py-1 flex items-center">
+      <nav className="fixed top-0 inset-x-0 z-40 bg-bg/85 backdrop-blur-md border-b border-border/60">
+        <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-2.5">
+          {/* Logo trasparente, ben integrato sulla nav chiara (niente più badge nero) */}
+          <Link href="/" className="flex items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoSrc} alt={c('brand_name')} className="h-7 w-auto" />
-          </span>
+            <img src={logoLight} alt={c('brand_name')} className="h-12 sm:h-14 w-auto" />
+          </Link>
           <div className="flex items-center gap-5">
             <LanguageSwitcher />
             <Link href="/login" className="text-sm text-text-muted hover:text-text transition-colors">
@@ -69,7 +71,7 @@ export default async function Home() {
             </Link>
             <Link
               href="/signup"
-              className="text-sm bg-brand text-white px-5 py-2 rounded-full font-medium hover:bg-brand-dark transition-colors shadow-sm"
+              className="text-sm bg-brand text-white px-5 py-2.5 rounded-full font-medium hover:bg-brand-dark transition-colors shadow-sm"
             >
               {n('signup')}
             </Link>
@@ -77,53 +79,53 @@ export default async function Home() {
         </div>
       </nav>
 
-      {/* ── Hero full-screen ────────────────────────────────────────────── */}
-      <section className="relative min-h-[100svh] flex flex-col justify-center overflow-hidden">
-        <div
-          className="absolute inset-0 -z-10 bg-cover bg-center"
-          style={{ backgroundImage: 'url(/hero-wedding.jpg)' }}
-        />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/60 via-black/40 to-[#f8f6f3]" />
-
-        <div className="max-w-4xl mx-auto px-6 pt-24 pb-16 text-center">
-          {/* Logo in filigrana: "screen" blend fa sparire lo sfondo scuro del file logo
-              contro la foto, lasciando visibili solo anelli/scritta. */}
+      {/* ── Hero stile Zola: fondo chiaro, titolo serif scuro (sempre leggibile),
+             logo grande in evidenza, foto in card arrotondata sotto ─────────── */}
+      <section className="relative overflow-hidden">
+        <div className="max-w-5xl mx-auto px-6 pt-32 sm:pt-36 pb-8 text-center">
+          {/* Logo protagonista: trasparente, ~4x rispetto alla vecchia versione nel badge */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={logoSrc}
-            alt=""
-            aria-hidden
-            style={{ opacity: 0.6, mixBlendMode: 'screen' }}
-            className="h-20 sm:h-28 w-auto mx-auto mb-8"
+            src={logoLight}
+            alt={c('brand_name')}
+            className="h-28 sm:h-40 w-auto mx-auto mb-8"
           />
-          <span className="inline-flex items-center gap-2 bg-white/90 border border-border rounded-full px-4 py-1.5 text-xs font-medium text-brand-dark shadow-sm mb-8 tracking-wide uppercase">
+          <span className="inline-flex items-center gap-2 bg-white border border-border rounded-full px-4 py-1.5 text-xs font-medium text-brand-dark shadow-sm mb-8 tracking-wide uppercase">
             {t('badge')}
           </span>
-          <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl font-semibold tracking-tight mb-6 text-balance text-white drop-shadow-md leading-[1.08]">
+          <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl font-semibold tracking-tight mb-6 text-balance text-text leading-[1.08]">
             {t('hero_title')}
           </h1>
-          <p className="text-lg sm:text-xl text-white/90 mb-10 max-w-2xl mx-auto leading-relaxed drop-shadow-sm">
+          <p className="text-lg sm:text-xl text-text-muted mb-10 max-w-2xl mx-auto leading-relaxed">
             {t('hero_subtitle')}
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
             <Link
               href="/signup"
-              className="px-8 py-3.5 bg-brand text-white rounded-full font-medium hover:bg-brand-dark transition-all hover:shadow-lg shadow-md text-base"
+              className="px-8 py-4 bg-brand text-white rounded-full font-semibold hover:bg-brand-dark transition-all hover:shadow-lg shadow-md text-base"
             >
               {t('cta_signup')}
             </Link>
             <Link
               href="/login"
-              className="px-8 py-3.5 border-2 border-white/70 text-white rounded-full font-medium hover:border-white hover:bg-white/10 transition-colors text-base"
+              className="px-8 py-4 border-2 border-text/20 text-text rounded-full font-semibold hover:border-brand hover:text-brand-dark transition-colors text-base"
             >
               {t('cta_login')}
             </Link>
           </div>
-          <p className="text-white/70 text-sm mt-6">{t('hero_note')}</p>
+          <p className="text-text-muted text-sm mt-6">{t('hero_note')}</p>
         </div>
 
-        <div className="absolute bottom-6 inset-x-0 flex justify-center text-white/70 animate-bounce">
-          <ChevronDown size={28} aria-hidden />
+        {/* Foto sposi in card (stile Zola): cornice arrotondata con ombra, invece che
+            sfondo a tutto schermo — più elegante e più clemente con la qualità della foto. */}
+        <div className="max-w-4xl mx-auto px-6 pb-16">
+          <div className="rounded-3xl overflow-hidden shadow-xl border border-border">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/hero-wedding.jpg" alt="" className="w-full h-auto object-cover" />
+          </div>
+          <div className="flex justify-center mt-8 text-text-muted animate-bounce">
+            <ChevronDown size={28} aria-hidden />
+          </div>
         </div>
       </section>
 
@@ -321,6 +323,8 @@ export default async function Home() {
       <section className="bg-text">
         <div className="max-w-3xl mx-auto px-6 py-24 text-center">
           <Reveal>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoDark} alt="" className="h-24 sm:h-32 w-auto mx-auto mb-8" />
             <h2 className="font-display text-3xl sm:text-5xl font-semibold mb-4 text-white text-balance">
               {t('final_cta_title')}
             </h2>
@@ -339,10 +343,8 @@ export default async function Home() {
       <footer className="border-t border-border bg-bg">
         <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-5">
           <span className="flex items-center gap-3 text-sm text-text-muted">
-            <span className="bg-[#0d1420] rounded px-1.5 py-1 flex items-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logoSrc} alt="" className="h-4 w-auto" />
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoLight} alt="" className="h-9 w-auto" />
             {c('brand_name')} — {t('footer_tagline')}
           </span>
           <LanguageSwitcher />

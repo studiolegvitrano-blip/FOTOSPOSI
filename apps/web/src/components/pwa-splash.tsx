@@ -25,16 +25,18 @@ export function PwaSplash() {
   if (!visible) return null;
 
   const isIt = typeof window !== 'undefined' && !window.location.hostname.includes('justmarry');
-  const logoSrc = isIt ? '/logo-sposi.png' : '/logo-justmarry.png';
+  // Logo a sfondo trasparente (variante per fondi scuri) — niente più trucco mix-blend-mode,
+  // che sacrificava la brillantezza: ora il logo è nitido al 100% sopra la foto scurita.
+  const logoSrc = isIt ? '/logo-sposi-trans.png' : '/logo-justmarry-trans.png';
 
   return (
     <div
       className={`fixed inset-0 z-[999] flex items-center justify-center bg-cover bg-center transition-opacity duration-300 ${fading ? 'opacity-0' : 'opacity-100'}`}
       style={{ backgroundImage: 'url(/hero-wedding.jpg)' }}
     >
-      <div className="absolute inset-0 bg-black/50" />
+      <div className="absolute inset-0 bg-black/55" />
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={logoSrc} alt="" style={{ opacity: 0.6, mixBlendMode: 'screen' }} className="relative h-24 w-auto" />
+      <img src={logoSrc} alt="" className="relative h-40 w-auto drop-shadow-lg" />
     </div>
   );
 }
