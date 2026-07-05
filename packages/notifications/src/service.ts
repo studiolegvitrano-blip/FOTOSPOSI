@@ -58,10 +58,12 @@ export async function sendNotification(params: {
 
   if (status === 'pending' && params.channel === 'email') {
     try {
+      const { data: event } = await supabase.from('events').select('brand').eq('id', params.event_id).single();
+      const fromAddress = event?.brand === 'weddingmoments' ? 'info@justmarry.live' : 'info@sposi.live';
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { Authorization: `Bearer ${channelKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: 'noreply@sposi.live', to: params.recipient, subject: params.subject, text: params.body }),
+        body: JSON.stringify({ from: fromAddress, to: params.recipient, subject: params.subject, text: params.body }),
       });
       if (!res.ok) { status = 'failed'; errorMsg = `Email error: ${res.statusText}`; }
       else status = 'sent';

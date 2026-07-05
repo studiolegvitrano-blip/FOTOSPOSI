@@ -31,7 +31,11 @@ export default function QrPage() {
         return;
       }
 
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      // window.location.origin reflects the actual domain the admin is browsing (sposi.live or
+      // justmarry.live) — must take precedence over NEXT_PUBLIC_APP_URL, which is a single fixed
+      // value on Vercel and would otherwise always point guests to the raw *.vercel.app deployment
+      // URL regardless of which branded domain generated the QR code.
+      const baseUrl = window.location.origin || process.env.NEXT_PUBLIC_APP_URL;
       setQrUrl(`${baseUrl}/event/${data.token.token}`);
     });
   }, [eventId]);

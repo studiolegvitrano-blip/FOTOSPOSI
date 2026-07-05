@@ -10,7 +10,9 @@ export async function createEvent(params: {
   date: string;
   location: string;
   church?: string;
+  church_city?: string;
   venue?: string;
+  venue_city?: string;
   brand: 'fotosposi' | 'weddingmoments';
   tier?: Tier;
 }): Promise<{ event?: WeddingEvent; error?: string }> {
@@ -25,7 +27,9 @@ export async function createEvent(params: {
       date: params.date,
       location: params.location,
       church: params.church,
+      church_city: params.church_city,
       venue: params.venue,
+      venue_city: params.venue_city,
       brand: params.brand,
       tier: params.tier ?? 'free',
     })

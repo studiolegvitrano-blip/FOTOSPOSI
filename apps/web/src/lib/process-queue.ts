@@ -3,16 +3,15 @@ import { createMediaRecord, getDriveToken, getEventDriveFolders, updateDriveSync
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
 import sharp from 'sharp';
 
-function getBrandFromHost(): string {
-  const host = process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL || '';
-  if (host.includes('justmarry')) return 'JustMarry.live';
-  return 'Sposi.live';
+function getBrandLabel(brand?: string): string {
+  return brand === 'weddingmoments' ? 'JustMarry.live' : 'Sposi.live';
 }
 
 async function applyWatermark(
   buffer: Buffer,
   coupleName: string,
   eventDate: string,
+  brand?: string,
 ): Promise<Buffer> {
   try {
     const meta = await sharp(buffer).metadata();
@@ -44,7 +43,7 @@ async function applyWatermark(
         fill="rgba(255,255,255,0.85)">${eventDate}</text>
       <text x="${w - 16}" y="${h - 16}" text-anchor="end"
         font-family="Georgia, serif" font-size="${fontSizeLogo}"
-        fill="rgba(255,255,255,0.50)">${getBrandFromHost()}</text>
+        fill="rgba(255,255,255,0.50)">${getBrandLabel(brand)}</text>
     </svg>`;
 
     return await sharp(buffer)
@@ -73,7 +72,7 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
   const supabase = createServiceClient();
 
   const [{ data: event }, { data: items }] = await Promise.all([
-    supabase.from('events').select('couple_name, date').eq('id', eventId).single(),
+    supabase.from('events').select('couple_name, date, brand').eq('id', eventId).single(),
     supabase
       .from('upload_queue')
       .select('*')
@@ -128,7 +127,7 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
 
       // Watermark solo immagini
       if (!isVideo && coupleName && eventDate) {
-        buffer = await applyWatermark(buffer as Buffer, coupleName, eventDate);
+        buffer = await applyWatermark(buffer as Buffer, coupleName, eventDate, event?.brand);
       }
 
       // Ricarica il file watermarked su R2 (sovrascrive l'originale)

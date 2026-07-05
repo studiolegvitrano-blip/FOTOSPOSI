@@ -75,12 +75,12 @@ export default function EventDetailPage() {
               </p>
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-text-muted mt-1">
                 {event.church && (
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.church + (event.location ? ', ' + event.location : ''))}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-brand transition-colors no-underline text-text-muted">
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.church + ', ' + (event.church_city || event.location || ''))}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-brand transition-colors no-underline text-text-muted">
                     <Church className="w-4 h-4" /> {event.church}
                   </a>
                 )}
                 {event.venue && (
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue + (event.location ? ', ' + event.location : ''))}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-brand transition-colors no-underline text-text-muted">
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue + ', ' + (event.venue_city || event.location || ''))}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-brand transition-colors no-underline text-text-muted">
                     <Building2 className="w-4 h-4" /> {event.venue}
                   </a>
                 )}

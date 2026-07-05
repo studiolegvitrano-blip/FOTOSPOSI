@@ -22,7 +22,14 @@ export async function signUp(email: string, password: string, name: string, extr
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { name, ...extra } },
+    options: {
+      data: { name, ...extra },
+      // Without this, Supabase falls back to the project's single static "Site URL" setting
+      // (still pointing at http://localhost:3000, a leftover dev default) for the confirmation
+      // email link — broken for every real signup in production. window.location.origin makes
+      // it correctly point back to sposi.live or justmarry.live, whichever the user signed up on.
+      emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/login` : undefined,
+    },
   });
   return { data, error };
 }

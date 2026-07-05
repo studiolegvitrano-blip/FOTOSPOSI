@@ -10,7 +10,9 @@ export interface WeddingEvent {
   date: string;
   location: string;
   church?: string;
+  church_city?: string;
   venue?: string;
+  venue_city?: string;
   brand: 'fotosposi' | 'weddingmoments';
   tier: Tier;
   created_at: string;

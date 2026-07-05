@@ -2,10 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { validateQrToken, getCurrentUser, registerGuest } from '@fotosposi/core';
-import { getEventById, getSubEvents } from '@fotosposi/events';
-import { getMediaByEvent } from '@fotosposi/media';
-import { getEventWindow } from '@fotosposi/events';
+import { getCurrentUser } from '@fotosposi/core';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { WeddingEvent, SubEvent, EventWindow } from '@fotosposi/events';
@@ -28,43 +25,45 @@ export default function GuestEventPage() {
   const [slideIdx, setSlideIdx] = useState(0);
   const timerRef = useRef<NodeJS.Timeout>(undefined);
 
-  const loadData = async (eventId: string) => {
-    const [e, s, m, w] = await Promise.all([
-      getEventById(eventId),
-      getSubEvents(eventId),
-      getMediaByEvent(eventId),
-      getEventWindow(eventId),
-    ]);
-    if (e.event) setEvent(e.event);
-    if (s.subEvents) setSubEvents(s.subEvents);
-    if (m.media) setMedia(m.media);
-    if (w.window) setWindow(w.window);
+  const loadData = async (guestUser?: { id: string; name: string; email?: string }) => {
+    const res = await fetch('/api/guest/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code,
+        guestUserId: guestUser?.id,
+        guestName: guestUser?.name,
+        guestEmail: guestUser?.email,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || 'Link non valido o scaduto');
+      setLoading(false);
+      return;
+    }
+    if (data.event) setEvent(data.event);
+    setSubEvents(data.subEvents ?? []);
+    setMedia(data.media ?? []);
+    setWindow(data.window ?? null);
     setLoading(false);
   };
 
   useEffect(() => {
     if (!code) return;
-    validateQrToken(code).then(async (result) => {
-      const eid = result.event_id;
-      if (!result.valid || !eid) {
-        setError('Link non valido o scaduto');
-        setLoading(false);
-        return;
-      }
-      await loadData(eid);
-      getCurrentUser().then(u => {
-        if (u.user?.id) {
-          registerGuest({
-            event_id: eid,
-            user_id: u.user.id,
+    let interval: ReturnType<typeof setInterval> | undefined;
+    getCurrentUser().then((u) => {
+      const guestUser = u.user?.id
+        ? {
+            id: u.user.id,
             name: u.user.user_metadata?.full_name || u.user.user_metadata?.name || u.user.email || 'Ospite',
             email: u.user.email,
-          });
-        }
-      });
-      const interval = setInterval(() => loadData(eid), 15000);
-      return () => clearInterval(interval);
+          }
+        : undefined;
+      loadData(guestUser);
+      interval = setInterval(() => loadData(guestUser), 15000);
     });
+    return () => clearInterval(interval);
   }, [code]);
 
   useEffect(() => {

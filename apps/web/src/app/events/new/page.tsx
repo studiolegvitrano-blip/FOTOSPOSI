@@ -12,7 +12,9 @@ export default function NewEventPage() {
   const [date, setDate] = useState('');
   const [location, setLocation] = useState('');
   const [church, setChurch] = useState('');
+  const [churchCity, setChurchCity] = useState('');
   const [venue, setVenue] = useState('');
+  const [venueCity, setVenueCity] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDriveStep, setShowDriveStep] = useState(false);
@@ -39,7 +41,9 @@ export default function NewEventPage() {
       date,
       location,
       church: church || undefined,
+      church_city: churchCity || undefined,
       venue: venue || undefined,
+      venue_city: venueCity || undefined,
       brand: 'fotosposi',
     });
 
@@ -95,20 +99,40 @@ export default function NewEventPage() {
           />
         </div>
         <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.25rem' }}>Cerimonia</label>
+          <label style={{ display: 'block', marginBottom: '0.25rem' }}>Cerimonia (nome e indirizzo, es. Chiesa San Pietro, Via Roma 10)</label>
           <input
             type="text"
             value={church}
             onChange={(e) => setChurch(e.target.value)}
             style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
           />
+          <label style={{ display: 'block', margin: '0.5rem 0 0.25rem', fontSize: '0.85rem', color: '#666' }}>
+            Comune della cerimonia (lascia vuoto se uguale a "Luogo")
+          </label>
+          <input
+            type="text"
+            value={churchCity}
+            onChange={(e) => setChurchCity(e.target.value)}
+            placeholder={location || 'es. Roma'}
+            style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
+          />
         </div>
         <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.25rem' }}>Ricevimento</label>
+          <label style={{ display: 'block', marginBottom: '0.25rem' }}>Ricevimento (nome e indirizzo, es. Villa Bianca, Via dei Fiori 5)</label>
           <input
             type="text"
             value={venue}
             onChange={(e) => setVenue(e.target.value)}
+            style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
+          />
+          <label style={{ display: 'block', margin: '0.5rem 0 0.25rem', fontSize: '0.85rem', color: '#666' }}>
+            Comune del ricevimento (lascia vuoto se uguale a "Luogo")
+          </label>
+          <input
+            type="text"
+            value={venueCity}
+            onChange={(e) => setVenueCity(e.target.value)}
+            placeholder={location || 'es. Roma'}
             style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
           />
         </div>

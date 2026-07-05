@@ -16,9 +16,10 @@ export async function generateMetadata(): Promise<Metadata> {
     manifest: '/manifest.webmanifest',
     icons: {
       icon: [
-        { url: '/favicon.svg', type: 'image/svg+xml' },
+        { url: isIt ? '/favicon-sposi-32.png' : '/favicon-justmarry-32.png', sizes: '32x32', type: 'image/png' },
+        { url: isIt ? '/favicon-sposi-192.png' : '/favicon-justmarry-192.png', sizes: '192x192', type: 'image/png' },
       ],
-      apple: '/icon-192.svg',
+      apple: isIt ? '/favicon-sposi-192.png' : '/favicon-justmarry-192.png',
     },
     other: {
       'mobile-web-app-capable': 'yes',

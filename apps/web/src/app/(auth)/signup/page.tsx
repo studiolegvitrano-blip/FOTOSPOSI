@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import LanguageSwitcher from '@/components/language-switcher';
 import { PhoneInput, usePhoneDefaultDial } from '@/components/phone-input';
+import { GoogleIcon, FacebookIcon, AppleIcon } from '@/components/oauth-icons';
 
 export default function SignupPage() {
   const t = useTranslations('auth');
@@ -147,9 +148,15 @@ export default function SignupPage() {
               <div className="relative flex justify-center text-xs"><span className="bg-surface px-2 text-text-muted">{c('or_continue_with')}</span></div>
             </div>
             <div className="grid grid-cols-3 gap-2 w-full">
-              <Button type="button" variant="outline" onClick={() => handleOAuth('google')} className="w-full">Google</Button>
-              <Button type="button" variant="outline" onClick={() => handleOAuth('facebook')} className="w-full">Facebook</Button>
-              <Button type="button" variant="outline" onClick={() => handleOAuth('apple')} className="w-full">Apple</Button>
+              <Button type="button" variant="outline" onClick={() => handleOAuth('google')} className="w-full" aria-label="Google">
+                <GoogleIcon className="h-5 w-5" />
+              </Button>
+              <Button type="button" variant="outline" onClick={() => handleOAuth('facebook')} className="w-full" aria-label="Facebook">
+                <FacebookIcon className="h-5 w-5" />
+              </Button>
+              <Button type="button" variant="outline" onClick={() => handleOAuth('apple')} className="w-full" aria-label="Apple">
+                <AppleIcon className="h-5 w-5" />
+              </Button>
             </div>
             <p className="text-sm text-text-muted text-center">
               {t('signup_has_account')} <a href="/login" className="text-brand hover:underline">{t('signup_login_link')}</a>
