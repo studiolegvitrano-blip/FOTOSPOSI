@@ -208,16 +208,33 @@ export default function SiteBuilderPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {/* Anteprima di esempio del template: mini-mockup della hero del sito
+                      renderizzato con la palette e il font DI QUESTO template (prima usava
+                      la palette del template selezionato, quindi tutte le card erano uguali). */}
+                  {(() => {
+                    const p = (tplItem.palette as string[]) ?? ['#d4a574', '#f5f0eb', '#1a1a2e', '#ffffff'];
+                    return (
+                      <div className="rounded-md overflow-hidden border border-border mb-2 select-none pointer-events-none">
+                        <div className="px-3 py-4 text-center" style={{ background: `linear-gradient(135deg, ${p[1]}, ${p[3]})`, fontFamily: tplItem.font_family }}>
+                          <p className="text-[9px] uppercase tracking-[0.25em] mb-1" style={{ color: p[0] }}>Ci sposiamo!</p>
+                          <p className="text-lg font-bold leading-tight" style={{ color: p[2] }}>{content.coupleNames || 'Giada & Gigi'}</p>
+                          <div className="w-8 h-0.5 mx-auto my-1.5" style={{ background: p[0] }} />
+                          <p className="text-[10px]" style={{ color: p[2] }}>{content.date || '28 Agosto 2026'}</p>
+                          <span className="inline-block mt-2 px-3 py-1 rounded-full text-[9px]" style={{ background: p[0], color: '#fff' }}>Conferma presenza</span>
+                        </div>
+                        <div className="px-3 py-2 flex items-center justify-between" style={{ background: p[3] }}>
+                          <span className="text-[9px]" style={{ color: p[2], fontFamily: tplItem.font_family }}>La nostra storia</span>
+                          <span className="text-[9px]" style={{ color: p[0], fontFamily: tplItem.font_family }}>Galleria · RSVP</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div className="flex gap-1 mb-2">
                     {(tplItem.palette as string[]).map((clr: string, i: number) => (
                       <div key={i} className="w-6 h-6 rounded-full border border-border" style={{ background: clr }} />
                     ))}
                   </div>
                   <p className="text-xs text-text-muted">{t('font_label')} {tplItem.font_family}</p>
-                  <div className="mt-2 text-xs" style={{ fontFamily: tplItem.font_family }}>
-                    <p style={{ color: palette[0] }} className="font-bold">{content.coupleNames || 'Giada & Gigi'}</p>
-                    <p style={{ color: palette[2] }}>{content.date || '28 Agosto 2026'}</p>
-                  </div>
                 </CardContent>
               </Card>
             );

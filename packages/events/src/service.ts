@@ -18,6 +18,8 @@ export async function createEvent(params: {
   brand: 'fotosposi' | 'weddingmoments';
   tier?: Tier;
   allow_guest_media?: boolean;
+  watermark_names?: boolean;
+  watermark_text?: string;
 }): Promise<{ event?: WeddingEvent; error?: string }> {
   const supabase = createClient();
 
@@ -38,6 +40,8 @@ export async function createEvent(params: {
       brand: params.brand,
       tier: params.tier ?? 'free',
       allow_guest_media: params.allow_guest_media ?? true,
+      watermark_names: params.watermark_names ?? true,
+      watermark_text: params.watermark_text ?? null,
     })
     .select()
     .single();
@@ -143,6 +147,26 @@ export async function getEventByCode(code: string): Promise<{ event?: WeddingEve
   if (error) return { error: error.message };
   if (data) data.code = code;
   return { event: data };
+}
+
+/**
+ * Aggiorna le impostazioni watermark dell'evento (solo il creatore, via RLS
+ * "Creators can update own event" — migrazione 00034). Il logo Sposi.live resta
+ * sempre impresso: qui si sceglie solo se/che testo degli sposi aggiungere.
+ */
+export async function updateEventWatermark(
+  eventId: string,
+  settings: { watermark_names: boolean; watermark_text?: string | null },
+): Promise<{ error?: string }> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from('events')
+    .update({
+      watermark_names: settings.watermark_names,
+      watermark_text: settings.watermark_names ? (settings.watermark_text?.trim() || null) : null,
+    })
+    .eq('id', eventId);
+  return { error: error?.message };
 }
 
 export async function getEventWindow(eventId: string): Promise<{ window?: EventWindow; error?: string }> {

@@ -100,17 +100,29 @@ export async function applyVideoOverlay(
     }
 
     const width = 1080;
-    const bandHeight = 140;
     const textColor = branding.textColor || '#ffffff';
 
-    const svg = `<svg width="${width}" height="${bandHeight}" xmlns="http://www.w3.org/2000/svg">
+    // Se gli sposi hanno disattivato nomi/data (coupleNames e date vuoti), niente banda
+    // piena: resta comunque SEMPRE impresso il wordmark (Sposi.live / JustMarry.live)
+    // su una striscia sottile semi-trasparente — il logo piattaforma non è opzionale.
+    const hasNames = !!(branding.coupleNames || branding.date);
+    const bandHeight = hasNames ? 140 : 48;
+
+    const svg = hasNames
+      ? `<svg width="${width}" height="${bandHeight}" xmlns="http://www.w3.org/2000/svg">
       <rect width="${width}" height="${bandHeight}" fill="${branding.primaryColor}" fill-opacity="0.85" />
-      <text x="32" y="${bandHeight / 2 - 6}" font-family="${branding.fontFamily || 'Georgia, serif'}"
+      <text x="32" y="${branding.date ? bandHeight / 2 - 6 : bandHeight / 2 + 12}" font-family="${branding.fontFamily || 'Georgia, serif'}"
             font-size="38" font-weight="bold" fill="${textColor}">${escapeXml(branding.coupleNames)}</text>
       <text x="32" y="${bandHeight / 2 + 34}" font-family="${branding.fontFamily || 'Georgia, serif'}"
             font-size="26" fill="${textColor}" fill-opacity="0.9">${escapeXml(branding.date)}</text>
       <text x="${width - 32}" y="${bandHeight / 2 + 4}" font-family="Inter, sans-serif"
             font-size="20" fill="${textColor}" fill-opacity="0.6"
+            text-anchor="end">${escapeXml(branding.wordmark)}</text>
+    </svg>`
+      : `<svg width="${width}" height="${bandHeight}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="${width}" height="${bandHeight}" fill="#000000" fill-opacity="0.35" />
+      <text x="${width - 24}" y="${bandHeight / 2 + 8}" font-family="Inter, sans-serif"
+            font-size="22" fill="${textColor}" fill-opacity="0.75"
             text-anchor="end">${escapeXml(branding.wordmark)}</text>
     </svg>`;
 

@@ -62,7 +62,8 @@ export default async function Home() {
           {/* Logo trasparente, ben integrato sulla nav chiara (niente più badge nero) */}
           <Link href="/" className="flex items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoLight} alt={c('brand_name')} className="h-12 sm:h-14 w-auto" />
+            {/* Logo ingrandito oltre il doppio (48→104px, 56→120px) */}
+            <img src={logoLight} alt={c('brand_name')} className="h-26 sm:h-30 w-auto" />
           </Link>
           <div className="flex items-center gap-5">
             <LanguageSwitcher />
@@ -82,7 +83,8 @@ export default async function Home() {
       {/* ── Hero stile Zola: fondo chiaro, titolo serif scuro (sempre leggibile),
              logo grande in evidenza, foto in card arrotondata sotto ─────────── */}
       <section className="relative overflow-hidden">
-        <div className="max-w-5xl mx-auto px-6 pt-32 sm:pt-36 pb-8 text-center">
+        {/* padding-top aumentato per compensare la nav più alta col logo ingrandito */}
+        <div className="max-w-5xl mx-auto px-6 pt-44 sm:pt-52 pb-8 text-center">
           {/* Logo protagonista: trasparente, ~4x rispetto alla vecchia versione nel badge */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

@@ -29,6 +29,11 @@ export default function NewEventPage() {
   const [venueAddress, setVenueAddress] = useState('');
   const [venueCity, setVenueCity] = useState('');
   const [allowGuestMedia, setAllowGuestMedia] = useState(true);
+  // Watermark: "Vuoi che nelle foto e nei video ci siano impressi i Vostri nomi?"
+  // Se sì, gli sposi possono scegliere un testo suggerito (nomi + Sposi + città + data)
+  // o scriverne uno libero. Il logo Sposi.live resta SEMPRE impresso a prescindere.
+  const [watermarkNames, setWatermarkNames] = useState(true);
+  const [watermarkText, setWatermarkText] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDriveStep, setShowDriveStep] = useState(false);
@@ -77,6 +82,8 @@ export default function NewEventPage() {
       brand: 'fotosposi',
       tier: selectedTier,
       allow_guest_media: allowGuestMedia,
+      watermark_names: watermarkNames,
+      watermark_text: watermarkNames && watermarkText.trim() ? watermarkText.trim() : undefined,
     });
 
     setLoading(false);
@@ -273,6 +280,61 @@ export default function NewEventPage() {
             />
             Consenti agli invitati di scattare foto e video
           </label>
+        </div>
+        <div style={{ marginBottom: '1rem', padding: '0.75rem', border: '1px solid #eee', borderRadius: '6px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem', fontWeight: 600 }}>
+            <input
+              type="checkbox"
+              checked={watermarkNames}
+              onChange={(e) => setWatermarkNames(e.target.checked)}
+            />
+            Vuoi che nelle foto e nei video ci siano impressi i Vostri nomi?
+          </label>
+          {watermarkNames && (
+            <div style={{ marginTop: '0.75rem' }}>
+              <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>
+                Scegli un suggerimento o scrivi il testo che preferisci:
+              </p>
+              {(() => {
+                const dateIT = date ? new Date(date).toLocaleDateString('it-IT') : '';
+                const suggestions = [
+                  [coupleName, 'Sposi', location, dateIT].filter(Boolean).join(' '),
+                  [coupleName, dateIT].filter(Boolean).join(' — '),
+                  ['W gli Sposi!', coupleName, dateIT].filter(Boolean).join(' '),
+                ].filter(s => s.length > 0);
+                return (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    {suggestions.map(s => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setWatermarkText(s)}
+                        style={{
+                          padding: '0.35rem 0.75rem', fontSize: '0.8rem', cursor: 'pointer',
+                          borderRadius: '999px',
+                          border: watermarkText === s ? '2px solid #d4a574' : '1px solid #ccc',
+                          background: watermarkText === s ? '#faf3ec' : 'white',
+                        }}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+              <input
+                type="text"
+                value={watermarkText}
+                onChange={(e) => setWatermarkText(e.target.value)}
+                maxLength={80}
+                placeholder={`es. ${coupleName || 'Ciccia & Ciccio'} Sposi ${location || 'Palermo'} ${date ? new Date(date).toLocaleDateString('it-IT') : '06/07/2026'}`}
+                style={{ width: '100%', padding: '0.5rem', fontSize: '1rem' }}
+              />
+              <p style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.35rem' }}>
+                Se lasci vuoto verranno impressi nomi e data. Il logo Sposi.live è sempre presente.
+              </p>
+            </div>
+          )}
         </div>
         {error && <p style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
         <button type="submit" disabled={loading} style={{ padding: '0.5rem 2rem', fontSize: '1rem', cursor: 'pointer' }}>

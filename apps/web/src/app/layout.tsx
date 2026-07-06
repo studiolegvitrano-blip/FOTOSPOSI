@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { cookies, headers } from 'next/headers';
 import { NextIntlClientProvider } from 'next-intl';
 import { Inter, Playfair_Display } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import { routing } from '../../i18n/routing';
 import './globals.css';
 
@@ -76,6 +77,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {children}
         </NextIntlClientProvider>
         <script dangerouslySetInnerHTML={{ __html: "if('serviceWorker' in navigator)navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(r){r.unregister()})})" }} />
+        {/* Vercel Web Analytics: visite e pagine viste, visibili nella dashboard Vercel
+            (tab Analytics del progetto). Lo script è servito dallo stesso dominio. */}
+        <Analytics />
       </body>
     </html>
   );

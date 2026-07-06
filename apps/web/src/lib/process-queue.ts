@@ -1,16 +1,27 @@
 import { createServiceClient } from '@fotosposi/core';
 import { createMediaRecord, getDriveToken, getEventDriveFolders, updateDriveSyncStatus } from '@fotosposi/media';
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
+import { applyVideoOverlay } from '@fotosposi/video-overlay';
 import sharp from 'sharp';
 
 function getBrandLabel(brand?: string): string {
   return brand === 'weddingmoments' ? 'JustMarry.live' : 'Sposi.live';
 }
 
+function escapeXml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Watermark foto. `line1`/`line2` sono le righe centrali (nomi sposi + data, oppure il
+ * testo personalizzato scelto dagli sposi in `events.watermark_text`). Se gli sposi hanno
+ * disattivato i nomi (`events.watermark_names = false`) le righe arrivano vuote: niente
+ * banda scura, resta impresso solo il logo Sposi.live in basso a destra.
+ */
 async function applyWatermark(
   buffer: Buffer,
-  coupleName: string,
-  eventDate: string,
+  line1: string,
+  line2: string,
   brand?: string,
 ): Promise<Buffer> {
   try {
@@ -19,12 +30,16 @@ async function applyWatermark(
     const h = meta.height || 900;
 
     const barHeight = Math.max(160, Math.round(h / 6));
-    const fontSizeName = Math.max(44, Math.round(w / 11));
+    // Il testo personalizzato può essere lungo ("Ciccia & Ciccio Sposi Palermo 06/07/2026"):
+    // riduciamo il font all'aumentare dei caratteri perché resti dentro la larghezza.
+    const fontSizeName = Math.min(Math.max(44, Math.round(w / 11)), Math.round((w * 1.6) / Math.max(line1.length, 8)));
     const fontSizeDate = Math.max(32, Math.round(w / 16));
     const fontSizeLogo = Math.max(24, Math.round(w / 22));
 
-    const nameY = h - barHeight + Math.round(barHeight * 0.38);
+    const nameY = h - barHeight + Math.round(barHeight * (line2 ? 0.38 : 0.55));
     const dateY = nameY + fontSizeName + 6;
+
+    const hasBand = !!line1;
 
     const svgOverlay = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -34,13 +49,13 @@ async function applyWatermark(
           <stop offset="100%" stop-color="rgba(0,0,0,0.82)" />
         </linearGradient>
       </defs>
-      <rect x="0" y="${h - barHeight}" width="${w}" height="${barHeight}" fill="url(#barGrad)" />
+      ${hasBand ? `<rect x="0" y="${h - barHeight}" width="${w}" height="${barHeight}" fill="url(#barGrad)" />
       <text x="${w / 2}" y="${nameY}" text-anchor="middle"
         font-family="Georgia, serif" font-weight="bold" font-size="${fontSizeName}"
-        fill="rgba(255,255,255,0.95)">${coupleName}</text>
-      <text x="${w / 2}" y="${dateY}" text-anchor="middle"
+        fill="rgba(255,255,255,0.95)">${escapeXml(line1)}</text>` : ''}
+      ${hasBand && line2 ? `<text x="${w / 2}" y="${dateY}" text-anchor="middle"
         font-family="Georgia, serif" font-size="${fontSizeDate}"
-        fill="rgba(255,255,255,0.85)">${eventDate}</text>
+        fill="rgba(255,255,255,0.85)">${escapeXml(line2)}</text>` : ''}
       <text x="${w - 16}" y="${h - 16}" text-anchor="end"
         font-family="Georgia, serif" font-size="${fontSizeLogo}"
         fill="rgba(255,255,255,0.50)">${getBrandLabel(brand)}</text>
@@ -72,7 +87,7 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
   const supabase = createServiceClient();
 
   const [{ data: event }, { data: items }] = await Promise.all([
-    supabase.from('events').select('couple_name, date, brand').eq('id', eventId).single(),
+    supabase.from('events').select('couple_name, date, brand, watermark_names, watermark_text').eq('id', eventId).single(),
     supabase
       .from('upload_queue')
       .select('*')
@@ -88,6 +103,13 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
 
   const coupleName = event?.couple_name || '';
   const eventDate = event?.date ? new Date(event.date).toLocaleDateString('it-IT') : '';
+  // Testo impresso su foto/video: se gli sposi hanno disattivato i nomi → righe vuote
+  // (resta solo il logo Sposi.live); se hanno scelto un testo personalizzato → quello
+  // su una riga sola; altrimenti nomi sposi + data come default.
+  const namesEnabled = event?.watermark_names !== false;
+  const customText = (event?.watermark_text || '').trim();
+  const wmLine1 = !namesEnabled ? '' : (customText || coupleName);
+  const wmLine2 = !namesEnabled || customText ? '' : eventDate;
 
   const [{ token }] = await Promise.all([getDriveToken(eventId)]);
   const hasDrive = !!token?.access_token;
@@ -124,10 +146,37 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
       let buffer = Buffer.from(rawArr) as Buffer;
 
       const isVideo = item.file_type?.startsWith('video/');
+      let contentType = item.file_type || 'application/octet-stream';
 
-      // Watermark solo immagini
-      if (!isVideo && coupleName && eventDate) {
-        buffer = await applyWatermark(buffer as Buffer, coupleName, eventDate, event?.brand);
+      // Watermark: SEMPRE applicato, su TUTTE le foto e TUTTI i video (il logo
+      // Sposi.live/JustMarry.live è impresso a prescindere dalle scelte degli sposi);
+      // nomi+data o testo personalizzato solo se gli sposi non li hanno disattivati
+      // (events.watermark_names / watermark_text).
+      if (!isVideo) {
+        buffer = await applyWatermark(buffer as Buffer, wmLine1, wmLine2, event?.brand);
+      } else {
+        try {
+          const branded = await applyVideoOverlay(buffer as Buffer, {
+            branding: {
+              coupleNames: wmLine1,
+              date: wmLine2,
+              primaryColor: '#1a1a2e',
+              wordmark: getBrandLabel(event?.brand),
+            },
+            // La route ha maxDuration 300s (Fluid Compute): 240s di clip lasciano
+            // margine per download/ri-codifica/upload. Oltre, il video passa
+            // originale (caso raro per clip degli invitati).
+            maxDurationSeconds: 240,
+          });
+          if (branded !== buffer) {
+            buffer = branded as Buffer;
+            contentType = 'video/mp4'; // l'overlay ri-codifica sempre in H.264/AAC MP4
+          }
+        } catch (overlayErr) {
+          // Se ffmpeg fallisce (video corrotto, codec esotico) pubblichiamo comunque
+          // il video originale: meglio senza watermark che perso.
+          console.error('Video overlay fallito:', overlayErr);
+        }
       }
 
       // Ricarica il file watermarked su R2 (sovrascrive l'originale)
@@ -145,7 +194,7 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
         Bucket: process.env.R2_BUCKET || 'fotosposi-uploads',
         Key: r2Key,
         Body: buffer,
-        ContentType: item.file_type || 'application/octet-stream',
+        ContentType: contentType,
       }));
 
       const { media, error: recordError } = await createMediaRecord({

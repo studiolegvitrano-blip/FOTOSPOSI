@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { rateLimit } from '@fotosposi/core';
 import { processQueueForEvent } from '@/lib/process-queue';
 
+// Il watermark video ri-codifica il clip con ffmpeg: serve il runtime Node e più
+// tempo del default. 300s è il massimo consentito con Fluid Compute.
+export const runtime = 'nodejs';
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest) {
   const ip = request.headers.get('x-forwarded-for') || 'unknown';
   const rl = rateLimit(`process-queue:${ip}`, 30, 60000);

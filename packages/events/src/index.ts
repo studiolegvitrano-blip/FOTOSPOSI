@@ -21,6 +21,10 @@ export interface WeddingEvent {
   code?: string;
   hashtag?: string;
   allow_guest_media: boolean;
+  /** Impressione nomi/data su foto e video (il logo Sposi.live c'è sempre). */
+  watermark_names?: boolean;
+  /** Testo personalizzato es. "Ciccia & Ciccio Sposi Palermo 06/07/2026"; null = nomi+data. */
+  watermark_text?: string | null;
 }
 
 export interface SubEvent {
@@ -61,4 +65,5 @@ export {
   createSubEvent,
   getSubEvents,
   getEventWindow,
+  updateEventWatermark,
 } from './service';

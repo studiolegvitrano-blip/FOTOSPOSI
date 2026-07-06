@@ -3,7 +3,9 @@ import { createServiceClient } from '@fotosposi/core';
 import { processQueueForEvent } from '@/lib/process-queue';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+// 300s (Fluid Compute): lo sweep ora brucia anche i watermark sui video (ffmpeg),
+// che con 60s rischiava il timeout già al primo clip.
+export const maxDuration = 300;
 
 // Caps keep a single cron run inside Vercel's function time budget even with many
 // simultaneous events (e.g. 500 weddings on the same Saturday).

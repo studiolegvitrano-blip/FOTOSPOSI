@@ -83,7 +83,9 @@ export function VideoRecorder({ onRecordingComplete, maxDuration = 30, suggested
   }, [state]);
 
   const beginRecordingOnStream = useCallback((stream: MediaStream, mime: string) => {
-    const recorder = new MediaRecorder(stream, { mimeType: mime });
+    // Bitrate esplicito: senza, molti browser registrano a ~1 Mbps e il video appare
+    // "impastato" anche se la camera è Full HD.
+    const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5_000_000, audioBitsPerSecond: 128_000 });
     mediaRecorderRef.current = recorder;
     chunksRef.current = [];
 
@@ -128,7 +130,18 @@ export function VideoRecorder({ onRecordingComplete, maxDuration = 30, suggested
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      // Full HD quando la camera lo consente: `video: true` lasciava il default del
+      // browser (spesso 640x480) e i video guestbook risultavano a bassa risoluzione.
+      // `ideal` degrada da solo su camere più scarse senza far fallire la richiesta.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 },
+          facingMode: 'user',
+        },
+        audio: true,
+      });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
 

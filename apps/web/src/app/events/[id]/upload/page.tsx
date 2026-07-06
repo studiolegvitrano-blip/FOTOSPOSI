@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { createMediaRecord, enqueueUpload, getPendingQueue, updateQueueItem, getQueueStats, compressImage, type QueueItem } from '@fotosposi/media';
+import { compressImage, type QueueItem } from '@fotosposi/media';
 import { getCurrentUser, getEventTier, type Tier } from '@fotosposi/core';
 import { getEventById, getEventWindow } from '@fotosposi/events';
 import { Button } from '@/components/ui/button';
@@ -31,60 +31,42 @@ export default function UploadPage() {
 
   const FREE_MAX_PHOTOS = 100;
 
-  const [eventMeta, setEventMeta] = useState<{ couple_name: string; date: string } | null>(null);
+  // Tutte le operazioni sulla coda passano da /api/queue (server-side, autenticata via
+  // cookie): scrivere su upload_queue direttamente dal browser falliva sotto RLS perché
+  // il client "service" degradava alla anon key senza sessione (auth.uid() = NULL) →
+  // "new row violates row-level security policy for table upload_queue".
+  const queueApi = useCallback(async (body: Record<string, unknown>): Promise<Record<string, any> | null> => {
+    try {
+      const res = await fetch('/api/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }, []);
 
-  function applyWatermark(blob: Blob, coupleName: string, eventDate: string): Promise<Blob> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { resolve(blob); return; }
-        ctx.drawImage(img, 0, 0);
-        const h = canvas.height;
-        const w = canvas.width;
-        const barH = Math.max(160, Math.round(h / 6));
-        const fontSizeName = Math.max(44, Math.round(w / 11));
-        const fontSizeDate = Math.max(32, Math.round(w / 16));
-        ctx.save();
-        ctx.fillStyle = 'rgba(0,0,0,0.45)';
-        ctx.fillRect(0, h - barH, w, barH);
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
-        ctx.font = `bold ${fontSizeName}px Georgia, serif`;
-        ctx.fillText(coupleName, w / 2, h - barH + Math.round(barH * 0.38));
-        ctx.font = `${fontSizeDate}px Georgia, serif`;
-        ctx.fillText(eventDate, w / 2, h - barH + Math.round(barH * 0.38) + fontSizeName + 6);
-        ctx.font = `${Math.max(24, Math.round(w / 22))}px Georgia, serif`;
-        ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.textAlign = 'right';
-        ctx.fillText((typeof window !== 'undefined' && window.location.hostname.includes('justmarry') ? 'JustMarry.live' : 'Sposi.live'), w - 12, 28);
-        ctx.restore();
-        canvas.toBlob(b => { if (b) resolve(b); else resolve(blob); }, blob.type, 0.92);
-      };
-      img.onerror = () => resolve(blob);
-      img.src = URL.createObjectURL(blob);
-    });
-  }
-
+  // Il watermark (nomi sposi + data + logo Sposi.live) viene applicato UNA sola volta,
+  // lato server, durante il processing della coda — non più anche qui nel client, dove
+  // creava una seconda banda sovrapposta e rallentava i telefoni.
   const loadQueue = useCallback(async () => {
-    const { items } = await getPendingQueue(eventId);
-    if (items) {
-      setQueue(items);
-      const s = await getQueueStats(eventId);
+    const d = await queueApi({ action: 'state', eventId });
+    if (d && d.stats) {
+      setQueue(d.items ?? []);
+      const s = d.stats;
       setStats(s);
-      if (items.some(i => i.status === 'pending' || i.status === 'failed')) {
+      if ((d.items ?? []).some((i: QueueItem) => i.status === 'pending' || i.status === 'failed')) {
         setPhase('processing');
         return true;
       }
-      if (s.synced + s.failed === s.pending + s.processing + s.synced + s.failed && s.synced + s.failed > 0) {
+      if (s.synced + s.failed > 0 && s.pending + s.processing === 0) {
         setPhase('idle');
       }
     }
     return false;
-  }, [eventId]);
+  }, [eventId, queueApi]);
 
   const triggerServerProcessing = async () => {
     await fetch('/api/r2/process-queue', {
@@ -102,7 +84,6 @@ export default function UploadPage() {
       if (!user) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
       const { event } = await getEventById(eventId);
       if (!event) return;
-      setEventMeta({ couple_name: event.couple_name, date: event.date });
       const isCreator = event.created_by === user.id;
       if (!isCreator) {
         const { window: w } = await getEventWindow(eventId);
@@ -117,9 +98,12 @@ export default function UploadPage() {
       const { tier: evTier } = await getEventTier(eventId);
       if (evTier) setTier(evTier);
       if (evTier === 'free') {
-        const s = await getQueueStats(eventId);
-        const totalExisting = s.synced + s.pending + s.processing;
-        if (totalExisting >= FREE_MAX_PHOTOS) setLimitReached(true);
+        const d = await queueApi({ action: 'state', eventId });
+        const s = d?.stats;
+        if (s) {
+          const totalExisting = s.synced + s.pending + s.processing;
+          if (totalExisting >= FREE_MAX_PHOTOS) setLimitReached(true);
+        }
       }
       setEventReady(true);
       const hasPending = await loadQueue();
@@ -159,7 +143,8 @@ export default function UploadPage() {
     }
     setSkipVideos(skippedVideos);
 
-    const s = await getQueueStats(eventId);
+    const stateData = await queueApi({ action: 'state', eventId });
+    const s = stateData?.stats ?? { synced: 0, pending: 0, processing: 0, failed: 0 };
     const totalExisting = s.synced + s.pending + s.processing;
     const slotsLeft = isFree ? Math.max(0, FREE_MAX_PHOTOS - totalExisting) : files.length;
     const allowed = files.slice(0, slotsLeft);
@@ -182,22 +167,20 @@ export default function UploadPage() {
         if (isFree) {
           try { uploadFile = await compressImage(file, 1200); compressed = true; } catch { }
         }
-        if (eventMeta) {
-          try { uploadFile = await applyWatermark(uploadFile, eventMeta.couple_name, eventMeta.date); } catch { }
-        }
       }
 
-      const { id, error } = await enqueueUpload({
-        event_id: eventId,
-        uploaded_by: user.id,
-        file_name: file.name,
-        file_type: file.type || 'application/octet-stream',
-        file_size: uploadFile.size,
+      const enq = await queueApi({
+        action: 'enqueue',
+        eventId,
+        fileName: file.name,
+        fileType: file.type || 'application/octet-stream',
+        fileSize: uploadFile.size,
         compressed,
       });
+      const id: string | undefined = enq?.id;
       // Prima un errore qui veniva ignorato in silenzio (`continue`): l'utente vedeva la
       // barra di caricamento ma il file spariva nel nulla, senza traccia in coda né in galleria.
-      if (error || !id) { alert(`"${file.name}" non accodato: ${error || 'errore sconosciuto'}`); continue; }
+      if (!id) { alert(`"${file.name}" non accodato: ${enq?.error || 'errore sconosciuto'}`); continue; }
 
       const prefix = `events/${eventId}`;
       const r2Resp = await fetch('/api/r2/upload', {
@@ -207,7 +190,7 @@ export default function UploadPage() {
       });
       const r2Data = await r2Resp.json();
       if (!r2Resp.ok || !r2Data.presignedUrl) {
-        await updateQueueItem(id, { status: 'failed', error: r2Data.error || 'Presigned URL fallita' });
+        await queueApi({ action: 'fail', id, error: r2Data.error || 'Presigned URL fallita' });
         continue;
       }
 
@@ -217,10 +200,10 @@ export default function UploadPage() {
         headers: { 'Content-Type': file.type },
       });
       if (!uploadResp.ok) {
-        await updateQueueItem(id, { status: 'failed', error: 'Upload R2 fallito' });
+        await queueApi({ action: 'fail', id, error: 'Upload R2 fallito' });
         continue;
       }
-      await updateQueueItem(id, { r2_key: r2Data.key });
+      await queueApi({ action: 'mark', id, r2Key: r2Data.key });
       queued++;
       setQueue(prev => [...prev, {
         id, event_id: eventId, uploaded_by: user.id,

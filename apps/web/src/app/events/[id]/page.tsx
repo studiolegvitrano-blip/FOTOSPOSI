@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { getEventById, getSubEvents, getEventWindow } from '@fotosposi/events';
+import { getEventById, getSubEvents, getEventWindow, updateEventWatermark } from '@fotosposi/events';
 import { getMediaByEvent } from '@fotosposi/media';
-import { hasFeature, type Tier } from '@fotosposi/core';
+import { getCurrentUser, hasFeature, type Tier } from '@fotosposi/core';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
@@ -31,6 +31,12 @@ export default function EventDetailPage() {
   const [evtWindow, setEvtWindow] = useState<EventWindow | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCountdown, setShowCountdown] = useState(true);
+  const [isCreator, setIsCreator] = useState(false);
+  // Impostazioni watermark (solo sposi): nomi impressi sì/no + testo personalizzato.
+  const [wmNames, setWmNames] = useState(true);
+  const [wmText, setWmText] = useState('');
+  const [wmSaving, setWmSaving] = useState(false);
+  const [wmSaved, setWmSaved] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,14 +46,29 @@ export default function EventDetailPage() {
       getSubEvents(eventId),
       getEventWindow(eventId),
       getMediaByEvent(eventId),
-    ]).then(([e, s, w, m]) => {
-      if (e.event) setEvent(e.event);
+      getCurrentUser(),
+    ]).then(([e, s, w, m, u]) => {
+      if (e.event) {
+        setEvent(e.event);
+        setWmNames(e.event.watermark_names !== false);
+        setWmText(e.event.watermark_text || '');
+        if (u.user && e.event.created_by === u.user.id) setIsCreator(true);
+      }
       if (s.subEvents) setSubEvents(s.subEvents);
       if (w.window) setEvtWindow(w.window);
       if (m.media) setMedia(m.media);
       setLoading(false);
     });
   }, [eventId]);
+
+  const saveWatermark = async () => {
+    setWmSaving(true);
+    setWmSaved(false);
+    const { error } = await updateEventWatermark(eventId, { watermark_names: wmNames, watermark_text: wmText });
+    setWmSaving(false);
+    if (!error) { setWmSaved(true); setTimeout(() => setWmSaved(false), 3000); }
+    else alert(`Salvataggio non riuscito: ${error}`);
+  };
 
   if (loading) return <p className="text-center mt-8">{c('loading')}</p>;
   if (!event) return <p className="text-center mt-8">{c('no_results')}</p>;
@@ -114,6 +135,8 @@ export default function EventDetailPage() {
               <Button variant="outline" asChild><Link href={`/events/${eventId}/wall`}>{t('wall')}</Link></Button>
               <Button variant="outline" asChild><Link href={`/events/${eventId}/video-challenges`}>{t('video_challenges')}</Link></Button>
               <Button variant="outline" asChild><Link href={`/events/${eventId}/wow-walk`}>{t('wow_walk')}</Link></Button>
+              {/* Capsula del Tempo: pagina di gestione già esistente ma mai linkata. */}
+              <Button variant="outline" asChild><Link href={`/events/${eventId}/capsule`}>Capsula del Tempo</Link></Button>
               <Button variant="outline" asChild><Link href={`/kiosk/${event.code || eventId}`}>{t('kiosk')}</Link></Button>
               {/* social-wall rimosso */}
               <Button variant="outline" asChild><Link href={`/events/${eventId}/qr`}>{t('qr_code')}</Link></Button>
@@ -183,6 +206,54 @@ export default function EventDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {isCreator && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Impostazioni foto e video</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input type="checkbox" checked={wmNames} onChange={(e) => setWmNames(e.target.checked)} />
+                  Vuoi che nelle foto e nei video ci siano impressi i Vostri nomi?
+                </label>
+                {wmNames && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-text-muted">Scegli un suggerimento o scrivi il testo che preferisci:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        [event.couple_name, 'Sposi', event.location, new Date(event.date).toLocaleDateString('it-IT')].filter(Boolean).join(' '),
+                        [event.couple_name, new Date(event.date).toLocaleDateString('it-IT')].filter(Boolean).join(' — '),
+                        ['W gli Sposi!', event.couple_name, new Date(event.date).toLocaleDateString('it-IT')].filter(Boolean).join(' '),
+                      ].map(s => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setWmText(s)}
+                          className={`px-3 py-1 rounded-full text-xs border transition-colors ${wmText === s ? 'border-brand bg-brand/10 font-medium' : 'border-border bg-background hover:border-brand/50'}`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="text"
+                      value={wmText}
+                      onChange={(e) => setWmText(e.target.value)}
+                      maxLength={80}
+                      placeholder={`es. ${event.couple_name} Sposi ${event.location} ${new Date(event.date).toLocaleDateString('it-IT')}`}
+                      className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                    />
+                    <p className="text-xs text-text-muted">Se lasci vuoto verranno impressi nomi e data. Il logo Sposi.live è sempre presente.</p>
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <Button size="sm" onClick={saveWatermark} disabled={wmSaving}>
+                    {wmSaving ? 'Salvataggio...' : 'Salva'}
+                  </Button>
+                  {wmSaved && <span className="text-sm text-success">Salvato ✓</span>}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="flex items-center gap-4">
             <ShareButton

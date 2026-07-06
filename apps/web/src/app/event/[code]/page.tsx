@@ -154,6 +154,9 @@ export default function GuestEventPage() {
               : <Button variant="outline" disabled>Carica (finestra chiusa)</Button>}
           <Button variant="outline" asChild><a href={`/events/${event.id}/games/jokes`}>Scherzi</a></Button>
           <Button variant="outline" asChild><a href={`/events/${event.id}/guestbook`}>Video</a></Button>
+          {/* Capsula del Tempo: la pagina pubblica esisteva già (/e/[id]/capsule) ma
+              nessun link la rendeva raggiungibile dagli invitati. */}
+          <Button variant="outline" asChild><a href={`/e/${event.id}/capsule`}>Capsula del Tempo</a></Button>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
