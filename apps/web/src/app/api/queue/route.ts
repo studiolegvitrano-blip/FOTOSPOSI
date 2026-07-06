@@ -111,12 +111,12 @@ export async function POST(request: NextRequest) {
         svc.from('upload_queue').select('status').eq('event_id', eventId),
       ]);
 
-      const items = all ?? [];
+      const items: { status: string }[] = all ?? [];
       const stats = {
-        pending: items.filter(i => i.status === 'pending').length,
-        processing: items.filter(i => i.status === 'processing').length,
-        synced: items.filter(i => i.status === 'synced').length,
-        failed: items.filter(i => i.status === 'failed').length,
+        pending: items.filter((i: { status: string }) => i.status === 'pending').length,
+        processing: items.filter((i: { status: string }) => i.status === 'processing').length,
+        synced: items.filter((i: { status: string }) => i.status === 'synced').length,
+        failed: items.filter((i: { status: string }) => i.status === 'failed').length,
       };
       return NextResponse.json({ items: pending ?? [], stats });
     }
