@@ -32,7 +32,10 @@ const nextConfig: NextConfig = {
     // Oltre a ffmpeg, ogni route che imprime watermark ha bisogno dei font in
     // assets/fonts: le lambda Vercel non hanno font di sistema e senza questi
     // il testo del watermark viene rasterizzato come quadrati (tofu).
-    'src/app/api/photos/[id]/share/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**'],
+    // sharp qui viene caricato via import() dinamico dentro photo-overlay/video-overlay:
+    // il tracer non lo segue e la lambda restava senza binario ("Could not load the
+    // sharp module using the linux-x64 runtime" nei log) → share sempre in 500.
+    'src/app/api/photos/[id]/share/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**', '../../node_modules/sharp/**', '../../node_modules/@img/**'],
     // Il watermark video ora viene bruciato anche durante il processing della coda
     // (upload ospiti), nello sweep del cron e sui video guestbook: tutte queste
     // route spawnano ffmpeg.

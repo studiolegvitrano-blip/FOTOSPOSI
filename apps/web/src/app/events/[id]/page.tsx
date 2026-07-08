@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ShareButton, Countdown } from '@fotosposi/ui';
 import { shareWatermarkedMedia } from '@/lib/share-watermarked';
-import { Share2, Download, Church, Building2 } from 'lucide-react';
+import { Share2, Church, Building2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +28,7 @@ export default function EventDetailPage() {
   const [subEvents, setSubEvents] = useState<SubEvent[]>([]);
   const [media, setMedia] = useState<MediaUpload[]>([]);
   const [videos, setVideos] = useState<MediaUpload[]>([]);
+  const [lightbox, setLightbox] = useState<string | null>(null);
   const [evtWindow, setEvtWindow] = useState<EventWindow | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCountdown, setShowCountdown] = useState(true);
@@ -165,7 +166,14 @@ export default function EventDetailPage() {
                   {media.slice(0, 12).map((m) => (
                     <div key={m.id} className="relative group rounded-md overflow-hidden border border-border">
                       {m.type === 'photo'
-                        ? <img src={mediaUrl(m)} alt="" className="w-full h-28 object-cover" loading="lazy" />
+                        ? <img
+                            src={mediaUrl(m)}
+                            alt=""
+                            className="w-full h-28 object-cover cursor-zoom-in"
+                            loading="lazy"
+                            // Tap sulla foto → ingrandimento a schermo intero (niente più download)
+                            onClick={() => setLightbox(mediaUrl(m))}
+                          />
                         : <video
                             src={mediaUrl(m)}
                             className="w-full h-28 object-cover bg-black"
@@ -187,9 +195,6 @@ export default function EventDetailPage() {
                         >
                           <Share2 className="w-4 h-4" />
                         </button>
-                        <a href={mediaUrl(m)} download className="p-1.5 bg-white/90 rounded-full shadow hover:bg-white transition-colors" title="Scarica">
-                          <Download className="w-4 h-4" />
-                        </a>
                       </div>
                     </div>
                   ))}
@@ -315,7 +320,23 @@ export default function EventDetailPage() {
             />
             <Button variant="link" asChild><Link href="/dashboard">{c('back')}</Link></Button>
           </div>
-        </main>
+          {lightbox && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-2"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            className="absolute top-4 right-4 bg-white/10 text-white rounded-full p-2"
+            aria-label="Chiudi"
+            onClick={() => setLightbox(null)}
+          >
+            <X className="w-5 h-5" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightbox} alt="" className="max-w-full max-h-full object-contain" />
+        </div>
+      )}
+    </main>
       </div>}
     </>
   );
