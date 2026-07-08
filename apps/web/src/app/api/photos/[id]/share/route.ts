@@ -50,25 +50,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   const isVideo = media.type === 'video';
-  const cacheExt = isVideo ? 'mp4' : 'jpg';
   const contentType = isVideo ? 'video/mp4' : 'image/jpeg';
-  const cacheNamespace = isGuestbookVideo ? 'guestbook' : 'photos';
-  const cachePath = `overlays/${eventId}/${cacheNamespace}/${id}_${format}.${cacheExt}`;
-
-  const { data: cached } = await supabase.storage.from('media').getPublicUrl(cachePath);
-  if (cached?.publicUrl) {
-    const headResp = await fetch(cached.publicUrl, { method: 'HEAD' });
-    if (headResp.ok) {
-      const cachedResp = await fetch(cached.publicUrl);
-      const cachedBlob = await cachedResp.blob();
-      return new NextResponse(cachedBlob, {
-        headers: {
-          'Content-Type': contentType,
-          'Cache-Control': 'public, max-age=31536000, immutable',
-        },
-      });
-    }
-  }
 
   // File caricati dopo la migrazione a R2 hanno `r2_key` valorizzato — serve un presigned URL,
   // il vecchio path via Supabase Storage pubblico non funziona più per quelli.
@@ -124,14 +106,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     result = await applyOverlay(srcBuffer, { format: format as 'square' | 'story', branding: brandingConfig });
   }
 
-  try {
-    await supabase.storage.from('media').upload(cachePath, result, {
-      contentType,
-      upsert: true,
-    });
-  } catch {
-    // Cache failure is non-fatal
-  }
+  // Nota: cache rimossa (era su Supabase Storage, ora migrato a R2). L'overlay viene
+  // rigenerato ad ogni richiesta — sharp è veloce (~50ms per foto). Per video è più lento
+  // (ffmpeg) ma l'uso tipico è foto. Caching futuro su R2 con namespace dedicato se serve.
 
   return new NextResponse(new Blob([result.buffer as ArrayBuffer], { type: contentType }), {
     headers: {

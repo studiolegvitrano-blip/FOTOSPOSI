@@ -44,23 +44,23 @@ export async function GET(
       return NextResponse.json({ error: 'Media non trovato' }, { status: 404 });
     }
 
-    // Verifica che l'utente appartenga all'evento
-    const { data: membership } = await svc
-      .from('core_users')
-      .select('id')
-      .eq('id', user.id)
-      .eq('event_id', media.event_id)
+    // Verifica autorizzazione: creator dell'evento O ospite registrato
+    // (non usiamo core_users.event_id perché è quasi sempre NULL — bug noto)
+    const { data: ev } = await svc
+      .from('events')
+      .select('created_by')
+      .eq('id', media.event_id)
       .maybeSingle();
 
-    // Se non è membro diretto, controlla se è creator dell'evento
-    let authorized = !!membership;
+    let authorized = ev?.created_by === user.id;
     if (!authorized) {
-      const { data: ev } = await svc
-        .from('events')
-        .select('created_by')
-        .eq('id', media.event_id)
-        .single();
-      authorized = ev?.created_by === user.id;
+      const { data: guest } = await svc
+        .from('event_guests')
+        .select('id')
+        .eq('event_id', media.event_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      authorized = !!guest;
     }
 
     if (!authorized) {

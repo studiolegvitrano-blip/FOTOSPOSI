@@ -93,6 +93,10 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
       .select('*')
       .eq('event_id', eventId)
       .in('status', ['pending', 'failed'])
+      // Massimo 5 tentativi: senza questo filtro un item irrecuperabile (es. "r2_key
+      // mancante": il file non è mai arrivato su R2) veniva riprovato all'infinito
+      // a ogni sweep, tenendo la coda dell'evento perennemente "in elaborazione".
+      .lt('retry_count', 5)
       .order('created_at', { ascending: true })
       .limit(limit),
   ]);
@@ -126,19 +130,21 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
 
       const r2Key = item.r2_key;
       if (!r2Key) {
-        await supabase.from('upload_queue').update({ status: 'failed', error: 'r2_key mancante' }).eq('id', item.id);
+        // Irrecuperabile: il client non ha mai completato l'upload su R2. retry_count
+        // alto = escluso subito dai prossimi sweep invece di consumare i 5 tentativi.
+        await supabase.from('upload_queue').update({ status: 'failed', error: 'r2_key mancante', retry_count: 99 }).eq('id', item.id);
         continue;
       }
 
       const downloadUrl = await getPresignedDownloadUrl(r2Key, 3600);
       if (!downloadUrl) {
-        await supabase.from('upload_queue').update({ status: 'failed', error: 'Download R2 fallito' }).eq('id', item.id);
+        await supabase.from('upload_queue').update({ status: 'failed', error: 'Download R2 fallito', retry_count: (item.retry_count || 0) + 1 }).eq('id', item.id);
         continue;
       }
 
       const resp = await fetch(downloadUrl);
       if (!resp.ok) {
-        await supabase.from('upload_queue').update({ status: 'failed', error: 'File su R2 non trovato' }).eq('id', item.id);
+        await supabase.from('upload_queue').update({ status: 'failed', error: 'File su R2 non trovato', retry_count: (item.retry_count || 0) + 1 }).eq('id', item.id);
         continue;
       }
 
@@ -207,7 +213,7 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
       });
 
       if (recordError || !media) {
-        await supabase.from('upload_queue').update({ status: 'failed', error: recordError || 'Media record fallito' }).eq('id', item.id);
+        await supabase.from('upload_queue').update({ status: 'failed', error: recordError || 'Media record fallito', retry_count: (item.retry_count || 0) + 1 }).eq('id', item.id);
         continue;
       }
 
@@ -238,17 +244,4 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
           }
         } catch {
           await updateDriveSyncStatus(media.id, 'failed');
-          await supabase.from('upload_queue').update({ status: 'synced', error: 'Drive sync fallito' }).eq('id', item.id);
-        }
-      } else {
-        await supabase.from('upload_queue').update({ status: 'synced', processed_at: new Date().toISOString() }).eq('id', item.id);
-      }
-      processed++;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Errore';
-      await supabase.from('upload_queue').update({ status: 'failed', error: msg, retry_count: (item.retry_count || 0) + 1 }).eq('id', item.id);
-    }
-  }
-
-  return { processed, remaining: items.length - processed };
-}
+          await supa

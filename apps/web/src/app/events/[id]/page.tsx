@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { getEventById, getSubEvents, getEventWindow, updateEventWatermark } from '@fotosposi/events';
-import { getMediaByEvent } from '@fotosposi/media';
-import { getCurrentUser, hasFeature, type Tier } from '@fotosposi/core';
+import { updateEventWatermark } from '@fotosposi/events';
+import { hasFeature, type Tier } from '@fotosposi/core';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
@@ -28,6 +27,7 @@ export default function EventDetailPage() {
   const [event, setEvent] = useState<WeddingEvent | null>(null);
   const [subEvents, setSubEvents] = useState<SubEvent[]>([]);
   const [media, setMedia] = useState<MediaUpload[]>([]);
+  const [videos, setVideos] = useState<MediaUpload[]>([]);
   const [evtWindow, setEvtWindow] = useState<EventWindow | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCountdown, setShowCountdown] = useState(true);
@@ -42,21 +42,23 @@ export default function EventDetailPage() {
   useEffect(() => {
     if (!eventId) return;
     Promise.all([
-      getEventById(eventId),
-      getSubEvents(eventId),
-      getEventWindow(eventId),
-      getMediaByEvent(eventId),
-      getCurrentUser(),
-    ]).then(([e, s, w, m, u]) => {
-      if (e.event) {
-        setEvent(e.event);
-        setWmNames(e.event.watermark_names !== false);
-        setWmText(e.event.watermark_text || '');
-        if (u.user && e.event.created_by === u.user.id) setIsCreator(true);
+      fetch(`/api/events/${eventId}/details`)
+        .then((r) => (r.ok ? r.json() : { event: null }))
+        .catch(() => ({ event: null })),
+      fetch(`/api/events/${eventId}/media`)
+        .then((r) => (r.ok ? r.json() : { media: [], videoMessages: [] }))
+        .catch(() => ({ media: [], videoMessages: [] })),
+    ]).then(([d, m]) => {
+      if (d.event) {
+        setEvent(d.event);
+        setWmNames(d.event.watermark_names !== false);
+        setWmText(d.event.watermark_text || '');
+        setIsCreator(d.isCreator ?? false);
       }
-      if (s.subEvents) setSubEvents(s.subEvents);
-      if (w.window) setEvtWindow(w.window);
+      if (d.subEvents) setSubEvents(d.subEvents);
+      if (d.window) setEvtWindow(d.window);
       if (m.media) setMedia(m.media);
+      if (m.videoMessages) setVideos(m.videoMessages);
       setLoading(false);
     });
   }, [eventId]);
@@ -164,7 +166,7 @@ export default function EventDetailPage() {
                     <div key={m.id} className="relative group rounded-md overflow-hidden border border-border">
                       {m.type === 'photo'
                         ? <img src={mediaUrl(m)} alt="" className="w-full h-28 object-cover" loading="lazy" />
-                        : <video src={mediaUrl(m)} className="w-full h-28 object-cover" />}
+                        : <video src={mediaUrl(m)} className="w-full h-28 object-cover bg-black" controls preload="metadata" />}
                       {/* Sempre visibili (non solo on-hover): su mobile/touch non esiste hover,
                           quindi i pulsanti per-foto restavano invisibili e inutilizzabili. */}
                       <div className="absolute bottom-1 right-1 flex items-center gap-1.5">
@@ -185,6 +187,39 @@ export default function EventDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {videos.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>Video Guestbook ({videos.length})</CardTitle></CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {videos.map((v) => {
+                    const videoId = String(v.id);
+                    const r2Key = v.r2_key as string;
+                    const src = r2Key ? `/api/media/${videoId}/download` : (v as unknown as { url: string }).url ?? '';
+                    const author = (v as unknown as { from_name?: string }).from_name;
+                    return (
+                      <div key={videoId} className="relative rounded-md overflow-hidden border border-border">
+                        <video
+                          src={src}
+                          className="w-full h-28 object-cover bg-black"
+                          controls
+                          preload="none"
+                          // poster placeholder — evita richiesta HTTP se non serve
+                          poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150'%3E%3Crect fill='%23111' width='200' height='150'/%3E%3Ccircle cx='100' cy='75' r='18' fill='%23444'/%3E%3Cpolygon points='95,65 95,85 110,75' fill='%23888'/%3E%3C/svg%3E"
+                        />
+                        {author && (
+                          <p className="absolute top-1 left-1 right-1 text-xs text-white bg-black/60 px-2 py-0.5 rounded truncate">
+                            {author}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader><CardTitle>{t('subtitle')}</CardTitle></CardHeader>

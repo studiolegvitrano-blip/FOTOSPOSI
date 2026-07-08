@@ -57,13 +57,15 @@ export default function UploadPage() {
       setQueue(d.items ?? []);
       const s = d.stats;
       setStats(s);
-      if ((d.items ?? []).some((i: QueueItem) => i.status === 'pending' || i.status === 'failed')) {
+      // Solo pending/processing tengono la pagina in "processing": prima bastava un
+      // item `failed` (che il server non riuscirà mai a recuperare, es. "r2_key
+      // mancante") per bloccare PER SEMPRE la fase e quindi disabilitare gli input
+      // file — il tap su "Galleria"/"Fotocamera" non apriva più nulla.
+      if ((d.items ?? []).some((i: QueueItem) => i.status === 'pending' || i.status === 'processing')) {
         setPhase('processing');
         return true;
       }
-      if (s.synced + s.failed > 0 && s.pending + s.processing === 0) {
-        setPhase('idle');
-      }
+      setPhase('idle');
     }
     return false;
   }, [eventId, queueApi]);
@@ -302,7 +304,7 @@ export default function UploadPage() {
         multiple
         accept={tier === 'free' ? 'image/*' : 'image/*,video/*'}
         onChange={handleSelectFiles}
-        disabled={phase === 'queueing' || phase === 'processing'}
+        disabled={phase === 'queueing'}
         className="hidden"
       />
       <input
@@ -311,7 +313,7 @@ export default function UploadPage() {
         accept="image/*"
         capture="environment"
         onChange={handleSelectFiles}
-        disabled={phase === 'queueing' || phase === 'processing'}
+        disabled={phase === 'queueing'}
         className="hidden"
       />
 
@@ -368,14 +370,4 @@ export default function UploadPage() {
         <Card className="border-success/30 bg-success/5">
           <CardContent className="py-3 text-sm text-success flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5" />
-            Tutti i file elaborati! {stats.synced} completati{stats.failed > 0 ? `, ${stats.failed} con errori.` : '.'}
-          </CardContent>
-        </Card>
-      )}
-
-      <Button variant="link" asChild>
-        <a href={`/events/${eventId}`}>Torna all'evento</a>
-      </Button>
-    </main>
-  );
-}
+            Tutti i file elaborati! {stats.synced} completati{stats.failed > 0 ? `, ${stats.failed} con err

@@ -8,7 +8,12 @@ const nextConfig: NextConfig = {
   // @fotosposi/photo-overlay workspace package) makes it go looking for
   // @img/sharp-libvips-dev/* files that don't exist in the Vercel build image.
   // Keeping it external forces Node's normal require() at runtime instead.
-  serverExternalPackages: ['sharp'],
+  // ffmpeg-static: se webpack lo inlinea, il path del binario viene calcolato dal
+  // __dirname della route bundlata (.next/server/app/api/...) e spawn fallisce con
+  // ENOENT ("spawn .../api/guestbook/messages/ffmpeg" — visto nei log Vercel).
+  // Tenendolo esterno, require() risolve il vero node_modules/ffmpeg-static a runtime
+  // (il binario arriva nella lambda grazie a outputFileTracingIncludes qui sotto).
+  serverExternalPackages: ['sharp', 'ffmpeg-static'],
   transpilePackages: [
     '@fotosposi/core',
     '@fotosposi/events',
@@ -25,13 +30,4 @@ const nextConfig: NextConfig = {
   // child_process.spawn, which the tracer can't follow like a normal `require`).
   outputFileTracingIncludes: {
     'src/app/api/photos/[id]/share/route.ts': ['../../node_modules/ffmpeg-static/**'],
-    // Il watermark video ora viene bruciato anche durante il processing della coda
-    // (upload ospiti), nello sweep del cron e sui video guestbook: tutte queste
-    // route spawnano ffmpeg.
-    'src/app/api/r2/process-queue/route.ts': ['../../node_modules/ffmpeg-static/**'],
-    'src/app/api/cron/maintenance/route.ts': ['../../node_modules/ffmpeg-static/**'],
-    'src/app/api/guestbook/messages/route.ts': ['../../node_modules/ffmpeg-static/**'],
-  },
-};
-
-export default withNextIntl(nextConfig);
+    // Il watermark video ora viene bruciato anche durante il proces

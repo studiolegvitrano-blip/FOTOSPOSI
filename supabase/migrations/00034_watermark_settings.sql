@@ -7,3 +7,10 @@
 -- Il logo Sposi.live resta sempre impresso a prescindere da questa scelta.
 ALTER TABLE events ADD COLUMN IF NOT EXISTS watermark_names BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS watermark_text TEXT;
+
+-- Finora NON esisteva alcuna policy UPDATE su events: il creatore non poteva modificare
+-- il proprio evento dal browser (ogni update falliva silenziosamente sotto RLS).
+DROP POLICY IF EXISTS "Creators can update own event" ON events;
+CREATE POLICY "Creators can update own event" ON events
+  FOR UPDATE USING (created_by = auth.uid())
+  WITH CHECK (created_by = auth.uid());
