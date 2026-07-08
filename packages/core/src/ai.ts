@@ -72,6 +72,7 @@ export async function generateChat(
         if (result.content) return result;
         errors.push(`Gemini: ${result.error}`);
       } else {
+        if (!p.url) continue; // provider senza endpoint OpenAI-compatible (es. gemini)
         const result = await callOpenAICompatible(p.url, key, p.model, groqMessages, maxTokens, 0.7);
         if (result.content) return result;
         errors.push(`${p.name}: ${result.error}`);
