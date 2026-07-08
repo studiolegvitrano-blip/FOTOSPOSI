@@ -29,13 +29,16 @@ const nextConfig: NextConfig = {
   // Make sure Vercel's function tracer bundles the ffmpeg-static binary (it's invoked via
   // child_process.spawn, which the tracer can't follow like a normal `require`).
   outputFileTracingIncludes: {
-    'src/app/api/photos/[id]/share/route.ts': ['../../node_modules/ffmpeg-static/**'],
+    // Oltre a ffmpeg, ogni route che imprime watermark ha bisogno dei font in
+    // assets/fonts: le lambda Vercel non hanno font di sistema e senza questi
+    // il testo del watermark viene rasterizzato come quadrati (tofu).
+    'src/app/api/photos/[id]/share/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**'],
     // Il watermark video ora viene bruciato anche durante il processing della coda
     // (upload ospiti), nello sweep del cron e sui video guestbook: tutte queste
     // route spawnano ffmpeg.
-    'src/app/api/r2/process-queue/route.ts': ['../../node_modules/ffmpeg-static/**'],
-    'src/app/api/cron/maintenance/route.ts': ['../../node_modules/ffmpeg-static/**'],
-    'src/app/api/guestbook/messages/route.ts': ['../../node_modules/ffmpeg-static/**'],
+    'src/app/api/r2/process-queue/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**'],
+    'src/app/api/cron/maintenance/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**'],
+    'src/app/api/guestbook/messages/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**'],
   },
 };
 

@@ -3,6 +3,10 @@ import { createMediaRecord, getDriveToken, getEventDriveFolders, updateDriveSync
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
 import { applyVideoOverlay } from '@fotosposi/video-overlay';
 import sharp from 'sharp';
+import { ensureWatermarkFonts } from '@/lib/watermark-fonts';
+
+// I glifi dei watermark richiedono font presenti nella lambda (vedi watermark-fonts.ts).
+ensureWatermarkFonts();
 
 function getBrandLabel(brand?: string): string {
   return brand === 'weddingmoments' ? 'JustMarry.live' : 'Sposi.live';

@@ -3,6 +3,9 @@ import { createVideoMessage, getVideoMessages } from '@fotosposi/media';
 import { createServiceClient } from '@fotosposi/core';
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
 import { applyVideoOverlay } from '@fotosposi/video-overlay';
+import { ensureWatermarkFonts } from '@/lib/watermark-fonts';
+
+ensureWatermarkFonts();
 
 // Il watermark video ri-codifica il clip con ffmpeg: serve il runtime Node e tempo
 // oltre il default. I clip guestbook durano max ~30s, ampiamente nei limiti.

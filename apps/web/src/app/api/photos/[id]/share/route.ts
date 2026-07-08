@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@fotosposi/core';
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
+import { ensureWatermarkFonts } from '@/lib/watermark-fonts';
+
+ensureWatermarkFonts();
 
 // Video watermarking shells out to ffmpeg and can take longer than the default 10s —
 // needs the Node.js runtime (not Edge) and a higher time budget.

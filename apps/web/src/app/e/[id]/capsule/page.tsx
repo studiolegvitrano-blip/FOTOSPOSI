@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { getEventByCode } from '@fotosposi/events';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { VideoRecorder } from '@/components/video-recorder';
 
 type SenderType = 'sposo' | 'sposa' | 'invitato';
 type RecipientType = 'sposi' | 'sposo' | 'sposa' | 'singolo' | 'gruppo';
@@ -140,8 +141,24 @@ export default function CapsulePage() {
               <textarea className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" value={content} onChange={e => setContent(e.target.value)} placeholder="Scrivi il tuo messaggio..." rows={4} />
             )}
 
-            {(messageType === 'photo' || messageType === 'video') && (
-              <input type="file" accept={messageType === 'photo' ? 'image/*' : 'video/*'} onChange={e => setFile(e.target.files?.[0] || null)} />
+            {messageType === 'photo' && (
+              <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
+            )}
+
+            {messageType === 'video' && (
+              <div className="space-y-2">
+                {/* Registrazione dal vivo (stesso recorder del guestbook): prima era
+                    possibile solo caricare un file già pronto, senza modo di registrare. */}
+                <VideoRecorder
+                  maxDuration={60}
+                  onRecordingComplete={(blob) => setFile(new File([blob], `capsula_${Date.now()}.webm`, { type: 'video/webm' }))}
+                />
+                {file && (
+                  <p className="text-xs text-success">Video pronto ({(file.size / (1024 * 1024)).toFixed(1)} MB) — verrà salvato con il messaggio.</p>
+                )}
+                <p className="text-xs text-text-muted">Oppure carica un video dal telefono:</p>
+                <input type="file" accept="video/*" onChange={e => setFile(e.target.files?.[0] || null)} />
+              </div>
             )}
 
             <p className="text-xs text-text-muted">Questo messaggio verrà custodito al sicuro e consegnato tra un anno.</p>
