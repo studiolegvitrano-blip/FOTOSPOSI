@@ -68,38 +68,46 @@ export default function GuestbookPage() {
     setLoadingText(false);
   };
 
-  const uploadToR2 = async (blob: Blob): Promise<string | null> => {
+  // Ritorna { key } oppure { error } con il motivo REALE: prima ogni fallimento
+  // diventava un generico "Upload fallito" e dai test sul telefono era impossibile
+  // capire quale dei tre passaggi (presign / PUT su R2 / rete) si fosse rotto.
+  const uploadToR2 = async (blob: Blob): Promise<{ key?: string; error?: string }> => {
+    const mb = (blob.size / (1024 * 1024)).toFixed(1);
     try {
       const r2Resp = await fetch('/api/r2/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: `guestbook_${Date.now()}.webm`, contentType: 'video/webm', prefix: `events/${id}/guestbook` }),
+        body: JSON.stringify({ filename: `guestbook_${Date.now()}.webm`, contentType: 'video/webm', prefix: `events/${id}/guestbook`, fileSize: blob.size }),
       });
       const r2Data = await r2Resp.json();
-      if (!r2Resp.ok || !r2Data.presignedUrl) return null;
-      const uploadResp = await fetch(r2Data.presignedUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': 'video/webm' } });
-      if (!uploadResp.ok) return null;
-      return r2Data.key;
-    } catch { return null; }
+      if (!r2Resp.ok || !r2Data.presignedUrl) return { error: `presign fallita (${r2Resp.status}): ${r2Data.error || 'senza dettagli'}` };
+      try {
+        const uploadResp = await fetch(r2Data.presignedUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': 'video/webm' } });
+        if (!uploadResp.ok) return { error: `PUT R2 rifiutata (HTTP ${uploadResp.status}, video ${mb}MB)` };
+      } catch (e: any) {
+        return { error: `PUT R2 interrotta (${e?.message || 'errore di rete'}, video ${mb}MB)` };
+      }
+      return { key: r2Data.key };
+    } catch (e: any) { return { error: `presign non raggiungibile: ${e?.message || 'errore di rete'}` }; }
   };
 
   const saveVideo = async (blob: Blob) => {
     if (!user) return;
     setUploading(true);
     try {
-      const r2Key = await uploadToR2(blob);
-      if (r2Key) {
+      const up = await uploadToR2(blob);
+      if (up.key) {
         const { error } = await saveMessage({
           event_id: id,
           from_user: user.id,
           from_name: name || 'Anonimo',
           type: 'guestbook',
-          url: r2Key,
-          r2_key: r2Key,
+          url: up.key,
+          r2_key: up.key,
           is_public: isPublic,
         });
         if (error) { alert('Errore salvataggio: ' + error); return; }
-      } else { alert('Upload fallito'); return; }
+      } else { alert('Upload fallito: ' + (up.error || 'motivo sconosciuto')); return; }
       await loadMessages();
       setTab('view');
     } catch (e: any) { alert('Errore: ' + e.message); }
@@ -116,18 +124,20 @@ export default function GuestbookPage() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       if (!file) continue;
-      const r2Key = await uploadToR2(file);
-      if (r2Key) {
+      const up = await uploadToR2(file);
+      if (up.key) {
         const { error } = await saveMessage({
           event_id: id,
           from_user: user.id,
           from_name: name || 'Anonimo',
           type: 'guestbook',
-          url: r2Key,
-          r2_key: r2Key,
+          url: up.key,
+          r2_key: up.key,
           is_public: isPublic,
         });
         if (!error) ok++;
+      } else {
+        alert(`"${file.name}" non caricato: ${up.error || 'motivo sconosciuto'}`);
       }
     }
     await loadMessages();
@@ -210,25 +220,4 @@ export default function GuestbookPage() {
                             non un semplice link — stesso comportamento della galleria evento. */}
                         <button
                           onClick={() => shareWatermarkedMedia(m.media_id || m.id, id, true, typeof window !== 'undefined' && window.location.hostname.includes('justmarry') ? 'JustMarry.live' : 'Sposi.live')}
-                          className="p-1.5 bg-white rounded-full border border-border shadow-sm hover:bg-muted transition-colors"
-                          title="Condividi video"
-                        >
-                          <Share2 className="w-4 h-4" />
-                        </button>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          {m.is_public ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-                          {m.is_public ? 'Pubblico' : 'Privato'}
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-xs text-text-muted">{new Date(m.created_at).toLocaleDateString('it-IT')}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </main>
-  );
-}
+                          className="p-1.5 bg-white rou
