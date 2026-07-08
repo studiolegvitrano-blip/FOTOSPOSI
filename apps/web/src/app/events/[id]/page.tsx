@@ -166,7 +166,17 @@ export default function EventDetailPage() {
                     <div key={m.id} className="relative group rounded-md overflow-hidden border border-border">
                       {m.type === 'photo'
                         ? <img src={mediaUrl(m)} alt="" className="w-full h-28 object-cover" loading="lazy" />
-                        : <video src={mediaUrl(m)} className="w-full h-28 object-cover bg-black" controls preload="metadata" />}
+                        : <video
+                            src={mediaUrl(m)}
+                            className="w-full h-28 object-cover bg-black"
+                            controls
+                            preload="metadata"
+                            onPlay={(e) => {
+                              const el = e.currentTarget as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+                              if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+                              else if (el.webkitEnterFullscreen) el.webkitEnterFullscreen(); // iOS Safari
+                            }}
+                          />}
                       {/* Sempre visibili (non solo on-hover): su mobile/touch non esiste hover,
                           quindi i pulsanti per-foto restavano invisibili e inutilizzabili. */}
                       <div className="absolute bottom-1 right-1 flex items-center gap-1.5">
@@ -204,6 +214,14 @@ export default function EventDetailPage() {
                           src={src}
                           className="w-full h-28 object-cover bg-black"
                           controls
+                          // Al play il video va a schermo intero da solo: nelle card piccole
+                          // della pagina evento il tasto fullscreen nativo spesso non c'è
+                          // (soprattutto su telefono) e guardare in miniatura non ha senso.
+                          onPlay={(e) => {
+                            const el = e.currentTarget as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+                            if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+                            else if (el.webkitEnterFullscreen) el.webkitEnterFullscreen(); // iOS Safari
+                          }}
                           preload="none"
                           // poster placeholder — evita richiesta HTTP se non serve
                           poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150'%3E%3Crect fill='%23111' width='200' height='150'/%3E%3Ccircle cx='100' cy='75' r='18' fill='%23444'/%3E%3Cpolygon points='95,65 95,85 110,75' fill='%23888'/%3E%3C/svg%3E"
