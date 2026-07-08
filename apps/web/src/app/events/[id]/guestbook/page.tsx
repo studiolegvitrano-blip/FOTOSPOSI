@@ -220,4 +220,25 @@ export default function GuestbookPage() {
                             non un semplice link — stesso comportamento della galleria evento. */}
                         <button
                           onClick={() => shareWatermarkedMedia(m.media_id || m.id, id, true, typeof window !== 'undefined' && window.location.hostname.includes('justmarry') ? 'JustMarry.live' : 'Sposi.live')}
-                          className="p-1.5 bg-white rou
+                          className="p-1.5 bg-white rounded-full border border-border shadow-sm hover:bg-muted transition-colors"
+                          title="Condividi video"
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          {m.is_public ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                          {m.is_public ? 'Pubblico' : 'Privato'}
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-text-muted">{new Date(m.created_at).toLocaleDateString('it-IT')}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </main>
+  );
+}

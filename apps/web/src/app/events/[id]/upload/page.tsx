@@ -370,4 +370,14 @@ export default function UploadPage() {
         <Card className="border-success/30 bg-success/5">
           <CardContent className="py-3 text-sm text-success flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5" />
-            Tutti i file elaborati! {stats.synced} completati{stats.failed > 0 ? `, ${stats.failed} con err
+            Tutti i file elaborati! {stats.synced} completati{stats.failed > 0 ? `, ${stats.failed} con errori.` : '.'}
+          </CardContent>
+        </Card>
+      )}
+
+      <Button variant="link" asChild>
+        <a href={`/events/${eventId}`}>Torna all'evento</a>
+      </Button>
+    </main>
+  );
+}

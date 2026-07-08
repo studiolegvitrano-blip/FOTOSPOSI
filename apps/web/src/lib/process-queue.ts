@@ -244,4 +244,17 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
           }
         } catch {
           await updateDriveSyncStatus(media.id, 'failed');
-          await supa
+          await supabase.from('upload_queue').update({ status: 'synced', error: 'Drive sync fallito' }).eq('id', item.id);
+        }
+      } else {
+        await supabase.from('upload_queue').update({ status: 'synced', processed_at: new Date().toISOString() }).eq('id', item.id);
+      }
+      processed++;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Errore';
+      await supabase.from('upload_queue').update({ status: 'failed', error: msg, retry_count: (item.retry_count || 0) + 1 }).eq('id', item.id);
+    }
+  }
+
+  return { processed, remaining: items.length - processed };
+}
