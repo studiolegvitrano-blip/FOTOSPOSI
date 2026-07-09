@@ -3,7 +3,7 @@ import { createMediaRecord, getDriveToken, getEventDriveFolders, updateDriveSync
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
 import { applyVideoOverlay } from '@fotosposi/video-overlay';
 import sharp from 'sharp';
-import { ensureWatermarkFonts } from '@/lib/watermark-fonts';
+import { ensureWatermarkFonts, watermarkFontFamily, loadBrandLogo } from '@/lib/watermark-fonts';
 
 // I glifi dei watermark richiedono font presenti nella lambda (vedi watermark-fonts.ts).
 ensureWatermarkFonts();
@@ -27,6 +27,8 @@ async function applyWatermark(
   line1: string,
   line2: string,
   brand?: string,
+  fontFamily = 'Playfair Display',
+  logoPng?: Buffer | null,
 ): Promise<Buffer> {
   try {
     const meta = await sharp(buffer).metadata();
@@ -55,18 +57,29 @@ async function applyWatermark(
       </defs>
       ${hasBand ? `<rect x="0" y="${h - barHeight}" width="${w}" height="${barHeight}" fill="url(#barGrad)" />
       <text x="${w / 2}" y="${nameY}" text-anchor="middle"
-        font-family="Georgia, serif" font-weight="bold" font-size="${fontSizeName}"
+        font-family="${fontFamily}" font-weight="bold" font-size="${fontSizeName}"
         fill="rgba(255,255,255,0.95)">${escapeXml(line1)}</text>` : ''}
       ${hasBand && line2 ? `<text x="${w / 2}" y="${dateY}" text-anchor="middle"
-        font-family="Georgia, serif" font-size="${fontSizeDate}"
+        font-family="${fontFamily}" font-size="${fontSizeDate}"
         fill="rgba(255,255,255,0.85)">${escapeXml(line2)}</text>` : ''}
-      <text x="${w - 16}" y="${h - 16}" text-anchor="end"
+      ${logoPng ? '' : `<text x="${w - 16}" y="${h - 16}" text-anchor="end"
         font-family="Georgia, serif" font-size="${fontSizeLogo}"
-        fill="rgba(255,255,255,0.50)">${getBrandLabel(brand)}</text>
+        fill="rgba(255,255,255,0.50)">${getBrandLabel(brand)}</text>`}
     </svg>`;
 
+    const layers: import('sharp').OverlayOptions[] = [{ input: Buffer.from(svgOverlay), top: 0, left: 0 }];
+    if (logoPng) {
+      // Logo brand in basso a destra al posto del wordmark testuale.
+      try {
+        const logoH = Math.max(40, Math.round(fontSizeLogo * 2));
+        const logo = await sharp(logoPng).resize({ height: logoH }).png().toBuffer();
+        const logoMeta = await sharp(logo).metadata();
+        layers.push({ input: logo, top: h - logoH - 14, left: w - (logoMeta.width || logoH) - 14 });
+      } catch { /* logo illeggibile: watermark senza logo */ }
+    }
+
     return await sharp(buffer)
-      .composite([{ input: Buffer.from(svgOverlay), top: 0, left: 0 }])
+      .composite(layers)
       .jpeg({ quality: 90 })
       .toBuffer();
   } catch {
@@ -91,7 +104,7 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
   const supabase = createServiceClient();
 
   const [{ data: event }, { data: items }] = await Promise.all([
-    supabase.from('events').select('couple_name, date, brand, watermark_names, watermark_text').eq('id', eventId).single(),
+    supabase.from('events').select('couple_name, date, brand, watermark_names, watermark_text, watermark_font').eq('id', eventId).single(),
     supabase
       .from('upload_queue')
       .select('*')
@@ -118,6 +131,8 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
   const customText = (event?.watermark_text || '').trim();
   const wmLine1 = !namesEnabled ? '' : (customText || coupleName);
   const wmLine2 = !namesEnabled || customText ? '' : eventDate;
+  const wmFont = watermarkFontFamily(event?.watermark_font);
+  const brandLogo = loadBrandLogo(event?.brand);
 
   const [{ token }] = await Promise.all([getDriveToken(eventId)]);
   const hasDrive = !!token?.access_token;
@@ -163,7 +178,7 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
       // nomi+data o testo personalizzato solo se gli sposi non li hanno disattivati
       // (events.watermark_names / watermark_text).
       if (!isVideo) {
-        buffer = await applyWatermark(buffer as Buffer, wmLine1, wmLine2, event?.brand);
+        buffer = await applyWatermark(buffer as Buffer, wmLine1, wmLine2, event?.brand, wmFont, brandLogo);
       } else {
         try {
           const branded = await applyVideoOverlay(buffer as Buffer, {
@@ -172,6 +187,8 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
               date: wmLine2,
               primaryColor: '#1a1a2e',
               wordmark: getBrandLabel(event?.brand),
+              fontFamily: wmFont,
+              logoPng: brandLogo ?? undefined,
             },
             // La route ha maxDuration 300s (Fluid Compute): 240s di clip lasciano
             // margine per download/ri-codifica/upload. Oltre, il video passa

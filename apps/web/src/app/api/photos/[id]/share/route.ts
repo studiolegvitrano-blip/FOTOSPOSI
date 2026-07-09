@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@fotosposi/core';
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
-import { ensureWatermarkFonts } from '@/lib/watermark-fonts';
+import { ensureWatermarkFonts, watermarkFontFamily, loadBrandLogo } from '@/lib/watermark-fonts';
 
 ensureWatermarkFonts();
 
@@ -75,7 +75,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const { data: event } = await supabase
     .from('events')
-    .select('couple_name, date, brand')
+    .select('couple_name, date, brand, watermark_font')
     .eq('id', eventId)
     .single();
 
@@ -90,14 +90,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     .maybeSingle();
 
   const primaryColor = branding?.primary_color || '#d4a574';
-  const fontFamily = branding?.font_family || 'Georgia, serif';
-  const wordmark = event.brand === 'fotosposi' ? 'fotosposi.it' : 'weddingmoments.app';
+  const fontFamily = branding?.font_family || watermarkFontFamily((event as { watermark_font?: string }).watermark_font);
+  const wordmark = event.brand === 'weddingmoments' ? 'JustMarry.live' : 'Sposi.live';
   const brandingConfig = {
     coupleNames: event.couple_name,
     date: new Date(event.date).toLocaleDateString('it-IT'),
     primaryColor,
     wordmark,
     fontFamily,
+    logoPng: loadBrandLogo(event.brand) ?? undefined,
   };
 
   let result: Buffer;

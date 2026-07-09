@@ -3,7 +3,7 @@ import { createVideoMessage, getVideoMessages } from '@fotosposi/media';
 import { createServiceClient } from '@fotosposi/core';
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
 import { applyVideoOverlay } from '@fotosposi/video-overlay';
-import { ensureWatermarkFonts } from '@/lib/watermark-fonts';
+import { ensureWatermarkFonts, watermarkFontFamily, loadBrandLogo } from '@/lib/watermark-fonts';
 
 ensureWatermarkFonts();
 
@@ -40,7 +40,7 @@ async function watermarkGuestbookVideo(eventId: string, r2Key: string): Promise<
   const supabase = createServiceClient();
   const { data: event } = await supabase
     .from('events')
-    .select('couple_name, date, brand, watermark_names, watermark_text')
+    .select('couple_name, date, brand, watermark_names, watermark_text, watermark_font')
     .eq('id', eventId)
     .single();
 
@@ -62,6 +62,8 @@ async function watermarkGuestbookVideo(eventId: string, r2Key: string): Promise<
       date: line2,
       primaryColor: '#1a1a2e',
       wordmark,
+      fontFamily: watermarkFontFamily(event?.watermark_font),
+      logoPng: loadBrandLogo(event?.brand) ?? undefined,
     },
     maxDurationSeconds: 240,
   });

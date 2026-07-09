@@ -156,15 +156,17 @@ export async function getEventByCode(code: string): Promise<{ event?: WeddingEve
  */
 export async function updateEventWatermark(
   eventId: string,
-  settings: { watermark_names: boolean; watermark_text?: string | null },
+  settings: { watermark_names: boolean; watermark_text?: string | null; watermark_font?: string | null },
 ): Promise<{ error?: string }> {
   const supabase = createClient();
+  const update: Record<string, unknown> = {
+    watermark_names: settings.watermark_names,
+    watermark_text: settings.watermark_names ? (settings.watermark_text?.trim() || null) : null,
+  };
+  if (settings.watermark_font) update.watermark_font = settings.watermark_font;
   const { error } = await supabase
     .from('events')
-    .update({
-      watermark_names: settings.watermark_names,
-      watermark_text: settings.watermark_names ? (settings.watermark_text?.trim() || null) : null,
-    })
+    .update(update)
     .eq('id', eventId);
   return { error: error?.message };
 }

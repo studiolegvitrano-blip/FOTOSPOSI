@@ -35,13 +35,13 @@ const nextConfig: NextConfig = {
     // sharp qui viene caricato via import() dinamico dentro photo-overlay/video-overlay:
     // il tracer non lo segue e la lambda restava senza binario ("Could not load the
     // sharp module using the linux-x64 runtime" nei log) → share sempre in 500.
-    'src/app/api/photos/[id]/share/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**', '../../node_modules/sharp/**', '../../node_modules/@img/**'],
+    'src/app/api/photos/[id]/share/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**', 'public/logo-*.png', '../../node_modules/sharp/**', '../../node_modules/@img/**'],
     // Il watermark video ora viene bruciato anche durante il processing della coda
     // (upload ospiti), nello sweep del cron e sui video guestbook: tutte queste
     // route spawnano ffmpeg.
-    'src/app/api/r2/process-queue/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**'],
-    'src/app/api/cron/maintenance/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**'],
-    'src/app/api/guestbook/messages/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**'],
+    'src/app/api/r2/process-queue/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**', 'public/logo-*.png'],
+    'src/app/api/cron/maintenance/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**', 'public/logo-*.png'],
+    'src/app/api/guestbook/messages/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**', 'public/logo-*.png'],
   },
 };
 

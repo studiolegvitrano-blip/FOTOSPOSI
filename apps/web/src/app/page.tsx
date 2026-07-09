@@ -63,7 +63,9 @@ export default async function Home() {
           <Link href="/" className="flex items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {/* Logo ingrandito oltre il doppio (48→104px, 56→120px) */}
-            <img src={logoLight} alt={c('brand_name')} className="h-26 sm:h-30 w-auto" />
+            {/* shrink-0 + altezza ridotta su mobile: dentro il flex justify-between il logo
+                veniva compresso in larghezza (schiacciato ai lati) sugli schermi stretti */}
+            <img src={logoLight} alt={c('brand_name')} className="h-14 sm:h-30 w-auto shrink-0 object-contain" />
           </Link>
           <div className="flex items-center gap-5">
             <LanguageSwitcher />

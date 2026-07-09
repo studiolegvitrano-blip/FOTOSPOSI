@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
@@ -29,5 +29,32 @@ export function ensureWatermarkFonts(): void {
     process.env.FOTOSPOSI_FONTS_READY = '1';
   } catch {
     // Se /tmp non è scrivibile meglio watermark coi quadrati che far fallire l'upload.
+  }
+}
+
+/**
+ * Mappa la scelta degli sposi (events.watermark_font) sulla famiglia reale dei font
+ * inclusi in assets/fonts. Default: 'classico'.
+ */
+export function watermarkFontFamily(font?: string | null): string {
+  switch (font) {
+    case 'elegante': return 'Dancing Script';
+    case 'moderno': return 'Noto Sans';
+    case 'classico':
+    default: return 'Playfair Display';
+  }
+}
+
+/**
+ * Carica il logo PNG del brand (public/logo-*-trans.png) da comporre nel watermark.
+ * Ritorna null se il file non è nella lambda (le route devono includerlo via
+ * outputFileTracingIncludes) — in quel caso resta il wordmark testuale.
+ */
+export function loadBrandLogo(brand?: string | null): Buffer | null {
+  try {
+    const file = brand === 'weddingmoments' ? 'logo-justmarry-trans.png' : 'logo-sposi-trans.png';
+    return readFileSync(join(process.cwd(), 'public', file));
+  } catch {
+    return null;
   }
 }

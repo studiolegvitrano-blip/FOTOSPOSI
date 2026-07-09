@@ -11,6 +11,8 @@ export interface VideoOverlayBranding {
   textColor?: string;
   wordmark: string;
   fontFamily?: string;
+  /** PNG del logo brand: se presente sostituisce il wordmark testuale nella banda. */
+  logoPng?: Buffer;
 }
 
 export interface VideoOverlayOptions {
@@ -108,6 +110,7 @@ export async function applyVideoOverlay(
     const hasNames = !!(branding.coupleNames || branding.date);
     const bandHeight = hasNames ? 140 : 48;
 
+    const hasLogo = !!branding.logoPng;
     const svg = hasNames
       ? `<svg width="${width}" height="${bandHeight}" xmlns="http://www.w3.org/2000/svg">
       <rect width="${width}" height="${bandHeight}" fill="${branding.primaryColor}" fill-opacity="0.85" />
@@ -115,18 +118,29 @@ export async function applyVideoOverlay(
             font-size="38" font-weight="bold" fill="${textColor}">${escapeXml(branding.coupleNames)}</text>
       <text x="32" y="${bandHeight / 2 + 34}" font-family="${branding.fontFamily || 'Georgia, serif'}"
             font-size="26" fill="${textColor}" fill-opacity="0.9">${escapeXml(branding.date)}</text>
-      <text x="${width - 32}" y="${bandHeight / 2 + 4}" font-family="Inter, sans-serif"
+      ${hasLogo ? '' : `<text x="${width - 32}" y="${bandHeight / 2 + 4}" font-family="Inter, sans-serif"
             font-size="20" fill="${textColor}" fill-opacity="0.6"
-            text-anchor="end">${escapeXml(branding.wordmark)}</text>
+            text-anchor="end">${escapeXml(branding.wordmark)}</text>`}
     </svg>`
       : `<svg width="${width}" height="${bandHeight}" xmlns="http://www.w3.org/2000/svg">
       <rect width="${width}" height="${bandHeight}" fill="#000000" fill-opacity="0.35" />
-      <text x="${width - 24}" y="${bandHeight / 2 + 8}" font-family="Inter, sans-serif"
+      ${hasLogo ? '' : `<text x="${width - 24}" y="${bandHeight / 2 + 8}" font-family="Inter, sans-serif"
             font-size="22" fill="${textColor}" fill-opacity="0.75"
-            text-anchor="end">${escapeXml(branding.wordmark)}</text>
+            text-anchor="end">${escapeXml(branding.wordmark)}</text>`}
     </svg>`;
 
-    const overlayPng = await sharp(Buffer.from(svg)).png().toBuffer();
+    let overlayPng = await sharp(Buffer.from(svg)).png().toBuffer();
+    if (branding.logoPng) {
+      // Logo brand al posto del wordmark testuale, a destra della banda.
+      try {
+        const logoH = Math.round(bandHeight * (hasNames ? 0.55 : 0.75));
+        const logo = await sharp(branding.logoPng).resize({ height: logoH }).png().toBuffer();
+        const logoMeta = await sharp(logo).metadata();
+        overlayPng = await sharp(overlayPng)
+          .composite([{ input: logo, top: Math.round((bandHeight - logoH) / 2), left: width - (logoMeta.width || logoH) - 24 }])
+          .png().toBuffer();
+      } catch { /* logo malformato: resta la banda senza logo */ }
+    }
     await writeFile(overlayPath, overlayPng);
 
     await run(bin, [
