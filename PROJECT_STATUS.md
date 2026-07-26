@@ -528,6 +528,41 @@
 - [x] **194 test totali (16 file)** — tutti verdi
 - [x] **GTM Engineer integrato**: package `@fotosposi/gte`, 5 API routes (`/api/gte/*`), admin page `/admin/leads`, migration 00023 (6 nuove tabelle GTE), 7 test
 
+## Sessione oggi — WATERMARK_FONTS lista reale (fontconfig) + 29 TTF → public/fonts/
+
+### Verifica situation pre-fix
+- `next.config.ts` `outputFileTracingIncludes` GIA' copriva `assets/fonts/**` per tutte le 4 route (share, process-queue, maintenance, guestbook) — il punto "Da fare" del PROJECT_STATUS chiuso retroattivamente.
+- `apps/web/assets/fonts/` contiene 29 TTF, di cui **28 family uniche** (le 2 variazioni Bold di Dancing Script e Playfair Display condividono family con le versioni Regular).
+- Bug fondo: `WATERMARK_FONTS` (lista 27 Google Fonts vecchi) -> nomi family della lista (es. "Tangerine", "Satisfy", "Mr Dafoe"...) non corrispondevano ai 29 TTF reali installati. Risultato: quando uno sposo sceglieva "Satisfy" o "Cormorant", fontconfig cadeva su fallback Noto Sans (il "tofu") perche il TTF non c'era.
+- Solo 4 font sui 27 avevano match reale: Allura, Dancing Script, Great Vibes, Pinyon Script.
+
+### Script diagnostico (temporaneo)
+- `scripts/list-ttf-families.mjs` + `fontkit --no-save` — legge la tabella `name` (nameID 1) TrueType di ogni TTF ed estrae il family name interno che fontconfig vede. Risultati:
+  - 29 TTF, 28 family uniche
+  - 28 family matched: Agetya Butterfly Demo, Agetya Butterfly Italic, Allura, Angelos-Personal use, Awesome, Babytime, Bakery  Wedding, Blackout Oldskull, Bobbers Personal Use, Brittany Signature Script, Dancing Script, Dearllane, Eagle Horizon-Personal use, Gista Danes, Great Vibes, Himalayan, Hugh is Life Personal Use, Italianno, Kingline, Lucida Calligraphy, Lucy Said Ok Personal Use, My Sunshine, Noto Sans, Ocean Delight, Ocean Trace-Personal use, Pinyon Script, Playfair Display
+
+### Fix WATERMARK_FONTS
+- `apps/web/src/lib/watermark-fonts.ts` completamente riscritto:
+  - Nuova interface `WatermarkFont` con campi: `value`, `label`, `family`, `category`, `googleImport?`, `ttfFile?`
+  - 28 voci totali (19 eleganti + 9 classici) distribuiti sui 29 TTF reali
+  - `watermarkFontFamily()` da `switch` a `.find()` piu' mantenibile (ridotto a 1 riga di logica)
+  - 6 font su Google Fonts (Playfair, Dancing, Allura, Great Vibes, Pinyon, Italianno, Noto Sans) — gli altri 22 SOLO TTF locali
+- Default invariato: `'classico'` → `Playfair Display`
+- Copiati anche tutti i 29 TTF da `assets/fonts/` a `apps/web/public/fonts/` (2.71 MB totali) per consentire l'anteprima browser della scelta font anche per i 22 non-Google
+
+### Fix settings/page.tsx
+- `apps/web/src/app/events/[id]/settings/page.tsx` aggiornato:
+  - Genera link Google Fonts CSS2 solo per i 7 font con `googleImport` (prima rompeva query string con `family=undefined` per i 22 nuovi font locali)
+  - Aggiunge `<style>` inline con 22 `@font-face` rules per i font locali (url `/fonts/<file>.ttf` con URL-encoded spazi)
+  - Sostituito `WATERMARK_FONTS[12]!` (hardcoded "Playfair") con `.find(f.value === 'classico') ?? classicoEntry ?? WATERMARK_FONTS[0]!`
+  - Commenti aggiornati 27 → 28
+
+### Test
+- Typecheck pulito: `npx tsc --noEmit -p apps/web/tsconfig.json` 0 errori
+- 225/225 test verdi
+- Dev server smoke test: homepage 200, /events/[id]/settings 200, file referenziato nei chunk
+- (work-tree ancora da pushare)
+
 ## Log cronologico
 | Data | Modulo | Commit |
 |------|--------|--------|

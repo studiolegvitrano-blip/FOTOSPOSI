@@ -15,7 +15,7 @@ import { WATERMARK_FONTS } from '@/lib/watermark-fonts';
  * testo E font, più i collegamenti alle altre aree di configurazione).
  * Gli invitati che provano ad aprirla vengono rimandati alla pagina evento.
  *
- * Novità: 27 font selezionabili (12 eleganti + 15 classici). Il menu a tendina
+ * Novità: 28 font selezionabili (19 eleganti + 9 classici). Il menu a tendina
  * mostra ogni voce scritta col proprio font reale, così gli sposi vedono
  * immediatamente l'aspetto finale. Dopo la scelta, l'anteprima in basso mostra
  * la frase scelta col font scelto.
@@ -33,16 +33,36 @@ export default function EventSettingsPage() {
   const [wmSaved, setWmSaved] = useState(false);
 
   // I font vanno caricati anche nel browser per l'anteprima della scelta.
-  // Un singolo <link> ai Google Fonts CSS2 con tutte le 27 famiglie.
+  // 1) Per i 7 font disponibili su Google Fonts: un singolo <link> CSS2.
+  // 2) Per i restanti 21 font (non su Google Fonts): @font-face inline che referenzia
+  //    i TTF locali in public/fonts/ (copiati anche in assets/fonts/ lato server).
   const googleFamilies = WATERMARK_FONTS
+    .filter((f) => f.googleImport)
     .map((f) => `family=${f.googleImport}`)
     .join('&');
-  const googleHref = `https://fonts.googleapis.com/css2?${googleFamilies}&display=swap`;
+  const googleHref = googleFamilies
+    ? `https://fonts.googleapis.com/css2?${googleFamilies}&display=swap`
+    : '';
+  // Stringa CSS @font-face per i font locali (TTF in public/fonts/). Ogni font
+  // carica il proprio TTF con display=swap, fall-back a Georgia/serif.
+  const localFontFaces = WATERMARK_FONTS
+    .filter((f) => !f.googleImport && f.ttfFile)
+    .map((f) => {
+      // Encoda gli SPAZI nel filename URL (es. "Agetya Butterfly Demo.ttf")
+      const urlSafe = f.ttfFile!.replace(/ /g, '%20');
+      return `@font-face{font-family:${f.family};src:url('/fonts/${urlSafe}') format('truetype');font-display:swap;}`;
+    })
+    .join('\n');
+  const localFontsStyle = localFontFaces
+    ? `/* 21 watermark font locali non disponibili su Google Fonts */\n${localFontFaces}`
+    : '';
 
   const eleganti = WATERMARK_FONTS.filter((f) => f.category === 'elegante');
   const classici = WATERMARK_FONTS.filter((f) => f.category === 'classico');
 
-  const currentFont = WATERMARK_FONTS.find((f) => f.value === wmFont) ?? WATERMARK_FONTS[12]!;
+  const classicoEntry = WATERMARK_FONTS.find((f) => f.value === 'classico');
+  const currentFont =
+    WATERMARK_FONTS.find((f) => f.value === wmFont) ?? classicoEntry ?? WATERMARK_FONTS[0]!;
   const currentFamilyCss = `${currentFont.family}, Georgia, serif`;
 
   useEffect(() => {
@@ -83,9 +103,16 @@ export default function EventSettingsPage() {
 
   return (
     <main className="max-w-2xl mx-auto p-4 space-y-6">
-      {/* Pre-caricamento Google Fonts (27 famiglie) per le anteprime */}
-      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-      <link rel="stylesheet" href={googleHref} />
+      {/* Pre-caricamento font per l'anteprima UI:
+          - 7 famiglie su Google Fonts (link CSS2)
+          - 21 font locali (TTF in public/fonts/) via @font-face inline */}
+      {googleHref && (
+        // eslint-disable-next-line @next/next/no-page-custom-font
+        <link rel="stylesheet" href={googleHref} />
+      )}
+      {localFontsStyle && (
+        <style dangerouslySetInnerHTML={{ __html: localFontsStyle }} />
+      )}
 
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-2"><Settings className="w-6 h-6" /> Impostazioni</h1>
