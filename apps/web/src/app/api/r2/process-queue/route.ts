@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { rateLimit } from '@fotosposi/core';
+import { cookies } from 'next/headers';
+import { rateLimit, createServerSideClient } from '@fotosposi/core';
 import { processQueueForEvent } from '@/lib/process-queue';
 
 // Il watermark video ri-codifica il clip con ffmpeg: serve il runtime Node e più
@@ -7,9 +8,25 @@ import { processQueueForEvent } from '@/lib/process-queue';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
+// Rate-limit GUARDIA: protegge da un attaccante che spamma richieste senza auth.
+// Key = userId autenticato, con finestra generosa perché l'elaborazione video è CPU-bound
+// (limitiamo le CHIAMATE esterne, non l'elaborazione interna). 60 chiamate/min per utente
+// = un utente può triggerare processing ogni secondo; sopra serve autenticarsi diversamente.
+// In dev/test localhost tutti gli agent girano dallo stesso IP → usare IP come fallback
+// quando non autenticati satura falsi positivi (vedi stress test 26/07/2026).
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for') || 'unknown';
-  const rl = rateLimit(`process-queue:${ip}`, 30, 60000);
+  let userIdForRate: string | null = null;
+  try {
+    const cookieStore = await cookies();
+    const authClient = createServerSideClient(() => cookieStore.getAll());
+    const { data: { user } } = await authClient.auth.getUser();
+    if (user) userIdForRate = user.id;
+  } catch { /* anonimo OK per il fallback */ }
+
+  const rateKey = userIdForRate
+    ? `process-queue:user:${userIdForRate}`
+    : `process-queue:ip:${request.headers.get('x-forwarded-for') || 'unknown'}`;
+  const rl = rateLimit(rateKey, 60, 60000);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Troppe richieste' },

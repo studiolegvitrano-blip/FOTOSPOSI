@@ -9,3 +9,8 @@ dist/
 next-env.d.ts
 ECCOLO FOTOSPOSI.txt
 FOTO AGO/
+
+# stress test runtime artifacts
+stress-test-agenti/logs/
+stress-test-agenti/reports/
+stress-test-agenti/.tmp-fixtures/

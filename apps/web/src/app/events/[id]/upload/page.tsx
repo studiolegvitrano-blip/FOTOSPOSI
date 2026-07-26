@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { compressImage, type QueueItem } from '@fotosposi/media';
-import { getCurrentUser, getEventTier, type Tier } from '@fotosposi/core';
-import { getEventById, getEventWindow } from '@fotosposi/events';
+import { getCurrentUser, type Tier } from '@fotosposi/core';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -84,34 +83,49 @@ export default function UploadPage() {
       // Passa la pagina corrente come `redirect` così, dopo login/registrazione/conferma email,
       // l'ospite torna qui a caricare le foto invece di finire su /dashboard e perdere l'invito.
       if (!user) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-      const { event } = await getEventById(eventId);
-      if (!event) return;
-      const isCreator = event.created_by === user.id;
-      if (!isCreator) {
-        const { window: w } = await getEventWindow(eventId);
-        if (w) {
-          const now = new Date();
-          if (now < new Date(w.opens_at) || now > new Date(w.closes_at)) {
-            router.push(`/events/${eventId}`);
-            return;
-          }
+
+      // Init server-side via API route (vedi /api/upload/init). Le vecchie chiamate dirette
+      // a getEventById/getEventTier/getEventWindow usavano la chiave anon dal browser, ma la
+      // RLS su 'events'/'event_windows' è scoped a created_by → invitati (non-creator) vedono
+      // 406 e la pagina resta su <Loader2 /> per sempre. La route service-role valida anche
+      // che il caller sia creator o membro del tenant dell'evento.
+      const initRes = await fetch(`/api/upload/init?eventId=${encodeURIComponent(eventId)}`);
+      if (!initRes.ok) {
+        const errBody = await initRes.json().catch(() => ({}));
+        const errMsg = errBody.error || `HTTP ${initRes.status}`;
+        // Se la finestra è chiusa, la route ritorna 409 con {error, window}: rimando all'evento
+        if (initRes.status === 409) {
+          router.push(`/events/${eventId}`);
+          return;
         }
+        // Auth errors: lascia la pagina mostrare Loader2 E log per capire (raro, perché login
+        // prima di arrivare qui). Per 'non autorizzato' torno al dashboard.
+        if (initRes.status === 401) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
+        if (initRes.status === 403) { router.push(`/dashboard`); return; }
+        if (initRes.status === 404) { router.push(`/dashboard`); return; }
+        // Errori sconosciuti: per ora log in console e lascia la pagina girare (eventReady=false).
+        console.error('[upload/init] failed:', initRes.status, errMsg);
+        return;
       }
-      const { tier: evTier } = await getEventTier(eventId);
-      if (evTier) setTier(evTier);
-      if (evTier === 'free') {
-        const d = await queueApi({ action: 'state', eventId });
-        const s = d?.stats;
-        if (s) {
-          const totalExisting = s.synced + s.pending + s.processing;
-          if (totalExisting >= FREE_MAX_PHOTOS) setLimitReached(true);
-        }
+      const initData = await initRes.json();
+      setTier((initData.tier as Tier) || 'free');
+      if (initData.tier === 'free' && initData.stats) {
+        const totalExisting =
+          (initData.stats.synced ?? 0) + (initData.stats.pending ?? 0) + (initData.stats.processing ?? 0);
+        if (totalExisting >= FREE_MAX_PHOTOS) setLimitReached(true);
       }
       setEventReady(true);
       const hasPending = await loadQueue();
       if (hasPending) {
         triggerServerProcessing();
         pollRef.current = setInterval(async () => {
+          // Continua a pingare il server: processQueueForEvent elabora max 5 item/round
+          // e ritorna 'remaining>0'. Qui sotto continuiamo a triggerarlo finché loadQueue
+          // non vede più pending — oppure fino al prossimo cron maintenance. Vedi
+          // stress test 26/07: il problema non era il rate-limit (era già 30/min/IP),
+          // era che dopo il PRIMO trigger, polling leggeva 'still pending' ma non
+          // inviava nuove richieste → coda viva ma nessuno la elaborava per 20min.
+          triggerServerProcessing();
           const stillPending = await loadQueue();
           if (!stillPending) clearInterval(pollRef.current);
         }, 3000);
@@ -121,13 +135,19 @@ export default function UploadPage() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [eventId, router, loadQueue]);
 
-  const startPolling = () => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(async () => {
-      const stillPending = await loadQueue();
-      if (!stillPending) { clearInterval(pollRef.current); pollRef.current = undefined; }
-    }, 3000);
-  };
+const startPolling = () => {
+  if (pollRef.current) clearInterval(pollRef.current);
+  pollRef.current = setInterval(async () => {
+    // Continua a triggerare il server finché c'è lavoro: il primo round processoQueueForEvent
+    // elabora al massimo 5 item × round, poi ritorna 'remaining>0' per richiedere un altro
+    // round. Da solo non basta → serve continuare a pingare /api/r2/process-queue ad ogni
+    // tick di poll (3s). Prima quando il polling finiva dopo il primo round, la coda
+    // rimaneva viva ma nessuno la elaborava fino al cron (20min).
+    triggerServerProcessing();
+    const stillPending = await loadQueue();
+    if (!stillPending) { clearInterval(pollRef.current); pollRef.current = undefined; }
+  }, 3000);
+};
 
   const processFiles = async (selected: FileList | File[]) => {
     const { user } = await getCurrentUser();
@@ -140,7 +160,20 @@ export default function UploadPage() {
     const files: File[] = [];
     for (const f of Array.from(selected as ArrayLike<File>)) {
       if (!f) continue;
-      if (isFree && f.type.startsWith('video/')) { skippedVideos++; continue; }
+      // Riconosci anche file MIME-vuoti via estensione: alcuni browser (Safari su .mov, Chrome
+      // su container atipici) lasciano File.type stringa vuota. Lo stress test del 26/07 ha
+      // mostrato 0/18 video in upload_queue con questa pagina: ipotesi principale era proprio
+      // filtrare i video per .startsWith('video/') che NON matchava type=''.
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      const looksLikeVideo = f.type.startsWith('video/') ||
+        ['mp4', 'mov', 'webm', 'm4v', 'qt', 'avi', 'mkv'].includes(ext);
+      const looksLikeImage = f.type.startsWith('image/') ||
+        ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'].includes(ext);
+      if (isFree && looksLikeVideo) { skippedVideos++; continue; }
+      if (!looksLikeVideo && !looksLikeImage) {
+        // File sconosciuto, prova ad accodarlo comunque (il server validatore in /api/r2/upload
+        // deciderà; qui non blocchiamo l'utente)
+      }
       files.push(f);
     }
     setSkipVideos(skippedVideos);
@@ -192,7 +225,11 @@ export default function UploadPage() {
       });
       const r2Data = await r2Resp.json();
       if (!r2Resp.ok || !r2Data.presignedUrl) {
-        await queueApi({ action: 'fail', id, error: r2Data.error || 'Presigned URL fallita' });
+        // Errore temporaneo (rate limit 429, network, R2 transient) → 'retry', non 'fail':
+        // il client non deve marcare un item permanentemente failed quando il problema è
+        // solo di rete o di rate-limit (vedi stress test 26/07: 8 foto finite in failed
+        // con r2_key NULL che il cron avrebbe potuto recuperare se non filtrate a monte).
+        await queueApi({ action: 'retry', id, error: r2Data.error || 'Presigned URL fallita' });
         continue;
       }
 
@@ -202,7 +239,7 @@ export default function UploadPage() {
         headers: { 'Content-Type': file.type },
       });
       if (!uploadResp.ok) {
-        await queueApi({ action: 'fail', id, error: 'Upload R2 fallito' });
+        await queueApi({ action: 'retry', id, error: `Upload R2 PUT ${uploadResp.status}` });
         continue;
       }
       await queueApi({ action: 'mark', id, r2Key: r2Data.key });

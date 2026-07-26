@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { getPresignedUploadUrl } from '@fotosposi/r2-storage';
-import { rateLimit, createServiceClient } from '@fotosposi/core';
+import { rateLimit, createServiceClient, createServerSideClient } from '@fotosposi/core';
 
 const ALLOWED_TYPES: Record<string, string[]> = {
   image: ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'],
@@ -46,9 +47,23 @@ async function resolvePrefix(
 }
 
 export async function POST(request: NextRequest) {
+  // Rate-limit per userId autenticato (più generoso) o per IP anonimo. Su dev/test
+  // localhost tutti gli agent girano dallo stesso IP → in stress test 26/07 questo
+  // limite era il vero blocker della concorrenza (9 agent × 5 foto + presigned = 45
+  // > 30/min, portava a 429 ovunque e code di upload svuotate a metà).
+  let userIdForRate: string | null = null;
   try {
-    const ip = request.headers.get('x-forwarded-for') || 'unknown';
-    const rl = rateLimit(`r2-upload:${ip}`, 30, 60000);
+    const cookieStore = await cookies();
+    const authClient = createServerSideClient(() => cookieStore.getAll());
+    const { data: { user } } = await authClient.auth.getUser();
+    if (user) userIdForRate = user.id;
+  } catch { /* fallback IP */ }
+  const rateKey = userIdForRate
+    ? `r2-upload:user:${userIdForRate}`
+    : `r2-upload:ip:${request.headers.get('x-forwarded-for') || 'unknown'}`;
+  const rl = rateLimit(rateKey, 60, 60000);
+
+  try {
     if (!rl.allowed) {
       return NextResponse.json(
         { error: 'Troppe richieste. Riprova tra qualche secondo.' },

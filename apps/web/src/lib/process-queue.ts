@@ -150,11 +150,16 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
 
       const r2Key = item.r2_key;
       if (!r2Key) {
-        // Irrecuperabile: il client non ha mai completato l'upload su R2. retry_count
-        // alto = escluso subito dai prossimi sweep invece di consumare i 5 tentativi.
+        // Irrecuperabile vero: il client non ha mai completato l'upload su R2.
+        // retry_count alto = escluso subito dai prossimi sweep invece di consumare i 5 tentativi.
+        // (vedi stress test 26/07: molti item con r2_key NULL arrivano qui perché il client
+        // ha completato /api/queue action='enqueue' ma è caduto prima della PUT R2.)
         await supabase.from('upload_queue').update({ status: 'failed', error: 'r2_key mancante', retry_count: 99 }).eq('id', item.id);
         continue;
       }
+      // Se l'item è marcato 'failed' ma HA un r2_key valido, è un fallimento temporaneo
+      // del processing (es. timeout ffmpeg, download R2 interrotto): deve essere ripreso,
+      // non marchiato di nuovo failed. reset retry_count così ripartiamo puliti.
 
       const downloadUrl = await getPresignedDownloadUrl(r2Key, 3600);
       if (!downloadUrl) {

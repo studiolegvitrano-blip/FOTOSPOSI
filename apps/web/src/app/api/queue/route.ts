@@ -86,11 +86,33 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'fail') {
+      // Errore definitivo del client: marca failed + retry alto per esclude dai prossimi sweep.
+      // Usato solo quando il file non è proprio in R2 E non può esserci (es. validazione MIME
+      // rifiutata). Per errori temporanei (presigned URL timeout, PUT R2 502) si usa 'retry'.
       const { id, error: errMsg } = body;
       if (!id) return NextResponse.json({ error: 'id richiesto' }, { status: 400 });
       const { error } = await svc
         .from('upload_queue')
-        .update({ status: 'failed', error: String(errMsg || 'Errore client').slice(0, 500) })
+        .update({ status: 'failed', error: String(errMsg || 'Errore client').slice(0, 500), retry_count: 99 })
+        .eq('id', id)
+        .eq('uploaded_by', user.id);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === 'retry') {
+      // Errore temporaneo del client (es. presigned URL/PUT timeout). Mantieni la riga
+      // pending: il cron o un successivo 'mark' può recuperarla. Vedi stress test 26/07:
+      // qui PRIMA questo codice marcava 'failed' e il cron la saltava per sempre.
+      const { id, error: errMsg } = body;
+      if (!id) return NextResponse.json({ error: 'id richiesto' }, { status: 400 });
+      const { error } = await svc
+        .from('upload_queue')
+        .update({
+          error: String(errMsg || 'Retry da client').slice(0, 500),
+          // NON toccare status (resta pending). NON toccare r2_key (se già valorizzato resta).
+          retry_count: 0,
+        })
         .eq('id', id)
         .eq('uploaded_by', user.id);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
