@@ -3,7 +3,8 @@ import { createVideoMessage, getVideoMessages } from '@fotosposi/media';
 import { createServiceClient } from '@fotosposi/core';
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
 import { applyVideoOverlay } from '@fotosposi/video-overlay';
-import { ensureWatermarkFonts, watermarkFontFamily, loadBrandLogo } from '@/lib/watermark-fonts';
+import { watermarkFontFamily } from '@/lib/watermark-fonts';
+import { ensureWatermarkFonts, loadBrandLogo } from '@/lib/watermark-fonts.server';
 
 ensureWatermarkFonts();
 

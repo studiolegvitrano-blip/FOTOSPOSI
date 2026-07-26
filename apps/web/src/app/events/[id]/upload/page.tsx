@@ -184,11 +184,11 @@ export default function UploadPage() {
       // barra di caricamento ma il file spariva nel nulla, senza traccia in coda né in galleria.
       if (!id) { alert(`"${file.name}" non accodato: ${enq?.error || 'errore sconosciuto'}`); continue; }
 
-      const prefix = `events/${eventId}`;
+      const prefix = `events/${eventId}`; // fallback prefix lato server resta compatibile (vedi route)
       const r2Resp = await fetch('/api/r2/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, contentType: file.type, prefix }),
+        body: JSON.stringify({ filename: file.name, contentType: file.type, prefix, eventId }),
       });
       const r2Data = await r2Resp.json();
       if (!r2Resp.ok || !r2Data.presignedUrl) {

@@ -3,7 +3,8 @@ import { createMediaRecord, getDriveToken, getEventDriveFolders, updateDriveSync
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
 import { applyVideoOverlay } from '@fotosposi/video-overlay';
 import sharp from 'sharp';
-import { ensureWatermarkFonts, watermarkFontFamily, loadBrandLogo } from '@/lib/watermark-fonts';
+import { watermarkFontFamily } from '@/lib/watermark-fonts';
+import { ensureWatermarkFonts, loadBrandLogo } from '@/lib/watermark-fonts.server';
 
 // I glifi dei watermark richiedono font presenti nella lambda (vedi watermark-fonts.ts).
 ensureWatermarkFonts();

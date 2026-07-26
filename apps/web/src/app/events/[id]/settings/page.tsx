@@ -7,12 +7,18 @@ import { updateEventWatermark, type WeddingEvent } from '@fotosposi/events';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Settings, Image as ImageIcon, Users, Bell, Shield, HardDrive, Globe, Loader2 } from 'lucide-react';
+import { WATERMARK_FONTS } from '@/lib/watermark-fonts';
 
 /**
  * Pagina Impostazioni riservata agli sposi (creatore evento): raccoglie in un
  * unico posto tutte le impostazioni prima sparse (watermark su foto/video con
  * testo E font, più i collegamenti alle altre aree di configurazione).
  * Gli invitati che provano ad aprirla vengono rimandati alla pagina evento.
+ *
+ * Novità: 27 font selezionabili (12 eleganti + 15 classici). Il menu a tendina
+ * mostra ogni voce scritta col proprio font reale, così gli sposi vedono
+ * immediatamente l'aspetto finale. Dopo la scelta, l'anteprima in basso mostra
+ * la frase scelta col font scelto.
  */
 export default function EventSettingsPage() {
   const { id: eventId } = useParams<{ id: string }>();
@@ -26,11 +32,18 @@ export default function EventSettingsPage() {
   const [wmSaving, setWmSaving] = useState(false);
   const [wmSaved, setWmSaved] = useState(false);
 
-  const FONTS: { value: string; label: string; sample: string; css: string }[] = [
-    { value: 'classico', label: 'Classico', sample: 'Giulia & Marco', css: '"Playfair Display", Georgia, serif' },
-    { value: 'elegante', label: 'Elegante (corsivo)', sample: 'Giulia & Marco', css: '"Dancing Script", cursive' },
-    { value: 'moderno', label: 'Moderno', sample: 'Giulia & Marco', css: '"Noto Sans", Arial, sans-serif' },
-  ];
+  // I font vanno caricati anche nel browser per l'anteprima della scelta.
+  // Un singolo <link> ai Google Fonts CSS2 con tutte le 27 famiglie.
+  const googleFamilies = WATERMARK_FONTS
+    .map((f) => `family=${f.googleImport}`)
+    .join('&');
+  const googleHref = `https://fonts.googleapis.com/css2?${googleFamilies}&display=swap`;
+
+  const eleganti = WATERMARK_FONTS.filter((f) => f.category === 'elegante');
+  const classici = WATERMARK_FONTS.filter((f) => f.category === 'classico');
+
+  const currentFont = WATERMARK_FONTS.find((f) => f.value === wmFont) ?? WATERMARK_FONTS[12]!;
+  const currentFamilyCss = `${currentFont.family}, Georgia, serif`;
 
   useEffect(() => {
     if (!eventId) return;
@@ -66,12 +79,13 @@ export default function EventSettingsPage() {
     </main>
   );
 
+  const previewText = wmText || event.couple_name || 'Giulia & Marco';
+
   return (
     <main className="max-w-2xl mx-auto p-4 space-y-6">
-      {/* I font vanno caricati anche nel browser per l'anteprima della scelta */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Dancing+Script:wght@700&display=swap');
-      `}</style>
+      {/* Pre-caricamento Google Fonts (27 famiglie) per le anteprime */}
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link rel="stylesheet" href={googleHref} />
 
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-2"><Settings className="w-6 h-6" /> Impostazioni</h1>
@@ -114,24 +128,66 @@ export default function EventSettingsPage() {
                 className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
               />
 
-              <p className="text-xs text-text-muted mt-3">Scegli il carattere con cui verrà impresso il testo:</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {FONTS.map(f => (
-                  <button
-                    key={f.value}
-                    type="button"
-                    onClick={() => setWmFont(f.value)}
-                    className={`rounded-lg border p-3 text-left transition-colors ${wmFont === f.value ? 'border-brand bg-brand/10' : 'border-border bg-background hover:border-brand/50'}`}
+              {/* ─── MENU A TENDINA FONT con ogni voce renderizzata col proprio font ───
+                  Native <select> NON può stilare singole option, quindi costruisco un
+                  dropdown custom. Ogni voce mostra il nome del font scritto col font
+                  stesso: l'utente vede in tempo reale come apparirà. */}
+              <p className="text-xs text-text-muted mt-3">Scegli il carattere ({WATERMARK_FONTS.length} disponibili):</p>
+
+              <details className="border border-border rounded-md bg-background">
+                <summary className="cursor-pointer px-3 py-2 flex items-center justify-between text-sm">
+                  <span className="text-text-muted">Carattere selezionato:</span>
+                  <span
+                    className="text-lg leading-snug"
+                    style={{ fontFamily: currentFamilyCss }}
                   >
-                    <p className="text-xs text-text-muted">{f.label}</p>
-                    <p className="text-xl leading-snug" style={{ fontFamily: f.css }}>{wmText || event.couple_name || f.sample}</p>
-                  </button>
-                ))}
+                    {currentFont.label}
+                  </span>
+                </summary>
+                <div className="border-t border-border max-h-72 overflow-y-auto py-2">
+                  <p className="px-3 py-1 text-[10px] uppercase tracking-wide text-text-muted">Eleganti</p>
+                  {eleganti.map((f) => (
+                    <button
+                      key={f.value}
+                      type="button"
+                      onClick={() => { setWmFont(f.value); (document.activeElement as HTMLElement)?.blur(); }}
+                      className={`w-full text-left px-3 py-2 text-lg flex items-center justify-between gap-3 hover:bg-muted ${wmFont === f.value ? 'bg-brand/10' : ''}`}
+                      style={{ fontFamily: `${f.family}, Georgia, serif` }}
+                    >
+                      <span>{f.label}</span>
+                      <span className="text-text-muted text-sm">{f.value === wmFont ? '✓' : ''}</span>
+                    </button>
+                  ))}
+                  <p className="px-3 py-1 mt-2 text-[10px] uppercase tracking-wide text-text-muted">Classici</p>
+                  {classici.map((f) => (
+                    <button
+                      key={f.value}
+                      type="button"
+                      onClick={() => { setWmFont(f.value); (document.activeElement as HTMLElement)?.blur(); }}
+                      className={`w-full text-left px-3 py-2 text-lg flex items-center justify-between gap-3 hover:bg-muted ${wmFont === f.value ? 'bg-brand/10' : ''}`}
+                      style={{ fontFamily: `${f.family}, Georgia, serif` }}
+                    >
+                      <span>{f.label}</span>
+                      <span className="text-text-muted text-sm">{f.value === wmFont ? '✓' : ''}</span>
+                    </button>
+                  ))}
+                </div>
+              </details>
+
+              {/* ─── Anteprima frase col font scelto ─── */}
+              <div className="mt-4 p-4 bg-background border border-border rounded-md">
+                <p className="text-xs text-text-muted mb-2">Anteprima del tuo watermark</p>
+                <p
+                  className="text-2xl text-text"
+                  style={{ fontFamily: currentFamilyCss }}
+                >
+                  {previewText}
+                </p>
               </div>
             </div>
           )}
 
-          <p className="text-xs text-text-muted">Il logo Sposi.live è sempre presente in basso a destra.</p>
+          <p className="text-xs text-text-muted">Il logo Sposi.live appare in alto a destra in trasparenza 60%.</p>
 
           <div className="flex items-center gap-3">
             <Button size="sm" onClick={saveWatermark} disabled={wmSaving}>

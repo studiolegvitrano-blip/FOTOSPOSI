@@ -1,60 +1,91 @@
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 /**
- * Le lambda Vercel non hanno NESSUN font di sistema: quando sharp/librsvg rasterizza
- * gli <text> SVG del watermark, ogni glifo diventa un quadrato (tofu). Qui creiamo a
- * runtime una config fontconfig che punta al Noto Sans incluso nel repo
- * (apps/web/assets/fonts, portato nella lambda da outputFileTracingIncludes) e la
- * esponiamo via FONTCONFIG_PATH PRIMA del primo render: fontconfig sostituisce
- * automaticamente Georgia/Inter richiesti dagli SVG con l'unico font disponibile.
- * Va chiamata a livello di modulo nelle route che imprimono watermark.
- */
-export function ensureWatermarkFonts(): void {
-  try {
-    if (process.env.FOTOSPOSI_FONTS_READY) return;
-    const fontsDir = join(process.cwd(), 'assets', 'fonts');
-    const confDir = join('/tmp', 'fotosposi-fontconfig');
-    const cacheDir = join('/tmp', 'fotosposi-fonts-cache');
-    mkdirSync(confDir, { recursive: true });
-    mkdirSync(cacheDir, { recursive: true });
-    writeFileSync(join(confDir, 'fonts.conf'), `<?xml version="1.0"?>
-<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
-<fontconfig>
-  <dir>${fontsDir}</dir>
-  <cachedir>${cacheDir}</cachedir>
-</fontconfig>
-`);
-    process.env.FONTCONFIG_PATH = confDir;
-    process.env.FOTOSPOSI_FONTS_READY = '1';
-  } catch {
-    // Se /tmp non è scrivibile meglio watermark coi quadrati che far fallire l'upload.
-  }
-}
-
-/**
- * Mappa la scelta degli sposi (events.watermark_font) sulla famiglia reale dei font
- * inclusi in assets/fonts. Default: 'classico'.
+ * Mappa la scelta degli sposi (events.watermark_font) sulla famiglia CSS reale.
+ * 27 font totali: 12 eleganti (corsivi/manoscritti) + 15 classici (serif).
+ * I nomi chiave qui sotto sono identici ai `value` del menu in
+ * apps/web/src/app/events/[id]/settings/page.tsx — se aggiungi/rimuovi un font
+ * lì, aggiornalo anche qui.
+ * Default: 'classico' (Playfair Display).
+ *
+ * Questo file NON deve importare `node:fs` o `node:path`: viene consumato anche
+ * da componenti client ('use client') e Webpack non sa gestire gli import
+ * `node:*` nel bundle browser → userebbe voci server in
+ * `watermark-fonts.server.ts`.
  */
 export function watermarkFontFamily(font?: string | null): string {
+  // 12 ELEGANTI (corsivi/manoscritti)
   switch (font) {
-    case 'elegante': return 'Dancing Script';
-    case 'moderno': return 'Noto Sans';
-    case 'classico':
-    default: return 'Playfair Display';
+    case 'elegante':       return 'Dancing Script';
+    case 'allura':         return 'Allura';
+    case 'tangerine':      return 'Tangerine';
+    case 'pinyon':         return 'Pinyon Script';
+    case 'great_vibes':    return 'Great Vibes';
+    case 'satisfy':        return 'Satisfy';
+    case 'sacramento':     return 'Sacramento';
+    case 'parisienne':     return 'Parisienne';
+    case 'mr_dafoe':       return 'Mr Dafoe';
+    case 'sofia':          return 'Sofia';
+    case 'norican':        return 'Norican';
+    case 'yellowtail':     return 'Yellowtail';
+    // 15 CLASSICI (serif/sans classic)
+    case 'classico':       return 'Playfair Display';
+    case 'moderno':        return 'Noto Sans';
+    case 'cormorant':      return 'Cormorant Garamond';
+    case 'bodoni':         return 'Bodoni Moda';
+    case 'eb_garamond':    return 'EB Garamond';
+    case 'cormorant_2':    return 'Cormorant';
+    case 'baskerville':    return 'Libre Baskerville';
+    case 'caslon':         return 'Libre Caslon Text';
+    case 'lora':           return 'Lora';
+    case 'cardo':          return 'Cardo';
+    case 'roboto_slab':    return 'Roboto Slab';
+    case 'source_serif':   return 'Source Serif Pro';
+    case 'crimson':        return 'Crimson Text';
+    case 'spectral':       return 'Spectral';
+    case 'cormorant_inf':  return 'Cormorant Infant';
+    default:               return 'Playfair Display';
   }
 }
 
 /**
- * Carica il logo PNG del brand (public/logo-*-trans.png) da comporre nel watermark.
- * Ritorna null se il file non è nella lambda (le route devono includerlo via
- * outputFileTracingIncludes) — in quel caso resta il wordmark testuale.
+ * Elenco strutturato dei 27 font per uso nel menu impostazioni e nelle anteprime.
+ * `googleImport` è usato per il <link> Google Fonts lato browser.
  */
-export function loadBrandLogo(brand?: string | null): Buffer | null {
-  try {
-    const file = brand === 'weddingmoments' ? 'logo-justmarry-trans.png' : 'logo-sposi-trans.png';
-    return readFileSync(join(process.cwd(), 'public', file));
-  } catch {
-    return null;
-  }
-}
+export const WATERMARK_FONTS: {
+  value: string;
+  label: string;
+  family: string;
+  category: 'elegante' | 'classico';
+  googleImport: string;
+}[] = [
+  // ── 12 ELEGANTI ─────────────────────────────────────
+  { value: 'elegante',      label: 'Elegante',         family: '"Dancing Script"',     category: 'elegante', googleImport: 'Dancing+Script:wght@700' },
+  { value: 'allura',        label: 'Allura',            family: 'Allura',                category: 'elegante', googleImport: 'Allura' },
+  { value: 'tangerine',     label: 'Tangerine',         family: 'Tangerine',             category: 'elegante', googleImport: 'Tangerine:wght@700' },
+  { value: 'pinyon',        label: 'Pinyon Script',     family: '"Pinyon Script"',       category: 'elegante', googleImport: 'Pinyon+Script' },
+  { value: 'great_vibes',   label: 'Great Vibes',       family: '"Great Vibes"',         category: 'elegante', googleImport: 'Great+Vibes' },
+  { value: 'satisfy',        label: 'Satisfy',           family: 'Satisfy',                category: 'elegante', googleImport: 'Satisfy' },
+  { value: 'sacramento',    label: 'Sacramento',         family: 'Sacramento',             category: 'elegante', googleImport: 'Sacramento' },
+  { value: 'parisienne',    label: 'Parisienne',         family: 'Parisienne',             category: 'elegante', googleImport: 'Parisienne' },
+  { value: 'mr_dafoe',      label: 'Mr Dafoe',           family: '"Mr Dafoe"',             category: 'elegante', googleImport: 'Mr+Dafoe' },
+  { value: 'sofia',          label: 'Sofia',             family: 'Sofia',                  category: 'elegante', googleImport: 'Sofia' },
+  { value: 'norican',       label: 'Norican',            family: 'Norican',                category: 'elegante', googleImport: 'Norican' },
+  { value: 'yellowtail',    label: 'Yellowtail',         family: 'Yellowtail',              category: 'elegante', googleImport: 'Yellowtail' },
+  // ── 15 CLASSICI ─────────────────────────────────────
+  { value: 'classico',      label: 'Classico (Playfair)', family: '"Playfair Display"',  category: 'classico', googleImport: 'Playfair+Display:wght@700' },
+  { value: 'moderno',       label: 'Moderno (Noto Sans)', family: '"Noto Sans"',          category: 'classico', googleImport: 'Noto+Sans:wght@700' },
+  { value: 'cormorant',     label: 'Cormorant Garamond', family: '"Cormorant Garamond"',  category: 'classico', googleImport: 'Cormorant+Garamond:wght@700' },
+  { value: 'bodoni',        label: 'Bodoni Moda',        family: '"Bodoni Moda"',          category: 'classico', googleImport: 'Bodoni+Moda:wght@700' },
+  { value: 'eb_garamond',   label: 'EB Garamond',        family: '"EB Garamond"',          category: 'classico', googleImport: 'EB+Garamond:wght@700' },
+  { value: 'cormorant_2',   label: 'Cormorant',          family: 'Cormorant',              category: 'classico', googleImport: 'Cormorant:wght@700' },
+  { value: 'baskerville',   label: 'Libre Baskerville',  family: '"Libre Baskerville"',    category: 'classico', googleImport: 'Libre+Baskerville:wght@700' },
+  { value: 'caslon',        label: 'Libre Caslon',        family: '"Libre Caslon Text"',    category: 'classico', googleImport: 'Libre+Caslon+Text:wght@700' },
+  { value: 'lora',          label: 'Lora',                family: 'Lora',                   category: 'classico', googleImport: 'Lora:wght@700' },
+  { value: 'cardo',         label: 'Cardo',              family: 'Cardo',                  category: 'classico', googleImport: 'Cardo:wght@700' },
+  { value: 'roboto_slab',   label: 'Roboto Slab',        family: '"Roboto Slab"',          category: 'classico', googleImport: 'Roboto+Slab:wght@700' },
+  { value: 'source_serif',  label: 'Source Serif',       family: '"Source Serif Pro"',     category: 'classico', googleImport: 'Source+Serif+Pro:wght@700' },
+  { value: 'crimson',       label: 'Crimson Text',       family: '"Crimson Text"',         category: 'classico', googleImport: 'Crimson+Text:wght@700' },
+  { value: 'spectral',      label: 'Spectral',           family: 'Spectral',               category: 'classico', googleImport: 'Spectral:wght@700' },
+  { value: 'cormorant_inf', label: 'Cormorant Infant',   family: '"Cormorant Infant"',     category: 'classico', googleImport: 'Cormorant+Infant:wght@700' },
+];
+
+

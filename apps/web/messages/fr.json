@@ -11,7 +11,8 @@
     "search": "Rechercher",
     "loading": "Chargement...",
     "error_generic": "Une erreur est survenue. Veuillez réessayer.",
-    "or_continue_with": "ou continuer avec","error_network": "Erreur de connexion. Vérifiez votre réseau.",
+    "or_continue_with": "ou continuer avec",
+    "error_network": "Erreur de connexion. Vérifiez votre réseau.",
     "back": "Retour",
     "next": "Suivant",
     "close": "Fermer",
@@ -62,25 +63,61 @@
     "platform_title": "Une plateforme unique",
     "platform_subtitle": "Quatre outils qui travaillent ensemble, sans rien à installer pour vos invités.",
     "platform_items": [
-      { "title": "Site d'invitation", "desc": "Un site élégant avec dates, lieux, RSVP et toutes les informations pour vos invités, prêt en quelques minutes." },
-      { "title": "Jeux interactifs", "desc": "Quiz, défis photo et classements en temps réel qui animent la réception." },
-      { "title": "Photos et vidéos par QR", "desc": "Les invités scannent le QR code et téléversent leurs photos en temps réel : la galerie se remplit toute seule." },
-      { "title": "Concierge IA", "desc": "Un assistant qui répond aux questions des invités : horaires, adresses, dress code, parking." }
+      {
+        "title": "Site d'invitation",
+        "desc": "Un site élégant avec dates, lieux, RSVP et toutes les informations pour vos invités, prêt en quelques minutes."
+      },
+      {
+        "title": "Jeux interactifs",
+        "desc": "Quiz, défis photo et classements en temps réel qui animent la réception."
+      },
+      {
+        "title": "Photos et vidéos par QR",
+        "desc": "Les invités scannent le QR code et téléversent leurs photos en temps réel : la galerie se remplit toute seule."
+      },
+      {
+        "title": "Concierge IA",
+        "desc": "Un assistant qui répond aux questions des invités : horaires, adresses, dress code, parking."
+      }
     ],
     "how_title": "Comment ça marche",
     "how_steps": [
-      { "title": "Créez l'événement", "desc": "Inscrivez-vous, choisissez une formule et personnalisez le site d'invitation avec vos noms, dates et lieux." },
-      { "title": "Partagez le QR code", "desc": "Imprimez le QR sur les tables ou envoyez-le aux invités : un scan et ils sont dans l'événement." },
-      { "title": "Revivez les souvenirs", "desc": "Photos, vidéos et messages vidéo restent rassemblés et organisés, prêts à télécharger et à partager." }
+      {
+        "title": "Créez l'événement",
+        "desc": "Inscrivez-vous, choisissez une formule et personnalisez le site d'invitation avec vos noms, dates et lieux."
+      },
+      {
+        "title": "Partagez le QR code",
+        "desc": "Imprimez le QR sur les tables ou envoyez-le aux invités : un scan et ils sont dans l'événement."
+      },
+      {
+        "title": "Revivez les souvenirs",
+        "desc": "Photos, vidéos et messages vidéo restent rassemblés et organisés, prêts à télécharger et à partager."
+      }
     ],
     "games_title": "Les jeux qui font la fête",
     "games_subtitle": "Pensés pour impliquer toutes les tables, des grands-parents aux témoins.",
     "games": [
-      { "title": "Wall", "desc": "Le mur social de l'événement : photos et messages des invités en direct sur grand écran." },
-      { "title": "Quiz des Mariés", "desc": "Qui connaît le mieux les mariés ? Questions personnalisées et classement en temps réel." },
-      { "title": "Chasse à la Photo", "desc": "Des missions photo pour les tables : le défi qui remplit la galerie de clichés spontanés." },
-      { "title": "Video Guestbook", "desc": "Des messages vidéo de vœux avec compte à rebours, enregistrés automatiquement dans vos archives." },
-      { "title": "Borne Selfie", "desc": "Une borne selfie en libre-service : les invités déclenchent et la photo rejoint aussitôt la galerie." }
+      {
+        "title": "Wall",
+        "desc": "Le mur social de l'événement : photos et messages des invités en direct sur grand écran."
+      },
+      {
+        "title": "Quiz des Mariés",
+        "desc": "Qui connaît le mieux les mariés ? Questions personnalisées et classement en temps réel."
+      },
+      {
+        "title": "Chasse à la Photo",
+        "desc": "Des missions photo pour les tables : le défi qui remplit la galerie de clichés spontanés."
+      },
+      {
+        "title": "Video Guestbook",
+        "desc": "Des messages vidéo de vœux avec compte à rebours, enregistrés automatiquement dans vos archives."
+      },
+      {
+        "title": "Borne Selfie",
+        "desc": "Une borne selfie en libre-service : les invités déclenchent et la photo rejoint aussitôt la galerie."
+      }
     ],
     "watermark_kicker": "Filigrane MAX",
     "watermark_title": "Chaque photo partagée porte votre logo",
@@ -94,21 +131,76 @@
     "plan_free_name": "Free",
     "plan_premium_name": "Premium",
     "plan_deluxe_name": "Deluxe",
-    "plan_free_features": ["Site d'invitation et QR code", "Jusqu'à 100 photos (qualité standard)", "Wall et jeux de base", "1 événement par compte"],
-    "plan_premium_features": ["Photos et vidéos illimitées en qualité originale", "Tous les jeux inclus", "Sauvegarde Google Drive", "Time Capsule", "Site d'événement personnalisé"],
-    "plan_deluxe_features": ["Tout Premium", "Concierge IA", "Borne Selfie", "Application mobile personnalisée", "Assistance prioritaire"],
+    "plan_free_features": [
+      "Site d'invitation et QR code",
+      "Jusqu'à 100 photos (qualité standard)",
+      "Wall et jeux de base",
+      "1 événement par compte"
+    ],
+    "plan_premium_features": [
+      "Photos et vidéos illimitées en qualité originale",
+      "Tous les jeux inclus",
+      "Sauvegarde Google Drive",
+      "Time Capsule",
+      "Site d'événement personnalisé"
+    ],
+    "plan_deluxe_features": [
+      "Tout Premium",
+      "Concierge IA",
+      "Borne Selfie",
+      "Application mobile personnalisée",
+      "Assistance prioritaire"
+    ],
     "plan_games_badge": "Jeux inclus",
     "plan_popular": "Le plus choisi",
     "plan_cta": "Commencer gratuitement",
     "stats": [
-      { "value": "10 000+", "label": "photos collectées" },
-      { "value": "150+", "label": "événements gérés" },
-      { "value": "5", "label": "jeux interactifs" },
-      { "value": "6", "label": "langues disponibles" }
+      {
+        "value": "10 000+",
+        "label": "photos collectées"
+      },
+      {
+        "value": "150+",
+        "label": "événements gérés"
+      },
+      {
+        "value": "5",
+        "label": "jeux interactifs"
+      },
+      {
+        "value": "6",
+        "label": "langues disponibles"
+      }
     ],
     "final_cta_title": "Créez votre site d'invitation gratuit",
     "final_cta_subtitle": "Prêt en quelques minutes. Sans carte bancaire.",
-    "footer_tagline": "Les photos, jeux et souvenirs de votre mariage, au même endroit."
+    "footer_tagline": "Les photos, jeux et souvenirs de votre mariage, au même endroit.",
+    "showcase_title": "Trois moments. Trois téléphones. Une seule histoire.",
+    "showcase_subtitle": "De la cérémonie au toast, chaque cliché de vos invités vit déjà dans l'appli. Ouvrez votre journée avec un QR.",
+    "showcase_cta": "Créez votre site de mariage gratuit",
+    "showcase_phone1_badge": "La cérémonie",
+    "showcase_phone1_caption": "L'instant du 'oui', capté en direct par les invités.",
+    "showcase_phone1_author": "Giulia, témoin",
+    "showcase_phone2_badge": "L'arrivée",
+    "showcase_phone2_caption": "La Ferrari Purosangue des mariés : une entrée qu'on n'oublie pas.",
+    "showcase_phone2_author": "Marco, ami du marié",
+    "showcase_phone3_badge": "La fête",
+    "showcase_phone3_caption": "Toasts, danses, rires : tout arrive dans la galerie automatiquement.",
+    "showcase_phone3_author": "Sofia, cousine de la mariée",
+    "fb_feed_demo_title": "Une journée racontée par vos invités",
+    "fb_feed_demo_subtitle": "Voici comment vos photos et vidéos apparaîtront dans votre app de mariage",
+    "fb_feed_demo_caption_1": "La cérémonie était magnifique ! Félicitations aux mariés",
+    "fb_feed_demo_caption_2": "La première danse : tout le monde est ému",
+    "fb_feed_demo_caption_3": "Des toasts sans fin à la table des mariés",
+    "fb_feed_demo_caption_4": "Le couper du gâteau, enfin",
+    "fb_feed_demo_caption_5": "Selfie de groupe à la fin de la soirée",
+    "fb_feed_demo_caption_6": "Les dragées : un souvenir impérissable",
+    "fb_feed_demo_author_1": "Camille Martin",
+    "fb_feed_demo_author_2": "Luc Bernard",
+    "fb_feed_demo_author_3": "Léa Dubois",
+    "fb_feed_demo_author_4": "Thomas Moreau",
+    "fb_feed_demo_comment_a": "Magnifique photo !",
+    "fb_feed_demo_comment_b": "Félicitations à vous deux !"
   },
   "auth": {
     "login_title": "Bon retour parmi nous",
@@ -585,5 +677,34 @@
   "brand": {
     "fotosposi": "Sposi.live",
     "weddingmoments": "JustMarry.live"
+  },
+  "reactions": {
+    "like": "J'aime",
+    "love": "J'adore",
+    "adore": "J'adore",
+    "wow": "Wow",
+    "sigh": "Ouh",
+    "grrr": "Grrr"
+  },
+  "feed": {
+    "mi_piaci": "J'aime",
+    "commenta": "Commenter",
+    "condividi": "Partager",
+    "invia_commento": "Écrire un commentaire...",
+    "invia": "Publier",
+    "caricamento": "Chargement...",
+    "niente_post": "Aucune publication pour l'instant",
+    "giorni_fa": "il y a {count} jours",
+    "ore_fa": "il y a {count} heures",
+    "minuti_fa": "il y a {count} minutes",
+    "adesso": "À l'instant",
+    "comments_count_label": "commentaires",
+    "reaction_like": "J'aime",
+    "reaction_love": "J'adore",
+    "reaction_adore": "J'adore",
+    "reaction_wow": "Wow",
+    "reaction_sigh": "Ouh",
+    "reaction_grrr": "Grrr",
+    "persone_ammirano": "Les gens admirent les souvenirs"
   }
 }

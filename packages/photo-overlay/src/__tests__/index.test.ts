@@ -1,15 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockSharp = vi.fn(() => {
-  const chain: any = {
-    metadata: vi.fn(),
-    resize: vi.fn(() => chain),
-    composite: vi.fn(() => chain),
-    jpeg: vi.fn(() => chain),
-    toBuffer: vi.fn(),
-  };
-  return chain;
-});
+// Mock sharp: ogni chiamata `sharp(buf)` ritorna la stessa catena con tutti i metodi chained.
+// Include extract/resize/stats/composite/jpeg/toBuffer usati dal nuovo applyOverlay.
+const chain: any = {
+  metadata: vi.fn(),
+  resize: vi.fn(() => chain),
+  extract: vi.fn(() => chain),
+  stats: vi.fn(),
+  composite: vi.fn(() => chain),
+  jpeg: vi.fn(() => chain),
+  toBuffer: vi.fn(),
+  raw: vi.fn(() => chain), // usato invec chainsoked altrove (defensive)
+};
+const mockSharp = vi.fn(() => chain);
 
 vi.mock('sharp', () => ({
   default: mockSharp,
@@ -27,55 +30,39 @@ describe('applyOverlay', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Re-bind default chain returns so reordered tests stay isolated.
+    chain.metadata = vi.fn().mockResolvedValue({ width: 1200, height: 800 });
+    // stats() per il path luminanza: returns channels RGB均值 pairing.
+    chain.stats = vi.fn().mockResolvedValue({
+      channels: [{ mean: 100 }, { mean: 100 }, { mean: 100 }], // avg muy scuro → text bianco
+    });
+    chain.jpeg = vi.fn(() => chain);
+    chain.composite = vi.fn(() => chain);
+    chain.toBuffer = vi.fn().mockResolvedValue(Buffer.from('result'));
+    chain.resize = vi.fn(() => chain);
+    chain.extract = vi.fn(() => chain);
   });
 
   it('applica overlay formato square', async () => {
-    const mockChain = {
-      metadata: vi.fn().mockResolvedValue({ width: 1200, height: 800 }),
-      resize: vi.fn().mockReturnThis(),
-      composite: vi.fn().mockReturnThis(),
-      jpeg: vi.fn().mockReturnThis(),
-      toBuffer: vi.fn().mockResolvedValue(Buffer.from('result')),
-    };
-    mockSharp.mockReturnValue(mockChain);
-
     const result = await applyOverlay(Buffer.from('test'), {
       format: 'square',
       branding: baseBranding,
     });
-
     expect(Buffer.isBuffer(result)).toBe(true);
-    expect(mockChain.jpeg).toHaveBeenCalledWith({ quality: 92 });
+    expect(chain.jpeg).toHaveBeenCalledWith({ quality: 92 });
   });
 
   it('applica overlay formato story', async () => {
-    const mockChain = {
-      metadata: vi.fn().mockResolvedValue({ width: 1080, height: 1920 }),
-      resize: vi.fn().mockReturnThis(),
-      composite: vi.fn().mockReturnThis(),
-      jpeg: vi.fn().mockReturnThis(),
-      toBuffer: vi.fn().mockResolvedValue(Buffer.from('result-story')),
-    };
-    mockSharp.mockReturnValue(mockChain);
-
+    chain.metadata = vi.fn().mockResolvedValue({ width: 1080, height: 1920 });
+    chain.toBuffer = vi.fn().mockResolvedValue(Buffer.from('result-story'));
     const result = await applyOverlay(Buffer.from('test'), {
       format: 'story',
       branding: baseBranding,
     });
-
     expect(Buffer.isBuffer(result)).toBe(true);
   });
 
   it('usa colori e font personalizzati', async () => {
-    const mockChain = {
-      metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
-      resize: vi.fn().mockReturnThis(),
-      composite: vi.fn().mockReturnThis(),
-      jpeg: vi.fn().mockReturnThis(),
-      toBuffer: vi.fn().mockResolvedValue(Buffer.from('custom')),
-    };
-    mockSharp.mockReturnValue(mockChain);
-
     const result = await applyOverlay(Buffer.from('test'), {
       format: 'square',
       branding: {
@@ -84,43 +71,37 @@ describe('applyOverlay', () => {
         fontFamily: 'Arial',
       },
     });
-
     expect(Buffer.isBuffer(result)).toBe(true);
   });
 
-  it('gestisce nomi con caratteri speciali XML', async () => {
-    const mockChain = {
-      metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
-      resize: vi.fn().mockReturnThis(),
-      composite: vi.fn().mockReturnThis(),
-      jpeg: vi.fn().mockReturnThis(),
-      toBuffer: vi.fn().mockResolvedValue(Buffer.from('safe')),
-    };
-    mockSharp.mockReturnValue(mockChain);
-
+  it('gestisce nomi con caratteri speciali XML (escape & < >)', async () => {
     const result = await applyOverlay(Buffer.from('test'), {
       format: 'square',
       branding: { ...baseBranding, coupleNames: 'Marco & Anna <3' },
     });
-
     expect(Buffer.isBuffer(result)).toBe(true);
   });
 
   it('usa metadati immagine per calcoli', async () => {
-    const mockChain = {
-      metadata: vi.fn().mockResolvedValue({ width: 640, height: 480 }),
-      resize: vi.fn().mockReturnThis(),
-      composite: vi.fn().mockReturnThis(),
-      jpeg: vi.fn().mockReturnThis(),
-      toBuffer: vi.fn().mockResolvedValue(Buffer.from('resized')),
-    };
-    mockSharp.mockReturnValue(mockChain);
-
+    chain.metadata = vi.fn().mockResolvedValue({ width: 640, height: 480 });
+    chain.toBuffer = vi.fn().mockResolvedValue(Buffer.from('resized'));
     await applyOverlay(Buffer.from('test'), {
       format: 'square',
       branding: baseBranding,
     });
+    expect(chain.metadata).toHaveBeenCalled();
+  });
 
-    expect(mockChain.metadata).toHaveBeenCalled();
+  it('cuore ❤ è XML-safe come entità &#10084; nel watermark', async () => {
+    chain.toBuffer = vi.fn().mockResolvedValue(Buffer.from('emoji'));
+    await applyOverlay(Buffer.from('test'), {
+      format: 'square',
+      branding: { ...baseBranding, coupleNames: 'Guido', date: '25/08/2026', wordmark: 'Sposi.live' },
+    });
+    expect(chain.composite).toHaveBeenCalled();
+    const call = chain.composite.mock.calls[0][0] as Array<{ input: Buffer }>;
+    const svgText = call[0].input.toString('utf8');
+    expect(svgText).toContain('&#10084;'); // cuore come entità XML
+    expect(svgText).toContain('fill="#d9534f"'); // tspan rosso
   });
 });

@@ -1,19 +1,30 @@
 @import "tailwindcss";
 
+/* Lucida Calligraphy — font self-hosted per watermark aspirazionale */
+@font-face {
+  font-family: 'Lucida Calligraphy';
+  src: url('/fonts/LucidaCalligraphy.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
-  /* Palette Zola-inspired: neutri caldi + oro */
-  --color-brand: #c4956a;
-  --color-brand-light: #dbb896;
-  --color-brand-dark: #a87a4e;
-  --color-bg: #f8f6f3;
+  /* Palette Facebook-inspired: blu #1877F2 + neutri puliti */
+  --color-brand: #1877f2;
+  --color-brand-light: #4a9af5;
+  --color-brand-dark: #1660c4;
+  --color-bg: #f0f2f5;
   --color-surface: #ffffff;
-  --color-muted: #f1ede7;
-  --color-text: #1a1a2e;
-  --color-text-muted: #6b6560;
-  --color-border: #e8e2d9;
-  --color-success: #22c55e;
-  --color-error: #ef4444;
-  --color-warning: #f59e0b;
+  --color-muted: #f0f2f5;
+  --color-text: #050505;
+  --color-text-muted: #65676b;
+  --color-border: #ced0d4;
+  --color-success: #31a24c;
+  --color-error: #e41e3f;
+  --color-warning: #f7b928;
+  --color-like: #1877f2;
+  --color-love: #f33e58;
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-serif: var(--font-playfair), Georgia, 'Times New Roman', serif;
 }
@@ -56,4 +67,67 @@ body {
     transform: none;
     transition: none;
   }
+}
+
+/* ── Stile Facebook: card post con angoli smussati morbidi ───────────── */
+.fb-card {
+  background: var(--color-surface);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.15s ease;
+}
+.fb-card:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+/* Avatar rotondo stile FB */
+.fb-avatar {
+  border-radius: 9999px;
+  object-fit: cover;
+  background: linear-gradient(180deg, #e7f0ff, #c4d8ff);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-brand-dark);
+  font-weight: 700;
+}
+
+/* Header nav stile FB (sticky, bianco, ombra leggera) */
+.fb-nav {
+  background: var(--color-surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Pulse animato per il numero like (pop) */
+@keyframes fb-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+.fb-pop {
+  animation: fb-pop 0.32s ease;
+}
+
+/* Barra reazioni (comparsa su hover del like) */
+.fb-reactions {
+  opacity: 0;
+  transform: translateY(4px) scale(0.9);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  pointer-events: none;
+}
+.fb-like-btn:hover .fb-reactions {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* Skeleton shimmer per infinite scroll */
+@keyframes fb-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.fb-shimmer {
+  background: linear-gradient(90deg, #e9ebee 25%, #f4f5f7 50%, #e9ebee 75%);
+  background-size: 800px 100%;
+  animation: fb-shimmer 1.4s infinite linear;
 }

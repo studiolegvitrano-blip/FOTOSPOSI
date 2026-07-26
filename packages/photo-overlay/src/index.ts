@@ -7,6 +7,11 @@ export interface OverlayBranding {
   textColor?: string;
   wordmark: string;
   fontFamily?: string;
+  /** Logo PNG brand (es. Sposi.live/JustMarry.live) da sovrapporre in alto a destra A COLORI.
+   *  Deve essere un Buffer PNG con trasparenza. Se assente, resta solo la parola wordmark. */
+  brandLogoBuffer?: Buffer | null;
+  /** Larghezza del logo brand in px (default 15% della larghezza foto, min 80 max 400). */
+  brandLogoWidth?: number;
 }
 
 export interface OverlayOptions {
@@ -14,49 +19,26 @@ export interface OverlayOptions {
   branding: OverlayBranding;
 }
 
+/**
+ * Watermark come da specifica utente (sessione 25/07/2026):
+ *   - Una sola riga in basso a sinistra: "{coupleNames} ❤ {date} · {wordmark}"
+ *     (Nel nostro standard "Guido ❤ Melissa · Sposi · 25/08/2026")
+ *   - Font piccolo (~3% dell'altezza foto, clampato 10–18px su square, 16–28 su story)
+ *   - Cuore SEMPRE rosso (#d9534f), testo resto auto black/white in base alla luminanza
+ *     della fascia bassa della foto (campionata via sharp.stats sulla region bottom-25%)
+ *   - Opacità testo 50%
+ *   - nessuna banda colorata di sfondo (filigrana integrata sulla foto)
+ *   - Logo brand in alto a destra A COLORI, senza mix-blend, senza opacità forzata
+ */
 export async function applyOverlay(
   imageBuffer: Buffer,
   options: OverlayOptions,
 ): Promise<Buffer> {
   const sharp = (await import('sharp')).default;
   const { format, branding } = options;
-  const textColor = branding.textColor || '#ffffff';
-  const fontSize = format === 'story' ? 42 : 28;
-  const wordmarkSize = format === 'story' ? 22 : 14;
 
-  const coupleLine = branding.coupleNames;
-  const dateLine = branding.date;
-  const wordmarkLine = branding.wordmark;
-
-  const bandHeight = format === 'story' ? 140 : 90;
-  const padding = format === 'story' ? 40 : 24;
-
-  const svgOverlay = `<svg width="100%" height="${bandHeight}" xmlns="http://www.w3.org/2000/svg">
-    <rect width="100%" height="${bandHeight}" fill="${branding.primaryColor}" fill-opacity="0.85" rx="0" />
-    <text x="${padding}" y="${bandHeight / 2 - 4}"
-          font-family="${branding.fontFamily || 'Georgia, serif'}"
-          font-size="${fontSize}"
-          font-weight="bold"
-          fill="${textColor}">
-      ${escapeXml(coupleLine)}
-    </text>
-    <text x="${padding}" y="${bandHeight / 2 + parseInt(String(fontSize)) + 2}"
-          font-family="${branding.fontFamily || 'Georgia, serif'}"
-          font-size="${Math.round(fontSize * 0.7)}"
-          fill="${textColor}" fill-opacity="0.9">
-      ${escapeXml(dateLine)}
-    </text>
-    <text x="100%" y="${bandHeight / 2 + 4}"
-          font-family="Inter, sans-serif"
-          font-size="${wordmarkSize}"
-          fill="${textColor}" fill-opacity="0.6"
-          text-anchor="end">
-      ${escapeXml(wordmarkLine)}
-    </text>
-  </svg>`;
-
+  // ── Pipeline setup: per story ridimensioniamo su 1080×1920 ──
   let image = sharp(imageBuffer);
-
   if (format === 'story') {
     const meta = await image.metadata();
     const w = meta.width || 1080;
@@ -68,7 +50,6 @@ export async function applyOverlay(
     const dh = Math.round(h * scale);
     const padX = Math.round((targetW - dw) / 2);
     const padY = Math.round((targetH - dh) / 2);
-
     image = sharp({
       create: { width: targetW, height: targetH, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 1 } },
     }).composite([
@@ -76,45 +57,79 @@ export async function applyOverlay(
     ]);
   }
 
-  const bandSvg = format === 'story'
-    ? `<svg width="1080" height="${bandHeight}" xmlns="http://www.w3.org/2000/svg">
-        <rect width="1080" height="${bandHeight}" fill="${branding.primaryColor}" fill-opacity="0.85" />
-        <text x="${padding}" y="${bandHeight / 2 - 4}"
-              font-family="${branding.fontFamily || 'Georgia, serif'}"
-              font-size="${fontSize}" font-weight="bold" fill="${textColor}">${escapeXml(coupleLine)}</text>
-        <text x="${padding}" y="${bandHeight / 2 + parseInt(String(fontSize)) + 2}"
-              font-family="${branding.fontFamily || 'Georgia, serif'}"
-              font-size="${Math.round(fontSize * 0.7)}" fill="${textColor}" fill-opacity="0.9">${escapeXml(dateLine)}</text>
-        <text x="1060" y="${bandHeight / 2 + 4}"
-              font-family="Inter, sans-serif"
-              font-size="${wordmarkSize}" fill="${textColor}" fill-opacity="0.6"
-              text-anchor="end">${escapeXml(wordmarkLine)}</text>
-      </svg>`
-    : `<svg width="100%" height="${bandHeight}" xmlns="http://www.w3.org/2000/svg">
-        <rect width="100%" height="${bandHeight}" fill="${branding.primaryColor}" fill-opacity="0.85" />
-        <text x="${padding}" y="${bandHeight / 2 - 4}"
-              font-family="${branding.fontFamily || 'Georgia, serif'}"
-              font-size="${fontSize}" font-weight="bold" fill="${textColor}">${escapeXml(coupleLine)}</text>
-        <text x="${padding}" y="${bandHeight / 2 + parseInt(String(fontSize)) + 2}"
-              font-family="${branding.fontFamily || 'Georgia, serif'}"
-              font-size="${Math.round(fontSize * 0.7)}" fill="${textColor}" fill-opacity="0.9">${escapeXml(dateLine)}</text>
-        <text x="100%" y="${bandHeight / 2 + 4}"
-              font-family="Inter, sans-serif"
-              font-size="${wordmarkSize}" fill="${textColor}" fill-opacity="0.6"
-              text-anchor="end" transform="translate(-${padding}, 0)">${escapeXml(wordmarkLine)}</text>
-      </svg>`;
-
   const imageMeta = await image.metadata();
   const imgWidth = imageMeta.width || 1080;
+  const imgHeight = imageMeta.height || (format === 'story' ? 1920 : 1080);
 
-  const bandTop = (imageMeta.height || 1920) - bandHeight;
+  // ── Luminanza della fascia bassa per scegliere il colore testo ──
+  const bottomStripHeight = Math.max(1, Math.floor(imgHeight * 0.25));
+  const bottomStrip = sharp(imageBuffer)
+    .extract({ left: 0, top: Math.max(0, imgHeight - bottomStripHeight), width: Math.min(imgWidth, imageMeta.width || imgWidth), height: bottomStripHeight })
+    .resize(64, 16, { fit: 'fill' })
+    .raw();
+  let avgLuma = 0.5; // safe default = scuro → testo bianco
+  try {
+    const stats = await bottomStrip.stats();
+    // stats.channels: ChannelStats[] in ordine R, G, B (e A se presente)
+    const channels = stats.channels ?? [];
+    const r = channels[0]?.mean ?? 128;
+    const g = channels[1]?.mean ?? 128;
+    const b = channels[2]?.mean ?? 128;
+    avgLuma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  } catch {
+    // fallback: safe default (testo bianco)
+  }
+  const autoText = avgLuma < 0.5 ? '#ffffff' : '#000000';
+  const textColor = branding.textColor && branding.textColor !== 'auto' ? branding.textColor : autoText;
 
-  const svgWidth = format === 'story' ? 1080 : imgWidth;
+  // ── Costruisce la riga monogramma con cuore sempre rosso (entità XML &#10084; per il ❤) ──
+  // Escapizza separatamente le parti utente — il <tspan> strutturale resta raw (XML valido).
+  const HEART_ENTITY = '&#10084;';
+  const monoLine =
+    escapeXml(branding.coupleNames) +
+    ' <tspan fill="#d9534f">' + HEART_ENTITY + '</tspan> ' +
+    escapeXml(branding.date) + ' · ' + escapeXml(branding.wordmark);
+  // Dimensione testo: ~3% altezza foto, clampato
+  const textPx = Math.min(
+    Math.max(10, Math.round(imgHeight * 0.018)),
+    format === 'story' ? 28 : 18,
+  );
+  // Padding piccolo dal bordo
+  const padBottom = Math.round(imgHeight * 0.012);
+  const padLeft = Math.round(imgWidth * 0.012);
 
-  const finalSvg = bandSvg.replace('width="100%"', `width="${svgWidth}"`);
+  // SVG watermark (una sola riga, in basso a sinistra) — dimensioni assolute (non 100%)
+  const watermarkSvg = `<svg width="${imgWidth}" height="${imgHeight}" xmlns="http://www.w3.org/2000/svg">
+    <text x="${padLeft}" y="${imgHeight - padBottom}"
+          font-family="${escapeXmlAttr(branding.fontFamily || 'Georgia, serif')}"
+          font-size="${textPx}" fill="${textColor}" fill-opacity="0.5">${monoLine}</text>
+  </svg>`;
+
+  const compositeOps: { input: Buffer; top: number; left: number }[] = [
+    { input: Buffer.from(watermarkSvg), top: 0, left: 0 },
+  ];
+
+  // ── Logo brand in alto a destra, A COLORI (no mix-blend, no opacità forzata) ──
+  if (branding.brandLogoBuffer) {
+    const targetLogoW = branding.brandLogoWidth ?? Math.min(400, Math.max(80, Math.round(imgWidth * 0.15)));
+    try {
+      const resizedLogo = await sharp(branding.brandLogoBuffer)
+        .resize(targetLogoW, null, { fit: 'inside' })
+        .toBuffer();
+      const logoMeta = await sharp(resizedLogo).metadata();
+      const logoW = logoMeta.width || targetLogoW;
+      const logoH = logoMeta.height || Math.round(targetLogoW * 0.5);
+      const logoTop = Math.round(imgHeight * 0.02);
+      const logoRight = Math.round(imgWidth * 0.02);
+      const logoLeft = Math.max(0, imgWidth - logoW - logoRight);
+      compositeOps.push({ input: resizedLogo, top: logoTop, left: logoLeft });
+    } catch (e) {
+      console.error('watermark brand logo err:', e);
+    }
+  }
 
   const result = await image
-    .composite([{ input: Buffer.from(finalSvg), top: bandTop, left: 0 }])
+    .composite(compositeOps)
     .jpeg({ quality: 92 })
     .toBuffer();
 
@@ -122,5 +137,14 @@ export async function applyOverlay(
 }
 
 function escapeXml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function escapeXmlAttr(s: string): string {
+  return escapeXml(s);
 }

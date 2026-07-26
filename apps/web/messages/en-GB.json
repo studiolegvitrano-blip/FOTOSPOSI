@@ -11,7 +11,8 @@
     "search": "Search",
     "loading": "Loading...",
     "error_generic": "Something went wrong. Try again.",
-    "or_continue_with": "or continue with","error_network": "Can't connect. Check your internet and try again.",
+    "or_continue_with": "or continue with",
+    "error_network": "Can't connect. Check your internet and try again.",
     "back": "Back",
     "next": "Next",
     "close": "Close",
@@ -62,25 +63,61 @@
     "platform_title": "One single platform",
     "platform_subtitle": "Four tools working together, with nothing for your guests to install.",
     "platform_items": [
-      { "title": "Invitation website", "desc": "An elegant site with dates, venues, RSVP, and everything your guests need — ready in minutes." },
-      { "title": "Interactive games", "desc": "Quizzes, photo challenges, and real-time leaderboards that light up the reception." },
-      { "title": "Photos & videos via QR", "desc": "Guests scan the QR code and upload their shots in real time — the gallery fills itself." },
-      { "title": "AI concierge", "desc": "An assistant that answers guests' questions: schedules, addresses, dress code, parking." }
+      {
+        "title": "Invitation website",
+        "desc": "An elegant site with dates, venues, RSVP, and everything your guests need — ready in minutes."
+      },
+      {
+        "title": "Interactive games",
+        "desc": "Quizzes, photo challenges, and real-time leaderboards that light up the reception."
+      },
+      {
+        "title": "Photos & videos via QR",
+        "desc": "Guests scan the QR code and upload their shots in real time — the gallery fills itself."
+      },
+      {
+        "title": "AI concierge",
+        "desc": "An assistant that answers guests' questions: schedules, addresses, dress code, parking."
+      }
     ],
     "how_title": "How it works",
     "how_steps": [
-      { "title": "Create your event", "desc": "Sign up, pick a plan, and personalise your invitation site with your names, dates, and venues." },
-      { "title": "Share the QR code", "desc": "Print the QR on the tables or send it to guests — one scan and they're in." },
-      { "title": "Relive the memories", "desc": "Photos, videos, and video messages stay collected and organised, ready to download and share." }
+      {
+        "title": "Create your event",
+        "desc": "Sign up, pick a plan, and personalise your invitation site with your names, dates, and venues."
+      },
+      {
+        "title": "Share the QR code",
+        "desc": "Print the QR on the tables or send it to guests — one scan and they're in."
+      },
+      {
+        "title": "Relive the memories",
+        "desc": "Photos, videos, and video messages stay collected and organised, ready to download and share."
+      }
     ],
     "games_title": "The games that make the party",
     "games_subtitle": "Designed to engage every table, from grandparents to the best man.",
     "games": [
-      { "title": "Wall", "desc": "Your event's social wall: guests' photos and messages live on the big screen." },
-      { "title": "Couple Quiz", "desc": "Who knows the couple best? Personalised questions and a real-time leaderboard." },
-      { "title": "Photo Hunt", "desc": "Photo missions for every table — the challenge that fills your gallery with candid shots." },
-      { "title": "Video Guestbook", "desc": "Video wishes with a countdown, automatically saved to your archive." },
-      { "title": "Selfie Kiosk", "desc": "A self-service selfie station: guests snap and the photo goes straight to the gallery." }
+      {
+        "title": "Wall",
+        "desc": "Your event's social wall: guests' photos and messages live on the big screen."
+      },
+      {
+        "title": "Couple Quiz",
+        "desc": "Who knows the couple best? Personalised questions and a real-time leaderboard."
+      },
+      {
+        "title": "Photo Hunt",
+        "desc": "Photo missions for every table — the challenge that fills your gallery with candid shots."
+      },
+      {
+        "title": "Video Guestbook",
+        "desc": "Video wishes with a countdown, automatically saved to your archive."
+      },
+      {
+        "title": "Selfie Kiosk",
+        "desc": "A self-service selfie station: guests snap and the photo goes straight to the gallery."
+      }
     ],
     "watermark_kicker": "MAX Watermark",
     "watermark_title": "Every shared photo carries your logo",
@@ -94,21 +131,76 @@
     "plan_free_name": "Free",
     "plan_premium_name": "Premium",
     "plan_deluxe_name": "Deluxe",
-    "plan_free_features": ["Invitation site & QR code", "Up to 100 photos (standard quality)", "Wall & basic games", "1 event per account"],
-    "plan_premium_features": ["Unlimited photos & videos in original quality", "All games included", "Google Drive backup", "Time Capsule", "Branded event site"],
-    "plan_deluxe_features": ["Everything in Premium", "AI concierge", "Selfie Kiosk", "Branded mobile app", "Priority support"],
+    "plan_free_features": [
+      "Invitation site & QR code",
+      "Up to 100 photos (standard quality)",
+      "Wall & basic games",
+      "1 event per account"
+    ],
+    "plan_premium_features": [
+      "Unlimited photos & videos in original quality",
+      "All games included",
+      "Google Drive backup",
+      "Time Capsule",
+      "Branded event site"
+    ],
+    "plan_deluxe_features": [
+      "Everything in Premium",
+      "AI concierge",
+      "Selfie Kiosk",
+      "Branded mobile app",
+      "Priority support"
+    ],
     "plan_games_badge": "Games included",
     "plan_popular": "Most popular",
     "plan_cta": "Start free",
     "stats": [
-      { "value": "10,000+", "label": "photos collected" },
-      { "value": "150+", "label": "events hosted" },
-      { "value": "5", "label": "interactive games" },
-      { "value": "6", "label": "languages available" }
+      {
+        "value": "10,000+",
+        "label": "photos collected"
+      },
+      {
+        "value": "150+",
+        "label": "events hosted"
+      },
+      {
+        "value": "5",
+        "label": "interactive games"
+      },
+      {
+        "value": "6",
+        "label": "languages available"
+      }
     ],
     "final_cta_title": "Create your free invitation site",
     "final_cta_subtitle": "Ready in minutes. No card required.",
-    "footer_tagline": "Your wedding's photos, games and memories — all in one place."
+    "footer_tagline": "Your wedding's photos, games and memories — all in one place.",
+    "showcase_title": "Three moments. Three phones. One story.",
+    "showcase_subtitle": "From the ceremony to the toast, every guest shot lives in the app the moment it's taken. Open your day with a QR.",
+    "showcase_cta": "Start your wedding site free",
+    "showcase_phone1_badge": "The ceremony",
+    "showcase_phone1_caption": "The 'I do' moment, captured live by the guests.",
+    "showcase_phone1_author": "Giulia, witness",
+    "showcase_phone2_badge": "The arrival",
+    "showcase_phone2_caption": "The couple's Ferrari Purosangue: an entrance no one forgets.",
+    "showcase_phone2_author": "Marco, groom's friend",
+    "showcase_phone3_badge": "The party",
+    "showcase_phone3_caption": "Toasts, dances and laughs: it all lands in the gallery automatically.",
+    "showcase_phone3_author": "Sofia, bride's cousin",
+    "fb_feed_demo_title": "A day, told by your guests",
+    "fb_feed_demo_subtitle": "Here is how your photos and videos will look in your wedding app",
+    "fb_feed_demo_caption_1": "The ceremony was lovely! Congrats to the happy couple",
+    "fb_feed_demo_caption_2": "The first dance — not a dry eye in the room",
+    "fb_feed_demo_caption_3": "Endless toasts at the top table",
+    "fb_feed_demo_caption_4": "Cutting the cake, at long last",
+    "fb_feed_demo_caption_5": "Group selfie at the end of the evening",
+    "fb_feed_demo_caption_6": "The favours — a keepsake to remember",
+    "fb_feed_demo_author_1": "Hannah Clarke",
+    "fb_feed_demo_author_2": "Oliver Reed",
+    "fb_feed_demo_author_3": "Sophie Hughes",
+    "fb_feed_demo_author_4": "James Walker",
+    "fb_feed_demo_comment_a": "Beautiful photo!",
+    "fb_feed_demo_comment_b": "Congrats to you both!"
   },
   "auth": {
     "login_title": "Welcome back",
@@ -585,5 +677,34 @@
   "brand": {
     "fotosposi": "Sposi.live",
     "weddingmoments": "JustMarry.live"
+  },
+  "reactions": {
+    "like": "Like",
+    "love": "Love",
+    "adore": "Adore",
+    "wow": "Wow",
+    "sigh": "Sigh",
+    "grrr": "Grrr"
+  },
+  "feed": {
+    "mi_piaci": "Like",
+    "commenta": "Comment",
+    "condividi": "Share",
+    "invia_commento": "Write a comment...",
+    "invia": "Post",
+    "caricamento": "Loading...",
+    "niente_post": "No posts yet",
+    "giorni_fa": "{count} days ago",
+    "ore_fa": "{count} hours ago",
+    "minuti_fa": "{count} minutes ago",
+    "adesso": "Just now",
+    "comments_count_label": "comments",
+    "reaction_like": "Like",
+    "reaction_love": "Love",
+    "reaction_adore": "Adore",
+    "reaction_wow": "Wow",
+    "reaction_sigh": "Sigh",
+    "reaction_grrr": "Grrr",
+    "persone_ammirano": "People are admiring the memories"
   }
 }

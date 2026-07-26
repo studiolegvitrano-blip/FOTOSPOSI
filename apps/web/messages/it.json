@@ -11,7 +11,8 @@
     "search": "Cerca",
     "loading": "Caricamento...",
     "error_generic": "Qualcosa è andato storto. Riprova.",
-    "or_continue_with": "o continua con","error_network": "Errore di connessione. Controlla la tua rete.",
+    "or_continue_with": "o continua con",
+    "error_network": "Errore di connessione. Controlla la tua rete.",
     "back": "Indietro",
     "next": "Avanti",
     "close": "Chiudi",
@@ -62,25 +63,61 @@
     "platform_title": "Una piattaforma unica",
     "platform_subtitle": "Quattro strumenti che lavorano insieme, senza nulla da installare per gli invitati.",
     "platform_items": [
-      { "title": "Sito invito", "desc": "Un sito elegante con date, luoghi, RSVP e tutte le informazioni per gli invitati, pronto in pochi minuti." },
-      { "title": "Giochi interattivi", "desc": "Quiz, sfide fotografiche e classifiche in tempo reale che accendono il ricevimento." },
-      { "title": "Foto e video con QR", "desc": "Gli invitati inquadrano il QR e caricano i loro scatti in tempo reale: la galleria si riempie da sola." },
-      { "title": "Concierge AI", "desc": "Un assistente che risponde alle domande degli invitati: orari, indirizzi, dress code, parcheggi." }
+      {
+        "title": "Sito invito",
+        "desc": "Un sito elegante con date, luoghi, RSVP e tutte le informazioni per gli invitati, pronto in pochi minuti."
+      },
+      {
+        "title": "Giochi interattivi",
+        "desc": "Quiz, sfide fotografiche e classifiche in tempo reale che accendono il ricevimento."
+      },
+      {
+        "title": "Foto e video con QR",
+        "desc": "Gli invitati inquadrano il QR e caricano i loro scatti in tempo reale: la galleria si riempie da sola."
+      },
+      {
+        "title": "Concierge AI",
+        "desc": "Un assistente che risponde alle domande degli invitati: orari, indirizzi, dress code, parcheggi."
+      }
     ],
     "how_title": "Come funziona",
     "how_steps": [
-      { "title": "Crea l'evento", "desc": "Registrati, scegli il piano e personalizza il sito invito con i vostri nomi, le date e i luoghi." },
-      { "title": "Condividi il QR", "desc": "Stampa il QR sui tavoli o invialo agli invitati: chi lo inquadra entra subito nell'evento." },
-      { "title": "Rivivi i ricordi", "desc": "Foto, video e videomessaggi restano raccolti e ordinati, pronti da scaricare e condividere." }
+      {
+        "title": "Crea l'evento",
+        "desc": "Registrati, scegli il piano e personalizza il sito invito con i vostri nomi, le date e i luoghi."
+      },
+      {
+        "title": "Condividi il QR",
+        "desc": "Stampa il QR sui tavoli o invialo agli invitati: chi lo inquadra entra subito nell'evento."
+      },
+      {
+        "title": "Rivivi i ricordi",
+        "desc": "Foto, video e videomessaggi restano raccolti e ordinati, pronti da scaricare e condividere."
+      }
     ],
     "games_title": "I giochi che fanno la festa",
     "games_subtitle": "Pensati per coinvolgere tutti i tavoli, dai nonni ai testimoni.",
     "games": [
-      { "title": "Wall", "desc": "Il muro social dell'evento: foto e messaggi degli invitati in diretta sul maxischermo." },
-      { "title": "Quiz sugli Sposi", "desc": "Chi conosce meglio gli sposi? Domande personalizzate e classifica in tempo reale." },
-      { "title": "Caccia alla Foto", "desc": "Missioni fotografiche per i tavoli: la sfida che riempie la galleria di scatti spontanei." },
-      { "title": "Video Guestbook", "desc": "Videomessaggi di auguri con countdown, salvati automaticamente nel vostro archivio." },
-      { "title": "Kiosk Selfie", "desc": "Una postazione selfie self-service: gli invitati scattano e la foto entra subito in galleria." }
+      {
+        "title": "Wall",
+        "desc": "Il muro social dell'evento: foto e messaggi degli invitati in diretta sul maxischermo."
+      },
+      {
+        "title": "Quiz sugli Sposi",
+        "desc": "Chi conosce meglio gli sposi? Domande personalizzate e classifica in tempo reale."
+      },
+      {
+        "title": "Caccia alla Foto",
+        "desc": "Missioni fotografiche per i tavoli: la sfida che riempie la galleria di scatti spontanei."
+      },
+      {
+        "title": "Video Guestbook",
+        "desc": "Videomessaggi di auguri con countdown, salvati automaticamente nel vostro archivio."
+      },
+      {
+        "title": "Kiosk Selfie",
+        "desc": "Una postazione selfie self-service: gli invitati scattano e la foto entra subito in galleria."
+      }
     ],
     "watermark_kicker": "Watermark MAX",
     "watermark_title": "Ogni foto condivisa porta il vostro logo",
@@ -94,21 +131,76 @@
     "plan_free_name": "Free",
     "plan_premium_name": "Premium",
     "plan_deluxe_name": "Deluxe",
-    "plan_free_features": ["Sito invito e QR code", "Fino a 100 foto (qualità standard)", "Wall e giochi base", "1 evento per account"],
-    "plan_premium_features": ["Foto e video illimitati in qualità originale", "Tutti i giochi inclusi", "Backup su Google Drive", "Time Capsule", "Sito evento brandizzato"],
-    "plan_deluxe_features": ["Tutto Premium", "Concierge AI", "Kiosk Selfie", "App mobile brandizzata", "Assistenza prioritaria"],
+    "plan_free_features": [
+      "Sito invito e QR code",
+      "Fino a 100 foto (qualità standard)",
+      "Wall e giochi base",
+      "1 evento per account"
+    ],
+    "plan_premium_features": [
+      "Foto e video illimitati in qualità originale",
+      "Tutti i giochi inclusi",
+      "Backup su Google Drive",
+      "Time Capsule",
+      "Sito evento brandizzato"
+    ],
+    "plan_deluxe_features": [
+      "Tutto Premium",
+      "Concierge AI",
+      "Kiosk Selfie",
+      "App mobile brandizzata",
+      "Assistenza prioritaria"
+    ],
     "plan_games_badge": "Giochi inclusi",
     "plan_popular": "Più scelto",
     "plan_cta": "Inizia gratis",
     "stats": [
-      { "value": "10.000+", "label": "foto raccolte" },
-      { "value": "150+", "label": "eventi gestiti" },
-      { "value": "5", "label": "giochi interattivi" },
-      { "value": "6", "label": "lingue disponibili" }
+      {
+        "value": "10.000+",
+        "label": "foto raccolte"
+      },
+      {
+        "value": "150+",
+        "label": "eventi gestiti"
+      },
+      {
+        "value": "5",
+        "label": "giochi interattivi"
+      },
+      {
+        "value": "6",
+        "label": "lingue disponibili"
+      }
     ],
     "final_cta_title": "Crea il tuo sito invito gratis",
     "final_cta_subtitle": "Pronto in pochi minuti. Nessuna carta di credito richiesta.",
-    "footer_tagline": "Foto, giochi e ricordi del vostro matrimonio, in un unico posto."
+    "footer_tagline": "Foto, giochi e ricordi del vostro matrimonio, in un unico posto.",
+    "showcase_title": "Tre momenti, tre telefoni, una sola storia",
+    "showcase_subtitle": "Dalla cerimonia al brindisi, ogni scatto dei vostri invitati vive già dentro l'app. Aprite il vostro ricordo con un QR.",
+    "showcase_cta": "Crea il tuo sito invito gratis",
+    "showcase_phone1_badge": "La cerimonia",
+    "showcase_phone1_caption": "Il momento del sì, tra lacrime e sorrisi.",
+    "showcase_phone1_author": "Giulia, testimone",
+    "showcase_phone2_badge": "L'arrivo",
+    "showcase_phone2_caption": "L'ingresso degli sposi: la festa comincia.",
+    "showcase_phone2_author": "Marco, amico dello sposo",
+    "showcase_phone3_badge": "La festa",
+    "showcase_phone3_caption": "Brindisi, balli e risate: il ricevimento esplode.",
+    "showcase_phone3_author": "Sofia, cugina della sposa",
+    "fb_feed_demo_title": "Una giornata, raccontata dai tuoi ospiti",
+    "fb_feed_demo_subtitle": "Ecco come appariranno foto e video nella vostra app matrimonio",
+    "fb_feed_demo_caption_1": "La cerimonia è stata bellissima! Auguri agli sposi ❤️",
+    "fb_feed_demo_caption_2": "Il primo ballo: tutti emozionati!",
+    "fb_feed_demo_caption_3": "Brindisi infinito al tavolo degli sposi",
+    "fb_feed_demo_caption_4": "Il taglio della torta, infine",
+    "fb_feed_demo_caption_5": "Selfie di gruppo a fine serata",
+    "fb_feed_demo_caption_6": "La confettata: un ricordo indelebile",
+    "fb_feed_demo_author_1": "Giulia Rossi",
+    "fb_feed_demo_author_2": "Marco Bianchi",
+    "fb_feed_demo_author_3": "Sofia Verdi",
+    "fb_feed_demo_author_4": "Luca Ferrari",
+    "fb_feed_demo_comment_a": "Bellissima foto!",
+    "fb_feed_demo_comment_b": "Auguri a entrambi!"
   },
   "auth": {
     "login_title": "Accedi a Sposi.live",
@@ -587,5 +679,34 @@
   "brand": {
     "fotosposi": "Sposi.live",
     "weddingmoments": "JustMarry.live"
+  },
+  "reactions": {
+    "like": "Mi piace",
+    "love": "Adoro",
+    "adore": "Adoro",
+    "wow": "Wow",
+    "sigh": "Sigh",
+    "grrr": "Grrr"
+  },
+  "feed": {
+    "mi_piaci": "Mi piace",
+    "commenta": "Commenta",
+    "condividi": "Condividi",
+    "invia_commento": "Scrivi un commento...",
+    "invia": "Invia",
+    "caricamento": "Caricamento...",
+    "niente_post": "Nessun post al momento",
+    "giorni_fa": "{count} giorni fa",
+    "ore_fa": "{count} ore fa",
+    "minuti_fa": "{count} minuti fa",
+    "adesso": "Adesso",
+    "comments_count_label": "commenti",
+    "reaction_like": "Mi piace",
+    "reaction_love": "Adoro",
+    "reaction_adore": "Adoro",
+    "reaction_wow": "Wow",
+    "reaction_sigh": "Sigh",
+    "reaction_grrr": "Grrr",
+    "persone_ammirano": "Le persone ammirano i ricordi"
   }
 }

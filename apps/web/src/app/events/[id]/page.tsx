@@ -13,6 +13,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { WeddingEvent, SubEvent, EventWindow } from '@fotosposi/events';
 import type { MediaUpload } from '@fotosposi/media';
+import EventTimelineFeed from '@/components/event-timeline-feed';
+import FullGalleryLightbox from '@/components/full-gallery-lightbox';
 
 export default function EventDetailPage() {
   const params = useParams();
@@ -73,7 +75,8 @@ export default function EventDetailPage() {
       )}
 
       {!showWidget && <div ref={contentRef}>
-        <main className="max-w-4xl mx-auto p-4 space-y-6">
+        <main className="max-w-7xl mx-auto p-4 space-y-4">
+          {/* Intestazione evento: full-width sopra le 3 colonne */}
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-2xl font-bold">{event.couple_name}</h1>
@@ -106,28 +109,6 @@ export default function EventDetailPage() {
               </div>
               <Badge variant={event.tier === 'premium' ? 'default' : 'secondary'}>{event.tier}</Badge>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {/* Visibili a TUTTI (sposi e invitati): partecipare all'evento */}
-              <Button variant="default" asChild><Link href={`/events/${eventId}/upload`}>{c('upload')}</Link></Button>
-              <Button variant="secondary" asChild><Link href={`/events/${eventId}/games`}>{t('games')}</Link></Button>
-              <Button variant="secondary" asChild><Link href={`/events/${eventId}/shop`}>{t('shop')}</Link></Button>
-              <Button variant="outline" asChild><Link href={`/events/${eventId}/guestbook`}>{t('guestbook')}</Link></Button>
-              <Button variant="outline" asChild><Link href={`/events/${eventId}/wall`}>{t('wall')}</Link></Button>
-              <Button variant="outline" asChild><Link href={`/events/${eventId}/video-challenges`}>{t('video_challenges')}</Link></Button>
-              <Button variant="outline" asChild><Link href={`/events/${eventId}/wow-walk`}>{t('wow_walk')}</Link></Button>
-              {/* Solo SPOSI (creatore evento): gestione e amministrazione */}
-              {isCreator && (
-                <>
-                  <Button variant="outline" asChild><Link href={`/events/${eventId}/notifications`}>{t('notifications')}</Link></Button>
-                  <Button variant="outline" asChild><Link href={`/events/${eventId}/concierge`}>{t('concierge')}</Link></Button>
-                  <Button variant="outline" asChild><Link href={`/events/${eventId}/guests`}>{t('guests')}</Link></Button>
-                  <Button variant="outline" asChild><Link href={`/events/${eventId}/capsule`}>Capsula del Tempo</Link></Button>
-                  <Button variant="outline" asChild><Link href={`/kiosk/${event.code || eventId}`}>{t('kiosk')}</Link></Button>
-                  <Button variant="outline" asChild><Link href={`/events/${eventId}/qr`}>{t('qr_code')}</Link></Button>
-                  <Button variant="secondary" asChild><Link href={`/events/${eventId}/settings`}>⚙️ Impostazioni</Link></Button>
-                </>
-              )}
-            </div>
           </div>
 
           {evtWindow && (
@@ -138,142 +119,99 @@ export default function EventDetailPage() {
             </Card>
           )}
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>{c('gallery')} ({media.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {media.length === 0 ? (
-                <p className="text-text-muted">{c('no_results')}</p>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                  {media.slice(0, 12).map((m) => (
-                    <div key={m.id} className="relative group rounded-md overflow-hidden border border-border">
-                      {m.type === 'photo'
-                        ? <img
-                            src={mediaUrl(m)}
-                            alt=""
-                            className="w-full h-28 object-cover cursor-zoom-in"
-                            loading="lazy"
-                            // Tap sulla foto → ingrandimento a schermo intero (niente più download)
-                            onClick={() => setLightbox(mediaUrl(m))}
-                          />
-                        : <video
-                            src={mediaUrl(m)}
-                            className="w-full h-28 object-cover bg-black"
-                            controls
-                            preload="metadata"
-                            onPlay={(e) => {
-                              const el = e.currentTarget as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
-                              if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-                              else if (el.webkitEnterFullscreen) el.webkitEnterFullscreen(); // iOS Safari
-                            }}
-                          />}
-                      {/* Sempre visibili (non solo on-hover): su mobile/touch non esiste hover,
-                          quindi i pulsanti per-foto restavano invisibili e inutilizzabili. */}
-                      <div className="absolute bottom-1 right-1 flex items-center gap-1.5">
-                        <button
-                          onClick={() => shareWatermarkedMedia(m.id, eventId, m.type !== 'photo', `${event?.couple_name} — ${typeof window !== 'undefined' && window.location.hostname.includes('justmarry') ? 'JustMarry.live' : 'Sposi.live'}`)}
-                          className="p-1.5 bg-white/90 rounded-full shadow hover:bg-white transition-colors"
-                          title="Condividi"
-                        >
-                          <Share2 className="w-4 h-4" />
-                        </button>
-                      </div>
+          {/* ─── LAYOUT 3 COLONNE: servizi sx | feed centrale | servizi dx ─── */}
+          <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)_200px] gap-4">
+            {/* Sidebar SINISTRA — azioni per TUTTI */}
+            <aside className="space-y-2 order-2 lg:order-1">
+              <p className="text-xs uppercase tracking-wide text-text-muted px-1">Partecipa</p>
+              <Button variant="default" className="w-full justify-center" asChild><Link href={`/events/${eventId}/upload`}>{c('upload')}</Link></Button>
+              <Button variant="secondary" className="w-full justify-center" asChild><Link href={`/events/${eventId}/games`}>{t('games')}</Link></Button>
+              <Button variant="secondary" className="w-full justify-center" asChild><Link href={`/events/${eventId}/shop`}>{t('shop')}</Link></Button>
+              <Button variant="outline" className="w-full justify-center" asChild><Link href={`/events/${eventId}/guestbook`}>{t('guestbook')}</Link></Button>
+              <Button variant="outline" className="w-full justify-center" asChild><Link href={`/events/${eventId}/wall`}>{t('wall')}</Link></Button>
+              <Button variant="outline" className="w-full justify-center" asChild><Link href={`/events/${eventId}/video-challenges`}>{t('video_challenges')}</Link></Button>
+              <Button variant="outline" className="w-full justify-center" asChild><Link href={`/events/${eventId}/wow-walk`}>{t('wow_walk')}</Link></Button>
+            </aside>
+
+            {/* COLONNA CENTRALE — feed timeline stile Facebook */}
+            <section className="order-1 lg:order-2">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>{c('gallery')} ({media.length + videos.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {media.length === 0 && videos.length === 0 ? (
+                    <p className="text-text-muted">{c('no_results')}</p>
+                  ) : (
+                    <EventTimelineFeed
+                      media={media}
+                      videos={videos}
+                      event={event}
+                      eventId={eventId}
+                      onShareMedia={(id, isVideo) => {
+                        const brand = typeof window !== 'undefined' && window.location.hostname.includes('justmarry')
+                          ? 'JustMarry.live'
+                          : 'Sposi.live';
+                        shareWatermarkedMedia(id, eventId, isVideo, `${event?.couple_name} — ${brand}`);
+                      }}
+                      onOpenImage={(url) => setLightbox(url)}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Sub-eventi + share/back */}
+              <Card className="mt-4">
+                <CardHeader><CardTitle>{t('subtitle')}</CardTitle></CardHeader>
+                <CardContent>
+                  {subEvents.length === 0 ? (
+                    <p className="text-text-muted">{c('no_results')}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {subEvents.map((s) => (
+                        <div key={s.id} className="flex items-center justify-between p-2 rounded-md border border-border">
+                          <div>
+                            <p className="font-medium">{s.title}</p>
+                            <p className="text-sm text-text-muted">{new Date(s.date).toLocaleDateString()}</p>
+                          </div>
+                          <Badge variant="outline">{s.type}</Badge>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  )}
+                </CardContent>
+              </Card>
 
-          {videos.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle>Video Guestbook ({videos.length})</CardTitle></CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                  {videos.map((v) => {
-                    const videoId = String(v.id);
-                    const r2Key = v.r2_key as string;
-                    const src = r2Key ? `/api/media/${videoId}/download` : (v as unknown as { url: string }).url ?? '';
-                    const author = (v as unknown as { from_name?: string }).from_name;
-                    return (
-                      <div key={videoId} className="relative rounded-md overflow-hidden border border-border">
-                        <video
-                          src={src}
-                          className="w-full h-28 object-cover bg-black"
-                          controls
-                          // Al play il video va a schermo intero da solo: nelle card piccole
-                          // della pagina evento il tasto fullscreen nativo spesso non c'è
-                          // (soprattutto su telefono) e guardare in miniatura non ha senso.
-                          onPlay={(e) => {
-                            const el = e.currentTarget as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
-                            if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-                            else if (el.webkitEnterFullscreen) el.webkitEnterFullscreen(); // iOS Safari
-                          }}
-                          preload="none"
-                          // poster placeholder — evita richiesta HTTP se non serve
-                          poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150'%3E%3Crect fill='%23111' width='200' height='150'/%3E%3Ccircle cx='100' cy='75' r='18' fill='%23444'/%3E%3Cpolygon points='95,65 95,85 110,75' fill='%23888'/%3E%3C/svg%3E"
-                        />
-                        {author && (
-                          <p className="absolute top-1 left-1 right-1 text-xs text-white bg-black/60 px-2 py-0.5 rounded truncate">
-                            {author}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+              <div className="flex items-center gap-4 mt-4">
+                <ShareButton
+                  eventUrl={typeof globalThis !== 'undefined' ? globalThis.location?.href ?? '' : ''}
+                  title={event.couple_name}
+                />
+                <Button variant="link" asChild><Link href="/dashboard">{c('back')}</Link></Button>
+              </div>
+            </section>
 
-          <Card>
-            <CardHeader><CardTitle>{t('subtitle')}</CardTitle></CardHeader>
-            <CardContent>
-              {subEvents.length === 0 ? (
-                <p className="text-text-muted">{c('no_results')}</p>
-              ) : (
-                <div className="space-y-2">
-                  {subEvents.map((s) => (
-                    <div key={s.id} className="flex items-center justify-between p-2 rounded-md border border-border">
-                      <div>
-                        <p className="font-medium">{s.title}</p>
-                        <p className="text-sm text-text-muted">{new Date(s.date).toLocaleDateString()}</p>
-                      </div>
-                      <Badge variant="outline">{s.type}</Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="flex items-center gap-4">
-            <ShareButton
-              eventUrl={typeof globalThis !== 'undefined' ? globalThis.location?.href ?? '' : ''}
-              title={event.couple_name}
-            />
-            <Button variant="link" asChild><Link href="/dashboard">{c('back')}</Link></Button>
+            {/* Sidebar DESTRA — solo SPOSI (creatore evento) */}
+            {isCreator && (
+              <aside className="space-y-2 order-3">
+                <p className="text-xs uppercase tracking-wide text-text-muted px-1">Gestione sposi</p>
+                <Button variant="outline" className="w-full justify-start" asChild><Link href={`/events/${eventId}/notifications`}>{t('notifications')}</Link></Button>
+                <Button variant="outline" className="w-full justify-start" asChild><Link href={`/events/${eventId}/concierge`}>{t('concierge')}</Link></Button>
+                <Button variant="outline" className="w-full justify-start" asChild><Link href={`/events/${eventId}/guests`}>{t('guests')}</Link></Button>
+                <Button variant="outline" className="w-full justify-start" asChild><Link href={`/events/${eventId}/capsule`}>Capsula del Tempo</Link></Button>
+                <Button variant="outline" className="w-full justify-start" asChild><Link href={`/kiosk/${event.code || eventId}`}>{t('kiosk')}</Link></Button>
+                <Button variant="outline" className="w-full justify-start" asChild><Link href={`/events/${eventId}/qr`}>{t('qr_code')}</Link></Button>
+                <Button variant="secondary" className="w-full justify-start" asChild><Link href={`/events/${eventId}/settings`}>⚙️ Impostazioni</Link></Button>
+              </aside>
+            )}
           </div>
-          {lightbox && (
-        <div
-          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-2"
-          onClick={() => setLightbox(null)}
-        >
-          <button
-            className="absolute top-4 right-4 bg-white/10 text-white rounded-full p-2"
-            aria-label="Chiudi"
-            onClick={() => setLightbox(null)}
-          >
-            <X className="w-5 h-5" />
-          </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={lightbox} alt="" className="max-w-full max-h-full object-contain" />
-        </div>
-      )}
-    </main>
+        </main>
       </div>}
+      <FullGalleryLightbox
+        media={media}
+        initialUrl={lightbox}
+        onClose={() => setLightbox(null)}
+      />
     </>
   );
 }
