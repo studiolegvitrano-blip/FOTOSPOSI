@@ -53,7 +53,10 @@ describe('signUp', () => {
     expect(mockAuth.signUp).toHaveBeenCalledWith({
       email: 'test@test.com',
       password: 'password123',
-      options: { data: { name: 'Mario' } },
+      options: {
+        data: { name: 'Mario' },
+        emailRedirectTo: expect.stringMatching(/\/(login|auth\/callback)/),
+      },
     });
     expect(result.data.user.id).toBe('u1');
   });

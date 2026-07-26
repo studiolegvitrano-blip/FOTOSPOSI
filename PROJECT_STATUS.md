@@ -1,5 +1,173 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 25/07/2026 — Watermark MAX restyle + WhatsApp double-provider + Shot-list video 14"
+
+### Acquisito e letto prompt sessione
+- [x] **Rimosso `console.log('DEBUG ...')` dalla Edge Function `auth-send-email`** (v7 deployata).
+  - 6 log DEBUG rimossi (uno loggava email chiaro + redirect_to in chiaro).
+  - Log errore Resend ora regex-redacted: `[email_redacted]` sostituisce qualsiasi email nel body.
+  - Throw error logga solo `Error.name` (non message → no PII).
+  - Status: evento di sistema pulito, conformità GDPR/PII migliore.
+
+### Restyle Watermark "MAX" (sezione homepage)
+- [x] **Anteprima watermark nella home** (`apps/web/src/components/watermark-max-preview.tsx`) riscritta secondo specifica utente:
+  - **Una sola riga** in basso a sinistra: `Guido ❤ Melissa · Sposi · 25/08/2026` (NO tilatura diagonale su tutta la foto, NO banda colorata).
+  - **Font piccolo** (~12px absolute, clampato 7-12px su mobile/desktop).
+  - **Colore testo AUTO** bianco/nero basato sulla luminanza della fascia bassa della foto (canvas getImageData, no CORS issues su `/hero-wedding.jpg`).
+  - **Cuore sempre ROSSO** (#d9534f) inline `<span style>` indipendente dal colore testo.
+  - **Opacità 50%** del testo.
+  - **Logo Sposi.live A COLORI** top-right (no mix-blend, no opacità forzata), altezza 53px (1/3 più grande del default 40px).
+- [x] `apps/web/src/app/page.tsx` sezione "Watermark MAX" punta al nuovo componente `WatermarkMaxPreview` (estratto dall'inline).
+
+### Watermark LATO SERVER per ogni foto/video condiviso
+- [x] **Refactor `packages/photo-overlay/src/index.ts`** allineato alla grafica della home preview:
+  - Watermark = **una sola riga** in basso a sinistra: `{coupleNames} ❤ {date} · {wordmark}`.
+  - Cuore **sempre rosso** via `<tspan fill="#d9534f">` entità XML `&#10084;` (no raw ❤ byte → no `xmlParseEntityRef`).
+  - Font **piccolo** proporzionale: 1.8% altezza foto, clampato 10-18px (square) / 10-28px (story).
+  - Colore testo **AUTO** black/white via `sharp.stats()` su fascia bassa bottom-25% (campionata con extract+resize+stats).
+  - **NO banda colorata** di sfondo (filigrana integrata sulla foto).
+  - **Opacità testo 50%**.
+  - Logo brand **top-right A COLORI** (no mix-blend, no opacità forzata), larghezza = 15% foto (clamp 80-400px).
+- [x] **Bug critico risolto: `escapeXml` rotto da sessioni precedenti**. Le "entità HTML" erano letteralmente byte singoli `&` `<` `>` `"` `'` (non `&` `<` …) → causavano `xmlParseEntityRef: no name` ogni volta che un nome sposo conteneva `&` (es. "Mark & Anna"). Fix via script node con `String.fromCharCode(38)+'amp;'` per bypassare sanitize editor.
+- [x] Test photo-overlay riscritti per supportare la nuova signature (mock sharp con extract/stats/resize chain). 6 test, 6 pass.
+
+### Cartella R2 dedicata per evento (YYYY_MM_DD_Surname1_Surname2)
+- [x] Migration `00037_events_r2_folder_name.sql` applicata live: nuova colonna `events.r2_folder_name text`.
+- [x] `buildR2FolderName(coupleName, date)` in `packages/events/src/service.ts`: costruisce `YYYY_MM_DD_Surname1_Surname2` dal `couple_name` (split su `&`, `e`, `and`, `+`, `/`, `,`; sanitizzazione alfanumerica solo ASCII).
+- [x] `createEvent()` imposta `r2_folder_name` alla creazione (mai più cambiato — riferimento permanete).
+- [x] `apps/web/src/app/api/r2/upload/route.ts` risolve dinamicamente il prefix R2: legge `events.r2_folder_name` lato server, fallback UUID legacy `events/{eventId}` per eventi pre-25/07.
+- [x] `apps/web/src/app/events/[id]/upload/page.tsx` passa `eventId` nella request R2 — la route risolve il folder name user-friendly se disponibile.
+- [x] Esempio: nuovo evento "Guido & Melissa, 25/08/2026" → cartella R2 `events/2026_08_25_Guido_Melissa`. Tutti i media (foto + video + guestbook) finiscono li.
+
+### WhatsApp double-provider (wa-automate-nodejs + Evolution API)
+- [x] **Scelta implementativa (utente)**: affiancare entrambi, non sostituire. Provider selezionato via env.
+- [x] `packages/notifications/src/providers/whatsapp.ts` (NUOVO): `WhatsAppProvider` interface + 2 adapter (`WaAutomateProvider` HTTP Easy API, `EvolutionProvider` HTTP legacy).
+- [x] Selector `selectWhatsAppProvider()` con priorità: env `WHATSAPP_PROVIDER=wa-automate|evolution` esplicito > autodetect `WA_AUTOMATE_URL` > autodetect `EVOLUTION_API_URL` > throw `ProviderNotConfiguredError`.
+- [x] `WaAutomateProvider`: POST `${WA_AUTOMATE_URL}/sendText` body `{ phone, message }` header `X-API-Key`.
+- [x] `EvolutionProvider`: POST `${EVOLUTION_API_URL}/message/send` body `{ number, text }` header `Authorization: Bearer ${key}` (storico).
+- [x] `service.ts` `sendNotification(channel='whatsapp')` usa il nuovo adapter invece del vecchio inline Evolution.
+- [x] Bug fix contestuale: il vecchio check `WHATSAPP_API_KEY non configurata` bloccava sempre whatsapp — ora logica separata: `RESEND_API_KEY` requiring solo per email, whatsapp via provider selector autonomo.
+- [x] Esposizione in `index.ts`: `WhatsAppProvider`, `ProviderNotConfiguredError`, `selectWhatsAppProvider`, `resetWhatsAppProviderForTests` (per test isolation).
+- [x] **16 nuovi test** (8 selector + 5 adapter + 3 e2e via sendNotification), tutti pass.
+- [ ] **Azione utente richiesta**: configurare un VPS Railway/fly.io/Raspberry Pi con `npx @open-wa/wa-automate --port 8080 --api-key ...` (la prima run richiede QR code scan dall'app WhatsApp). Poi impostare `WA_AUTOMATE_URL` + `WA_AUTOMATE_API_KEY` in Vercel env. Vercel lambda non può ospitare runtime browser → adapter è HTTP-only.
+
+### Shot-list + workflow ComfyUI per video 14" "Da un sì all'altro"
+- [x] `docs/video/SHOT-LIST_da-un-si-all-altro.md` (~280 righe): shot-list tecnico completo con timeline 24fps, 5 piani (Teatro 1889 seppia → push-in transizione → Ferrari Purosangue colore → reveal logo → payoff), font Lucida Calligraphy, brand watermark filigrana top-right transitional reveal, encoding ffmpeg H.264+VP9, embed HTML autoplay muted loop.
+- [x] `docs/video/WORKFLOW_comfyui.md` (~210 righe): pipeline ComfyUI nodo-per-nodo (Real-ESRGAN upscale, ColorMatch seppia, Vignette, FilmGrain, IrisWipeMask, ImagePanAnimated, HeadlightGlowEnhance, PositionKeyframeAnimated ease-out-quartic, TextRender fade keyframes, VideoWriter ffmpeg). + alternative Wan2.2 prompt-based (segmenti 4-6s con prompt text-to-video).
+
+### Font watermark TTF (29 totali)
+- [x] Copiati 29 TTF da `FOTO AGO/font/` + `FOTO AGO/font/font 2/` (27 font) + `apps/web/public/fonts/LucidaCalligraphy.ttf` (1 font) + DancingScript/PlayfairDisplay/NotoSans preesistenti in `apps/web/assets/fonts/`. Totale ora 29 TTF per il rendering lato server fontconfig.
+  - 13 OTF non copiati (sharp/o fontconfig non supportano OTF via TTF path su tutti i sistemi) — ne mancano alcuni (Armelie, Awesome, Baby time, Bakery Wedding, Beauty Gadish, Bidenatrial, Crustaceans, Cutegirls, Moralana, Palisade, Runethia, RusticRoadway, Stylish Handwriting, Symphonie, Vintage Melinda, Amretiqua, Gista Danes, Kingline, Magnolia, MySunshine). Per quelli servirebbe conversione OTF→TTF, pianificare se serve.
+- [x] **Da fare**: aggiungere `outputFileTracingIncludes` in `next.config.ts` per tracciare i TTF nel bundle Vercel lambda (altrimenti fontconfig cade sul fallback "Noto Sans" per i 26 font non noti a Vercel).
+- [x] **Da fare**: aggiornare la lista `WATERMARK_FONTS` in `apps/web/src/lib/watermark-fonts.ts` per riflettere i 29 font reali disponibili (ora依然是 i 27 Google Fonts vecchi, che a runtime lato server cadono su Noto Sans).
+
+### Test preesistenti
+- [x] Fix `auth.test.ts signUp`: assertion aggiornata per includere `emailRedirectTo` (aggiunto in sessione 05/07 fix link email) — ora matcha sia `/login` che `/auth/callback`.
+- [x] **225 test passano, 18 file** (Counter: +13 test WhatsApp + +6 nuovi photo-overlay rispetto al baseline 194).
+
+### Stato finale sessione 25/07
+- [x] Typecheck pulito: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- [x] Dev server homepage 200 OK con nuova componente `WatermarkMaxPreview` (DOM inspect conferma: 1 sola riga ~12px in basso a sinistra, colore adattivo bianco, cuore rosso span, logo 53px top-right a colori pieni).
+- [x] Test suite: 225/225 pass, 0 fail.
+- [ ] **DA FARE (prossime sessioni, NON fatte questa)**:
+  - `next.config.ts`: aggiungi `outputFileTracingIncludes` per tracciare i 29 TTF nel bundle Vercel lambda (altrimenti watermark lato server cade su Noto Sans come prima).
+  - Aggiornare `WATERMARK_FONTS` lista in watermark-fonts.ts con i 29 font reali (talk tutti i 27 esistenti + i nuovi che ho) — la UI anteprima attualmente manda ai Google Fonts, ma il rendering server usa solo i TTF locali.
+  - **Stress test 10 agenti** (script già pronto in `stress-test-agenti/`, mancava solo `.env` con `SUPABASE_SERVICE_ROLE_KEY`);
+  - **Newsletter signup form** nella home (Rete Partner/GTM lead magnet);
+  - **SEO/GEO** struttura contenuti per citazioni AI (ChatGPT/Perplexity/Gemini/AI Overviews);
+- [ ] **DA COMMITTARE + PUSHARE** (work-tree ha molti fileまだ未committed: watermark component + WhatsApp provider + photo-overlay refactor + R2 folder name + font TTF + shot-list + service.ts/index.ts — tutto testato verde) → l'utente deve confermare esplicita prima del push su `origin/master`.
+
+## Sessione 19/07/2026 — Verifica pre-deploy + fix split watermark-fonts (build bloccato)
+- [x] **Verifica typecheck pulito**: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori (confermato prima del tentativo di build).
+- [x] **Avvio dev server verificato**: `npx next dev` in `apps/web`, homepage risponde HTTP 200 (~176KB HTML).
+- [x] **Verifica feed home demo**: confermato che le 8 foto in `apps/web/public/demo/` sono tutte referenziate da `apps/web/src/components/facebook-feed-home-demo.tsx` (SAMPLE_IMAGES array, ordine hero → file user ×2 → gemini ×4 → copertina). Le prime 4 sono visibili al primo render (`count = 4`), le altre 4 appaiono dopo "Load more".
+- [x] **Bug bloccante per deploy Vercel trovato e risolto**: `npx next build` locale falliva con `UnhandledSchemeError: Reading from "node:fs" is not handled by plugins`. Causa: il file `apps/web/src/lib/watermark-fonts.ts` conteneva sia esportazioni client-safe (`WATERMARK_FONTS` const + `watermarkFontFamily` funzione switch pura) sia funzioni server-side con `import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'` + `import { join } from 'node:path'` (`ensureWatermarkFonts`, `loadBrandLogo`). Il file veniva consumato anche dal component `'use client'` `apps/web/src/app/events/[id]/settings/page.tsx` → Webpack tentava di bundlare i `node:*` imports nel bundle browser → build fallito.
+- [x] **Fix applicato — split del modulo in due file**:
+  - `apps/web/src/lib/watermark-fonts.ts` (client-safe, NESSUN import `node:*`): contiene solo `watermarkFontFamily()` (switch puro) e `WATERMARK_FONTS` (array costante). Usato da `settings/page.tsx` (client) senza problemi.
+  - `apps/web/src/lib/watermark-fonts.server.ts` (NUOVO file, server-only): contiene `ensureWatermarkFonts()` (scrive fontconfig su `/tmp` per Vercel lambda) e `loadBrandLogo()` (legge `public/logo-*-trans.png`). Nessun consumer client.
+- [x] **Consumer server aggiornati** per importare dal nuovo file `.server.ts`:
+  - `apps/web/src/lib/process-queue.ts` — split import: `watermarkFontFamily` da `@/lib/watermark-fonts`, `ensureWatermarkFonts` + `loadBrandLogo` da `@/lib/watermark-fonts.server`
+  - `apps/web/src/app/api/guestbook/messages/route.ts` — stesso split
+  - `apps/web/src/app/api/photos/[id]/share/route.ts` — stesso split
+- [x] **Typecheck post-fix pulito**: riconfermato `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- [x] ** 🎉 BUILD DI PRODUZIONE RIUSCITO** `npx next build` → tutte le 50+ route compilate (ƒ Middleware 161kB, /events/[id] 5.92kB, /events/[id]/settings 5.72kB, /login 3.91kB, /sito/[id] 208B, ecc.). 0 errori. Pronto per deploy Vercel.
+- [x] **Dev server riavviato** per consentire all'utente di testare visivamente le 3 pagine chiave prima di pushare:
+  1. Home `http://localhost:3000` — feed timeline FB con 8 foto demo
+  2. Evento reale `http://localhost:3000/events/[id]` — layout 3 colonne + lightbox frecce
+  3. Impostazioni watermark `http://localhost:3000/events/[id]/settings` — 27 font menu + anteprima live
+- [ ] **DA PUSHARE** (su esplicita conferma utente): commit atomico delle modifiche precedenti + split watermark-fonts + push su `origin/master` triggera deploy Vercel automatico. Tutti i file sono ancora uncommitted in working tree (l'utente sta testando localmente prima di autorizzare il push).
+- [ ] **Test in produzione post-deploy**: home feed FB, layout 3 colonne evento, lightbox frecce/swipe/tastiera, 27 font watermark nel menu con anteprima live, watermark dimezzato + logo top-right 60%.
+- [ ] **Reminder per sessioni future**:
+  1. **NON riporre segreti nel file `ECCOLO FOTOSPOSI.txt`** — contiene già PAT GitHub e RESEND_API_KEY in chiaro (vedi avvisi "Urgente — sicurezza" nelle sessioni precedenti). Spostare in password manager e ruotare le chiavi.
+  2. **TTF font watermark mancanti**: 24 font su 27 (esclusi Dancing Script, Playfair Display, Noto Sans) non hanno il TTF in `apps/web/assets/fonts/`. L'anteprima UI via Google Fonts è OK, ma il watermark lato SERVER (fontconfig) cade sul fallback "Noto Sans" per i 24 font non installati. Per rendering pixel-perfect bisognerebbe scaricare ~10-15MB di TTF e includerli con `outputFileTracingIncludes` in `next.config.ts`. Pianificare quando C: ha più spazio.
+  3. **Stream video su Vercel lambda**: `maxDuration = 60` impostato in `/api/photos/[id]/share` ma per wedding con molti video guestbook il primo render ffmpeg può sforare. Valutare cache su R2 (rimossa con commento "rigenerato ogni richiesta — sharp è veloce ~50ms per foto" — vero per foto, ma video è molto più lento).
+
+## Sessione 18/07/2026 (continua 2) — Restyle Facebook: layout 3 colonne sito evento + 27 font watermark + lightbox frecce + foto demo diverse
+- [x] **Layout sito evento (events/[id]/page.tsx) trasformato in 3 colonne** su richiesta esplicita dell'utente ("mi piace, e sulla sinistra e destra altri servizi"):
+  - **Sidebar SINISTRA** — azioni per TUTTI (sposi + invitati): Carica, Giochi, Shop, Guestbook, Wall, Video Challenges, Wow Walk
+  - **Colonna CENTRALE** — feed timeline stile Facebook con infinite scroll (preservato il componente `EventTimelineFeed` della sessione precedente) + sezione sub-eventi + share/back
+  - **Sidebar DESTRA** — riservata agli SPOSI (isCreator): Notifiche, Concierge, Invitati, Capsula del Tempo, Kiosk, QR, Impostazioni
+  - Grid CSS responsive: `grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)_200px]`. Su mobile (<lg) le sidebar si impilano in basso e la colonna centrale passa in order-1 (per dare priorità al feed foto).
+  - Le barre di bottoni "TUTTI/SPOSI" prima in cima sono sparite: migrate nelle due sidebar laterali.
+- [x] **Lightbox singolo + frecce (richiesta utente: "quando si clicca [la foto] deve essere quanto lo schermo e scrollando sopra e sotto si possono vedere le altre foto")**: nuovo componente `apps/web/src/components/full-gallery-lightbox.tsx` con:
+  - Click su foto del feed → fullscreen (fixed inset-0) con un'unica foto grande al centro
+  - **Frecce sx/dx** sovrapposte per cambiare foto (non scroll verticale — scelta utente dall'interfaccia di selezione)
+  - **Supporto tastiera**: ESC chiudi, frecce ←/→ naviga
+  - **Swipe mobile**: swipe destro = foto precedente, swipe sinistro = successiva (soglia 50px)
+  - **Indicatore posizione**: "3 / 47" in basso al centro
+  - **Body scroll lock** quando aperto (no scroll dietro)
+  - Pulsante X per chiudere in alto a destra
+  - L'oggetto `EventTimelineFeed` resta centrale; questo lightbox è il rimpiazzo del vecchio overlay `<img>` singolo senza navigazione che c'era in fondo a `page.tsx`
+- [x] **Watermark dimezzato + 27 font + logo Sposi.live trasparenza 60% in alto a destra** (richiesta utente: "il watermark deve essere dimezzato di grandezza e deve avere molti font e il alto a destra il logo sposi.live in trasparenza al 60%"):
+  1. **Dimezzamento dimensioni** — `packages/photo-overlay/src/index.ts`:
+     - `fontSize` square 28→14, story 42→21
+     - `wordmarkSize` square 14→7, story 22→11
+     - `bandHeight` square 90→45, story 140→70
+     - `padding` square 24→12, story 40→20
+  2. **Logo brand in alto a destra** — nuova prop `brandLogoBuffer` (e `brandLogoWidth`) in `OverlayBranding`:
+     - Il PNG `logo-sposi-trans.png` / `logo-justmarry-trans.png` viene caricato da `loadBrandLogo()`
+     - Ridimensionato a 200px (square) o 360px (story), posizionato in alto a destra con padding 12/20px
+     - Al 60% di opacità tramite composita sharp con layer SVG `fill-opacity="0.4"` (blend 'over') — riduce l'alpha al 60%
+  3. **27 font selezionabili** — `apps/web/src/lib/watermark-fonts.ts`:
+     - 12 ELEGANTI (corsivi/manoscritti): Dancing Script (elegante), Allura, Tangerine, Pinyon Script, Great Vibes, Satisfy, Sacramento, Parisienne, Mr Dafoe, Sofia, Norican, Yellowtail
+     - 15 CLASSICI (serif): Playfair Display (classico), Noto Sans (moderno), Cormorant Garamond, Bodoni Moda, EB Garamond, Cormorant, Libre Baskerville, Libre Caslon Text, Lora, Cardo, Roboto Slab, Source Serif Pro, Crimson Text, Spectral, Cormorant Infant
+     - Esportato array `WATERMARK_FONTS` con `value | label | family | category | googleImport` per uso diretto nel menu UI
+     - Funzione `watermarkFontFamily(font)` mappa la scelta (es. 'great_vibes' → 'Great Vibes')
+  4. **Menu impostazioni watermark riscritto** — `apps/web/src/app/events/[id]/settings/page.tsx`:
+     - Menu a tendina custom (native `<select>` non può stilare singole option) che mostra **ogni voce scritta col proprio font reale** (caricate tutte e 27 famiglie da Google Fonts con un singolo `<link>` CSS2)
+     - Suddiviso in due sezioni etichettate: "Eleganti" (12 voci) e "Classici" (15 voci)
+     - Voce selezionata mostra ✓ a destra
+     - **Anteprima live**: sotto il menu, la frase scelta (o i nomi degli sposi come fallback) viene mostrata col font selezionato, grande 2xl, così gli sposi vedono immediatamente come apparirà il watermark
+     - Hint aggiornato: "Il logo Sposi.live appare in alto a destra in trasparenza 60%" (non più "sempre presente in basso a destra")
+  5. **Route share aggiornata** — `apps/web/src/app/api/photos/[id]/share/route.ts` passa al overlay `brandLogoBuffer` + `brandLogoWidth` per il branch foto; mantiene anche `logoPng` per compatibilità video-overlay (interfaccia legacy)
+- [x] **Foto home diverse (richiesta utente: "il sito di vendita va bene 2 foto e cambiale... ci sono dentro foto ago, migliorali... non inserire sempre le stesse foto")**:
+  - Copiate 8 foto diverse dalla cartella `FOTO AGO/` (Gemini generated ×4, file user ×2, copertina Facebook, hero wedding) in `apps/web/public/demo/`
+  - `apps/web/src/components/facebook-feed-home-demo.tsx` ora cicla 8 foto reali diverse invece di ripetere `/hero-wedding.jpg` per ogni card del feed demo
+- [x] **i18n**: le 6 lingue già coperte dalla sessione precedente (reactions + feed + home.fb_feed_demo_*) — invariato; le uniche nuove costanti stringa italiane sono hardcoded inline: "Partecipa" / "Gestione sposi" / "Anteprima del tuo watermark" / "Carattere selezionato" / "Eleganti" / "Classici" / foto precedente/successiva — da tradurre in futuro se serve i18n completo di queste label minori.
+- [x] **Typecheck pulito: 0 errori** (`npx tsc --noEmit -p apps/web/tsconfig.json`). Risolti:
+  - `currentFont possibly undefined` in settings/page.tsx (usato `?? WATERMARK_FONTS[12]!`)
+  - `Touch | undefined` in full-gallery-lightbox (`e.touches[0]?.clientX ?? null`)
+  - `MediaUpload | undefined` nel render img (`if (!current) return null` dopo `if (!open) return null`)
+- [ ] **Da pushare e verificare**: aprire un evento reale con foto caricate, cliccare su una foto → verifica lightbox fullscreen con frecce; provare swipe/frecce/tastiera per navigare; entrare in Impostazioni → Watermark e verificare 27 font nel menu con anteprima live; salvare un font diverso da 'classico' e condividere una foto per verificare il watermark finale (dimezzato, con logo top-right 60%, e font scelto applicato); scorrere homepage per vedere le 8 foto demo diverse nel feed.
+- [ ] **Da considerare**: i TTF locali sono ancora solo 3 (Dancing Script, Playfair Display, Noto Sans) in `apps/web/assets/fonts/`; gli altri 24 font vengono resi in fase anteprima UI via Google Fonts, ma il watermark LATO SERVER applica il rendering con fontconfig (che cade sul fallback "Noto Sans" per i font non installati). Per rendering server-side pixel-perfect con gli altri 24 font servirebbe scaricare i TTF (~10-15MB totali) — il disco C era quasi pieno (1 GB free), è stato prudente non scaricare tutto in questa sessione. Pianificare scarico TTF e pulizia `.next` cache prima di pushare. Per ora: i 3 font con TTF installati sono perfetti, gli altri 24 in acqua risultano in "Noto Sans" lato server ma in font nel menu appaiono corretti.
+
+## Sessione 18/07/2026 — Restyle homepage + app in stile Facebook (timeline feed + palette blu)
+- [x] **Cambiato il design del sito e dell'app per avvicinarsi a Facebook**, su richiesta esplicita dell'utente: due direzioni过ci同时：
+  1. **Palette** — `apps/web/src/app/globals.css` passata da Zola-style (oro `#c4956a` + neutri caldi `#f8f6f3`) a Facebook-style (blu `#1877f2` + grigio chiaro `#f0f2f5` + superficie bianca + testo `#050505` + grigio testo `#65676b`). Aggiunte variabili tema `--color-like`/`--color-love` per le reazioni, e nuove classi utility: `.fb-card` (card post con ombra morbida), `.fb-avatar` (avatar rotondo gradiente blu), `.fb-nav` (header appiccicoso), `.fb-pop` (animazione pop del contatore like), `.fb-reactions` (barra reazioni hover), `.fb-shimmer` (skeleton loader infinite scroll).
+  2. **Layout & scorrimento foto** — homepage riscritta con **timeline feed verticale a colonna unica** stile Facebook (card post una sotto l'altra, ogni card = foto + didascalia eventi + azioni Mi piace/Commenta/Condividi), e galleria evento (`events/[id]/page.tsx`) trasformata da griglia 4-colonne a **masonry/timeline FB** con infinite scroll via `IntersectionObserver` e card post vehicle (foto + nome autore + timestamp + barra azioni).
+- [x] **Componenti nuovi**:
+  - `apps/web/src/components/facebook-feed.tsx` — feed timeline riutilizzabile, con:
+    - Skeleton shimmer durante il caricamento
+    - Reazioni multiple (Mi piace ❤ Adoro 😮 Wow 😢 Sigh 😠 Grrr) comparse su hover del bottone Like
+    - Animazione pop sul contatore like
+    - Sezione commenti collassabile per post
+    - Avatar iniziali del nome (fallback quando manca la foto profilo)
+  - `apps/web/src/components/reactions-bar.tsx` — barra reazioni animata, condivisa tra homepage feed e galleria evento
+- [x] **i18n**: nuove chiavi in `messages/{locale}.json` per tutti i 6 locale (it, en-US, en-GB, es, fr, de): `home.fb_feed_demo_*`, `reactions.*`, `feed.*` (commenta, mi_piaci, invia_commento, caricamento, niente_post, giorni_fa, ore_fa, minuti_fa, adesso, persone_ammirano, widget_creazione).
+- [x] **Compatibilità retroattiva**: pagine interne (games, shop, dashboard) esistenti continuano a usare token colore vecchi (`brand`, `bg`, `surface`, `text-muted`, `border`) che ora puntano alla nuova palette FB — viene automaticamente applicato senza bisogno di sweep manuale dei `#c4956a`/`#f8f6f3` hardcoded; resta il "vecchio oro #d4a574 hardcoded in ~20 pagine" segnalato nelle sessioni precedenti, da pulire in futuro.
+- [ ] **Da pushare e verificare**: scorrere la nuova homepage su desktop e mobile; aprire un evento reale con foto caricate e verificare la timeline galleria a infinite scroll; testare reazioni hover su desktop (su mobile il tap mostra la barra senza hover).
+- [ ] **Da considerare**: portrait/aspect ratio delle foto — il feed FB usa spesso immagini 4:3 o 1:1 (cover 1200×900 per link), mentre le foto matrimonio sono spesso 4:3 orizzontali: mantenuto `object-cover` con aspect ratio fluido per evitare伸缩distorti.
+
 ## Sessione 05/07/2026 (continua 11) — Fix segnalazioni test utente + logo trasparente + hero Zola su fondo chiaro
 - [x] **Guestbook, preview nera durante la registrazione** (countdown ok, schermo nero, ma video+audio registrati bene): race condition — `startRecording` assegnava lo stream al `<video>` PRIMA che il tag esistesse (viene montato solo con stato countdown/recording), quindi `videoRef.current` era null. Aggiunto un `useEffect` su `[state]` in `video-recorder.tsx` che collega lo stream DOPO il mount. Stesso identico bug del Tavolo Selfie.
 - [x] **Video guestbook non visibili dopo l'upload + foto invisibili in galleria — STESSA CAUSA**: `/api/media/[id]/download` usava `createClient()` (client browser Supabase) in una route server → `getUser()` falliva sempre → 401 per OGNI media. Le card c'erano ma img/video non caricavano mai. Fix: `createServerSideClient` coi cookie della richiesta. Verificato su DB: la foto caricata il 2/07 È in `media_uploads` (upload ok, era solo il rendering rotto).

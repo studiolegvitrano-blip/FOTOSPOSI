@@ -3,6 +3,26 @@ import type { Tier } from '@fotosposi/core';
 import { calculateWindow } from './index';
 import type { WeddingEvent, SubEvent, EventWindow } from './index';
 
+/**
+ * Costruisce il nome della cartella R2 dedicata all'evento.
+ * Formato: `YYYY_MM_DD_Surname1_Surname2` dove le surname derivano da `couple_name`
+ * (es. "Guido & Melissa" → "Guido_Melissa"). Caratteri non alfanumerici剥离,
+ * lunghezza max 60 per compatibilità filesystem / S3.
+ */
+export function buildR2FolderName(coupleName: string, date: string): string {
+  const datePart = (date || '').replace(/[^0-9-]/g, '').replace(/-/g, '_'); // 2026_08_25
+  // Split del couple_name: "&", "e", "and", "+", "/", ","
+  const names = (coupleName || '')
+    .split(/\s*(?:&|e|and|\+|\/|,)\s*/i)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => s.replace(/[^A-Za-z0-9]/g, '')) // togli accenti/spazi/punteggiatura
+    .filter(Boolean);
+  const namesPart = names.slice(0, 2).join('_');
+  const raw = `${datePart}_${namesPart}`;
+  return raw.replace(/_+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60);
+}
+
 export async function createEvent(params: {
   tenant_id: string;
   created_by: string;
@@ -42,6 +62,7 @@ export async function createEvent(params: {
       allow_guest_media: params.allow_guest_media ?? true,
       watermark_names: params.watermark_names ?? true,
       watermark_text: params.watermark_text ?? null,
+      r2_folder_name: buildR2FolderName(params.couple_name, params.date),
     })
     .select()
     .single();

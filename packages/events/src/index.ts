@@ -25,6 +25,8 @@ export interface WeddingEvent {
   watermark_names?: boolean;
   /** Testo personalizzato es. "Ciccia & Ciccio Sposi Palermo 06/07/2026"; null = nomi+data. */
   watermark_text?: string | null;
+  /** Cartella R2 dedicata (formato YYYY_MM_DD_Surname1_Surname2). Stabile dall'evento create. */
+  r2_folder_name?: string;
 }
 
 export interface SubEvent {
@@ -66,4 +68,5 @@ export {
   getSubEvents,
   getEventWindow,
   updateEventWatermark,
+  buildR2FolderName,
 } from './service';

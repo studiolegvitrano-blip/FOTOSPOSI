@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPresignedUploadUrl } from '@fotosposi/r2-storage';
-import { rateLimit } from '@fotosposi/core';
+import { rateLimit, createServiceClient } from '@fotosposi/core';
 
 const ALLOWED_TYPES: Record<string, string[]> = {
   image: ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'],
@@ -19,6 +19,32 @@ function validateFile(filename: string, contentType: string): string | null {
   return null;
 }
 
+/**
+ * Risolve il prefix R2 per un evento: usa `events.r2_folder_name` se presente
+ * (formato user-friendly "YYYY_MM_DD_Surname1_Surname2"), altrimenti fallback
+ * al UUID `events/{eventId}` (compatibilità eventi creati prima di questa feature).
+ * Il client può passare `eventId` nella request body; altrimenti usa `prefix` raw.
+ */
+async function resolvePrefix(
+  eventId: string | undefined,
+  clientPrefix: string | undefined,
+): Promise<string> {
+  if (!eventId) return clientPrefix || 'uploads';
+  try {
+    const supabase = createServiceClient();
+    const { data } = await supabase
+      .from('events')
+      .select('r2_folder_name')
+      .eq('id', eventId)
+      .maybeSingle();
+    if (data?.r2_folder_name) return `events/${data.r2_folder_name}`;
+    // fallback UUID legacy
+    return clientPrefix || `events/${eventId}`;
+  } catch {
+    return clientPrefix || 'uploads';
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get('x-forwarded-for') || 'unknown';
@@ -30,8 +56,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { filename, contentType, prefix, fileSize } = await request.json();
-
+    const { filename, contentType, prefix, fileSize, eventId } = await request.json();
     if (!filename || !contentType) {
       return NextResponse.json({ error: 'filename e contentType richiesti' }, { status: 400 });
     }
@@ -45,8 +70,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File troppo grande (max 200MB)' }, { status: 400 });
     }
 
+    const resolvedPrefix = await resolvePrefix(eventId, prefix);
     const result = await getPresignedUploadUrl(
-      prefix || 'uploads',
+      resolvedPrefix,
       filename,
       contentType,
     );
@@ -59,6 +85,7 @@ export async function POST(request: NextRequest) {
       key: result.key,
       url: result.url,
       presignedUrl: result.presignedUrl,
+      prefix: resolvedPrefix,
     });
   } catch (e) {
     return NextResponse.json(
