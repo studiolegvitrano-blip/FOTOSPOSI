@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { resetWhatsAppProviderForTests } from '../providers/whatsapp';
 
 const mockFrom = vi.fn();
 
@@ -93,6 +94,9 @@ describe('sendNotification', () => {
     delete process.env.EMAIL_API_KEY;
     delete process.env.EVOLUTION_API_URL;
     delete process.env.EVOLUTION_API_KEY;
+    delete process.env.WHATSAPP_PROVIDER;
+    delete process.env.WA_AUTOMATE_URL;
+    delete process.env.WA_AUTOMATE_API_KEY;
     global.fetch = vi.fn();
   });
 
@@ -168,6 +172,90 @@ describe('sendNotification', () => {
     });
     expect(result.log?.status).toBe('failed');
     expect(result.log?.error).toContain('Unauthorized');
+  });
+  it('logs failed when whatsapp channel has no provider configured', async () => {
+    // No WHATSAPP_* envs set → selector throws ProviderNotConfiguredError → service sets failed.
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'notification_log') {
+        return { select: () => chain([]), insert: (obj: any) => chain(obj), upsert: () => chain(null) };
+      }
+      return build([]);
+    });
+    const result = await sendNotification({
+      event_id: 'evt1',
+      channel: 'whatsapp',
+      recipient: '+393334445566',
+      body: 'Ciao!',
+    });
+    expect(result.log?.status).toBe('failed');
+    expect(result.log?.error).toMatch(/WhatsApp provider non configurato/i);
+  });
+
+  it('sends whatsapp via wa-automate provider when configured', async () => {
+    process.env.WHATSAPP_PROVIDER = 'wa-automate';
+    process.env.WA_AUTOMATE_URL = 'http://localhost:8080';
+    process.env.WA_AUTOMATE_API_KEY = 'wa-key';
+    resetWhatsAppProviderForTests();
+    (global.fetch as any).mockResolvedValue(
+      new Response(JSON.stringify({ success: true, id: 'wa_1' }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'notification_log') {
+        return { select: () => chain([]), insert: (obj: any) => chain(obj), upsert: () => chain(null) };
+      }
+      return build([]);
+    });
+    const result = await sendNotification({
+      event_id: 'evt1',
+      channel: 'whatsapp',
+      recipient: '+39 333 444 5566',
+      body: 'Ciao da Sposi!',
+    });
+    expect(result.log?.status).toBe('sent');
+    expect(result.log?.sent_at).toBeDefined();
+    // Confirm we posted to wa-automate endpoint
+    const [url, init] = (global.fetch as any).mock.calls.at(-1);
+    expect(String(url)).toBe('http://localhost:8080/sendText');
+    const body = JSON.parse((init as any).body as string);
+    expect(body.phone).toBe('393334445566');
+    expect(body.message).toBe('Ciao da Sposi!');
+    delete process.env.WHATSAPP_PROVIDER;
+    delete process.env.WA_AUTOMATE_URL;
+    delete process.env.WA_AUTOMATE_API_KEY;
+    resetWhatsAppProviderForTests();
+  });
+
+  it('sends whatsapp via evolution provider (legacy) when configured', async () => {
+    process.env.WHATSAPP_PROVIDER = 'evolution';
+    process.env.EVOLUTION_API_URL = 'http://evo:3000';
+    process.env.EVOLUTION_API_KEY = 'evo-key';
+    resetWhatsAppProviderForTests();
+    (global.fetch as any).mockResolvedValue(
+      new Response(JSON.stringify({ id: 'evo_1' }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'notification_log') {
+        return { select: () => chain([]), insert: (obj: any) => chain(obj), upsert: () => chain(null) };
+      }
+      return build([]);
+    });
+    const result = await sendNotification({
+      event_id: 'evt1',
+      channel: 'whatsapp',
+      recipient: '+39 02 1234',
+      body: 'Legacy evolution',
+    });
+    expect(result.log?.status).toBe('sent');
+    const [url, init] = (global.fetch as any).mock.calls.at(-1);
+    expect(String(url)).toBe('http://evo:3000/message/send');
+    const headers = (init as any).headers as Record<string, string>;
+    expect(headers['Authorization']).toBe('Bearer evo-key');
+    const body = JSON.parse((init as any).body as string);
+    expect(body.number).toBe('39021234');
+    delete process.env.WHATSAPP_PROVIDER;
+    delete process.env.EVOLUTION_API_URL;
+    delete process.env.EVOLUTION_API_KEY;
+    resetWhatsAppProviderForTests();
   });
 });
 

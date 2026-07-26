@@ -1,4 +1,5 @@
 import { createServiceClient } from '@fotosposi/core';
+import { selectWhatsAppProvider, ProviderNotConfiguredError } from './providers/whatsapp';
 
 export interface NotificationPreference {
   id: string;
@@ -46,14 +47,14 @@ export async function sendNotification(params: {
   body?: string;
 }): Promise<{ log?: NotificationLog; error?: string }> {
   const supabase = createServiceClient();
-  const channelKey = process.env[`${params.channel.toUpperCase()}_API_KEY`] || process.env.RESEND_API_KEY;
 
   let status = 'pending';
   let errorMsg: string | null = null;
 
-  if (!channelKey) {
+  // Email-specific: Resend is the only email provider. Bail out fast if missing.
+  if (params.channel === 'email' && !process.env.RESEND_API_KEY) {
     status = 'failed';
-    errorMsg = `${params.channel.toUpperCase()}_API_KEY non configurata`;
+    errorMsg = 'RESEND_API_KEY non configurata';
   }
 
   if (status === 'pending' && params.channel === 'email') {
@@ -62,7 +63,7 @@ export async function sendNotification(params: {
       const fromAddress = event?.brand === 'weddingmoments' ? 'info@justmarry.live' : 'info@sposi.live';
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${channelKey}`, 'Content-Type': 'application/json' },
+        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ from: fromAddress, to: params.recipient, subject: params.subject, text: params.body }),
       });
       if (!res.ok) { status = 'failed'; errorMsg = `Email error: ${res.statusText}`; }
@@ -72,17 +73,21 @@ export async function sendNotification(params: {
 
   if (status === 'pending' && params.channel === 'whatsapp') {
     try {
-      const evoUrl = process.env.EVOLUTION_API_URL;
-      const evoKey = process.env.EVOLUTION_API_KEY;
-      if (evoUrl && evoKey) {
-        await fetch(`${evoUrl}/message/send`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${evoKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ number: params.recipient, text: params.body }),
-        });
+      const provider = selectWhatsAppProvider();
+      const result = await provider.sendText({ to: params.recipient, text: params.body ?? '' });
+      if (result.ok) {
         status = 'sent';
-      } else { status = 'failed'; errorMsg = 'Evolution API non configurata'; }
-    } catch (e: any) { status = 'failed'; errorMsg = e.message; }
+      } else {
+        status = 'failed';
+        errorMsg = `WhatsApp (${provider.id}): ${result.error ?? 'errore sconosciuto'}`;
+      }
+    } catch (e: any) {
+      status = 'failed';
+      // ProviderNotConfiguredError or any unexpected runtime error
+      errorMsg = e instanceof ProviderNotConfiguredError
+        ? 'WhatsApp provider non configurato (impostare WHATSAPP_PROVIDER=wa-automate|evolution + URL/KEY)'
+        : (e?.message ?? String(e));
+    }
   }
 
   const { data, error } = await supabase.from('notification_log').insert({
