@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   });
 
   const tokens = await tokenRes.json();
-  if (tokens.error) return NextResponse.redirect(new URL(`/events/${eventId}/drive?error=${tokens.error_description || tokens.error}`, req.url));
+  if (tokens.error) return NextResponse.redirect(new URL(`/events/${eventId}/drive?error=${encodeURIComponent(tokens.error_description || tokens.error)}`, req.url));
 
   const supabase = createServiceClient();
   await supabase.from('event_drive_tokens').upsert({
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     updated_at: new Date().toISOString(),
   }, { onConflict: 'event_id' });
 
-  const { folders } = await ensureDriveFolders(tokens.access_token);
+  const { folders } = await ensureDriveFolders(tokens.access_token, 'Sposi.live');
   if (folders) {
     for (const [name, folderId] of Object.entries(folders)) {
       if (folderId) {
@@ -55,7 +55,9 @@ export async function GET(req: NextRequest) {
         }, { onConflict: 'event_id, folder_name' });
       }
     }
-    await supabase.from('event_drive_tokens').update({ drive_folder_id: folders.root || null }).eq('event_id', eventId);
+    // Nota: in passato aggiornavamo `drive_folder_id` su event_drive_tokens ma la colonna
+    // non esiste (`event_drive_tokens` ha solo access_token/refresh_token/expires_at/drive_email).
+    // La folder map è già su `event_drive_folders` e letta via getEventDriveFolders.
   }
 
   return NextResponse.redirect(new URL(`/events/${eventId}/drive?success=true`, req.url));

@@ -1,5 +1,6 @@
 import { createServiceClient } from '@fotosposi/core';
 import { createMediaRecord, getDriveToken, getEventDriveFolders, updateDriveSyncStatus } from '@fotosposi/media';
+import type { EventDriveToken } from '@fotosposi/media';
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
 import { applyVideoOverlay } from '@fotosposi/video-overlay';
 import sharp from 'sharp';
@@ -11,6 +12,35 @@ ensureWatermarkFonts();
 
 function getBrandLabel(brand?: string): string {
   return brand === 'weddingmoments' ? 'JustMarry.live' : 'Sposi.live';
+}
+
+/**
+ * Aggiorna il token OAuth Google Drive se scaduto usando il refresh_token.
+ * - Nessun token / nessun expires_at / non scaduto → ritorna invariato.
+ * - Nessun refresh_token → non può refreshare, ritorna invariato (lascia che la
+ *   chiamata Drive fallisca con 401, gestita poi dal flow normale).
+ * - Refresh fallito → same.
+ * - Refresh ok → persiste su `event_drive_tokens` e ritorna il nuovo token.
+ * Esportata (e non più come closure interna) per test unitario diretto.
+ */
+export async function refreshDriveTokenIfExpired(
+  eventId: string,
+  current: EventDriveToken | undefined,
+  supabase: ReturnType<typeof createServiceClient>,
+): Promise<EventDriveToken | undefined> {
+  if (!current) return current;
+  if (!current.expires_at || new Date(current.expires_at).getTime() > Date.now()) return current;
+  if (!current.refresh_token) return current;
+  const { refreshDriveAccessToken } = await import('@fotosposi/media');
+  const refreshed = await refreshDriveAccessToken(current.refresh_token);
+  if (!refreshed.access_token) return current;
+  const newExpiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
+  await supabase.from('event_drive_tokens').update({
+    access_token: refreshed.access_token,
+    expires_at: newExpiresAt,
+    updated_at: new Date().toISOString(),
+  }).eq('event_id', eventId);
+  return { ...current, access_token: refreshed.access_token, expires_at: newExpiresAt };
 }
 
 function escapeXml(s: string): string {
@@ -135,10 +165,12 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
   const wmFont = watermarkFontFamily(event?.watermark_font);
   const brandLogo = loadBrandLogo(event?.brand);
 
-  const [{ token }] = await Promise.all([getDriveToken(eventId)]);
+  const tokenResp = await getDriveToken(eventId);
+  let token = tokenResp.token;
   const hasDrive = !!token?.access_token;
   let folders: Record<string, string> | null = null;
   if (hasDrive) {
+    token = await refreshDriveTokenIfExpired(eventId, token, supabase);
     const f = await getEventDriveFolders(eventId);
     folders = f.folders ?? null;
   }
@@ -246,7 +278,8 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
 
       if (hasDrive && folders) {
         try {
-          const driveFolderId = isVideo ? (folders['Video'] || folders['root']) : (folders['Foto'] || folders['root']);
+          // NB: folder_name nel DB è lowercase ('foto'/'video'/...) da ensureDriveFolders.
+          const driveFolderId = isVideo ? (folders['video'] || folders['root']) : (folders['foto'] || folders['root']);
 
           const formData = new FormData();
           const blob = new Blob([new Uint8Array(buffer)], { type: item.file_type || 'application/octet-stream' });
@@ -257,7 +290,7 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
 
           const driveRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id%2Csize', {
             method: 'POST',
-            headers: { Authorization: `Bearer ${token.access_token}` },
+            headers: { Authorization: `Bearer ${token!.access_token}` },
             body: formData,
             signal: AbortSignal.timeout(15000),
           });
@@ -266,12 +299,15 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
             await updateDriveSyncStatus(media.id, 'synced', driveData.id);
             await supabase.from('upload_queue').update({ status: 'synced', drive_file_id: driveData.id, processed_at: new Date().toISOString() }).eq('id', item.id);
           } else {
+            // Bug precedente: status='synced' nonostante Drive sync fallito. Adesso il
+            // file placeholder potrebbe mancare di Drive_replica ma lo stato dice la verità
+            // e un prossimo cron/sweep può riprovare con retry_count+1.
             await updateDriveSyncStatus(media.id, 'failed');
-            await supabase.from('upload_queue').update({ status: 'synced', error: 'Drive sync fallito' }).eq('id', item.id);
+            await supabase.from('upload_queue').update({ status: 'failed', error: `Drive sync fallito: HTTP ${driveRes.status}`, retry_count: (item.retry_count || 0) + 1 }).eq('id', item.id);
           }
-        } catch {
+        } catch (err) {
           await updateDriveSyncStatus(media.id, 'failed');
-          await supabase.from('upload_queue').update({ status: 'synced', error: 'Drive sync fallito' }).eq('id', item.id);
+          await supabase.from('upload_queue').update({ status: 'failed', error: `Drive sync exception: ${(err as Error).message}`, retry_count: (item.retry_count || 0) + 1 }).eq('id', item.id);
         }
       } else {
         await supabase.from('upload_queue').update({ status: 'synced', processed_at: new Date().toISOString() }).eq('id', item.id);

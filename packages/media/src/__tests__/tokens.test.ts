@@ -145,4 +145,54 @@ describe('ensureDriveFolders', () => {
     const result = await ensureDriveFolders('tok');
     expect(result.error).toBe('API error');
   });
+
+  it('usa brand Sposi.live di default se non specificato', async () => {
+    let urlLog: string[] = [];
+    (fetch as any).mockImplementation((url: string) => {
+      urlLog.push(typeof url === 'string' ? url : String(url));
+      return Promise.resolve({ json: () => Promise.resolve({ files: [{ id: 'root-sposi', name: 'Sposi.live' }] }) });
+    });
+    await ensureDriveFolders('tok');
+    expect(urlLog[0]).toContain(encodeURIComponent("Sposi.live"));
+    expect(urlLog[0]).not.toContain(encodeURIComponent("JustMarry.live"));
+  });
+
+  it('usa brand JustMarry.live quando esplicitato', async () => {
+    let urlLog: string[] = [];
+    (fetch as any).mockImplementation((url: string) => {
+      urlLog.push(typeof url === 'string' ? url : String(url));
+      return Promise.resolve({ json: () => Promise.resolve({ files: [{ id: 'root-jm', name: 'JustMarry.live' }] }) });
+    });
+    const result = await ensureDriveFolders('tok', 'JustMarry.live');
+    expect(urlLog[0]).toContain(encodeURIComponent("JustMarry.live"));
+    expect(result.folders?.root).toBe('root-jm');
+  });
+
+  it('crea subfolder Foto e le mappa lowercase', async () => {
+    let callCount = 0;
+    (fetch as any).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return Promise.resolve({ json: () => Promise.resolve({ files: [{ id: 'root1' }] }) });
+      if (callCount === 2) return Promise.resolve({ json: () => Promise.resolve({ files: [] }) });
+      if (callCount === 3) return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'foto-id' }) });
+      return Promise.resolve({ json: () => Promise.resolve({ files: [{ id: 'existing', name: 'Video' }] }) });
+    });
+    const result = await ensureDriveFolders('tok');
+    expect(result.folders?.foto).toBe('foto-id');
+    expect(result.folders?.video).toBe('existing');
+  });
+
+  it('lancia errore se subfolder creation fallisce (mappa solo quelle ce)', async () => {
+    let callCount = 0;
+    (fetch as any).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return Promise.resolve({ json: () => Promise.resolve({ files: [{ id: 'root1' }] }) });
+      if (callCount === 2) return Promise.resolve({ json: () => Promise.resolve({ files: [] }) });
+      if (callCount === 3) return Promise.resolve({ ok: false, json: () => Promise.resolve({ error: { message: 'fail' } }) });
+      return Promise.resolve({ json: () => Promise.resolve({ files: [] }) });
+    });
+    const result = await ensureDriveFolders('tok');
+    expect(result.folders?.foto).toBeUndefined();
+    expect(result.folders?.root).toBe('root1');
+  });
 });

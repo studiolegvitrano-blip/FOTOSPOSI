@@ -156,7 +156,8 @@ export async function syncCapsuleToDrive(
   if (!token?.access_token) return { error: 'Drive not connected' };
 
   const { folders } = await getEventDriveFolders(msg.event_id);
-  const folderId = folders?.['Foto'] || folders?.['Video'] || folders?.['root'];
+  // folder_name nel DB è lowercase ('foto'/'video'/...) da ensureDriveFolders.
+  const folderId = folders?.['foto'] || folders?.['video'] || folders?.['root'];
 
   const { code } = await getEventCode(msg.event_id);
   const eventCode = code?.code || msg.event_id.slice(0, 8);
