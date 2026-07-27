@@ -203,3 +203,177 @@ I due file **non** sono collegati automaticamente. Quando modifichi la grafica
 del watermark nel package Vercel, ricopia i blocchi `escapeXml` e `renderWatermarkOverlay`
 in `overlay.js` qui. Drift = video_watermarked lato VPS avrà grafica diversa dalla foto
 lato lambda (branding disallineato per gli ospiti).
+
+---
+
+## Setup specifico: Oracle Cloud Free Tier (consigliato per produzione)
+
+L'opzione migliore "free per sempre" nel 2026: **4 VM ARM Ampere A1 con 4 OCPU
+totali e 24GB RAM totali, sempre gratis**. ffmpeg gira nativamente ARM
+(molto più veloce di x86 sul nostro carico single-thread encode H.264).
+
+### 1. Provisioning dal browser (5 minuti)
+
+1. Vai su https://cloud.oracle.com/free e clicca "Start for Free"
+2. Registrati (richiede carta di credito **non** addebitata, serve solo per verifica).
+3. Scegli **Home Region**: **EU-Frankfurt** o **EU-Milan** (se disponibile, latenza minore dall'Italia).
+4. ☰ → Compute → Instances → Create Instance:
+   - **Name**: `fotosposi-watermark`
+   - **Image**: Canonical Ubuntu 22.04 (aarch64) — IMPORTANTE: deve essere ARM (aarch64), non x86
+   - **Shape**: VM.Standard.A1.Flex — 2 OCPU + 12 GB RAM (metà del free tier; l'altra metà la tieni per backup/scale-out futuro)
+   - **SSH**: `ssh-keygen -t ed25519` se non hai già chiave, poi "Paste" della public key
+5. Create. Annotati l'IP pubblico e l'username (`ubuntu`).
+
+### 2. Setup iniziale (sul VPS)
+
+```bash
+ssh ubuntu@<PUBLIC_IP>
+
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y ffmpeg nodejs npm
+
+node --version   # verifica >=18. Se <18:
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+sudo mkdir -p /opt/fotosposi-vps && sudo chown ubuntu:ubuntu /opt/fotosposi-vps
+cd /opt/fotosposi-vps
+npm init -y
+npm install sharp
+
+# Copia qui i due file (vedi sezione "Copiare i file" sopra)
+```
+
+### 3. systemd service
+
+```bash
+# Genera API key (COPIALA → Vercel env VPS_FFMPEG_API_KEY)
+openssl rand -hex 32
+
+sudo tee /etc/systemd/system/fotosposi-watermark.service > /dev/null <<EOF
+[Unit]
+Description=FOTOSPOSI video watermark sidecar
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/fotosposi-vps
+Environment="PORT=8081"
+Environment="API_KEY=INSERISCI_QUI_OUTPUT_OPENSSL_RAND_HEX_32"
+ExecStart=/usr/bin/node /opt/fotosposi-vps/video-watermark-server.js
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable fotosposi-watermark
+sudo systemctl start fotosposi-watermark
+sudo systemctl status fotosposi-watermark   # deve mostrare "active (running)"
+```
+
+Log live: `sudo journalctl -u fotosposi-watermark -f`.
+
+### 4. HTTPS con Cloudflare Tunnel (consigliato, zero porta aperta)
+
+Requisito: dominio `sposi.live` su Cloudflare (anche solo DNS). Se non c'è, vedi punto 5.
+
+**Sulla tua macchina locale (dove hai il browser):**
+```bash
+cloudflared tunnel login   # autorizza via browser
+```
+
+**Sul VPS:**
+```bash
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared jammy main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
+sudo apt update && sudo apt install -y cloudflared
+
+cloudflared tunnel create fotosposi-wm
+# Output: TUNNEL_ID + file ~/.cloudflared/<TUNNEL_ID>.json
+
+cloudflared tunnel route dns fotosposi-wm watermark.sposi.live
+
+sudo mkdir -p /etc/cloudflared
+sudo tee /etc/cloudflared/config.yml > /dev/null <<EOF
+tunnel: <TUNNEL_ID>
+credentials-file: /home/ubuntu/.cloudflared/<TUNNEL_ID>.json
+
+ingress:
+  - hostname: watermark.sposi.live
+    service: http://localhost:8081
+  - service: http_status:404
+EOF
+sudo cloudflared service install
+sudo systemctl restart cloudflared
+sudo systemctl status cloudflared
+```
+
+Verifica: `curl -H "X-API-Key: <your-key>" https://watermark.sposi.live/health` → JSON ok.
+
+### 5. Strada alternativa: nginx + Let's Encrypt (dominio DNS classico)
+
+Apri ingress 80 e 443 da Oracle → Networking → Security Lists (0.0.0.0/0).
+
+Aggiungi DNS su Register.it:
+```
+A    watermark   <PUBLIC_IP_VPS_ORACLE>
+```
+
+Aspetta 5-30 minuti per la propagazione. Verifica: `dig watermark.sposi.live +short`.
+
+Sul VPS:
+```bash
+sudo apt install -y nginx certbot python3-certbot-nginx
+
+sudo tee /etc/nginx/sites-available/watermark > /dev/null <<'EOF'
+server {
+    listen 80;
+    server_name watermark.sposi.live;
+    client_max_body_size 1m;
+    proxy_read_timeout 120s;
+    proxy_send_timeout 120s;
+    location / {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+sudo ln -sf /etc/nginx/sites-available/watermark /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d watermark.sposi.live --redirect
+```
+
+### 6. Vercel env vars
+
+https://vercel.com/studiolegvitrano-blip/fotosposi-web/settings/environment-variables → Add:
+
+| Name | Value | Environment |
+|---|---|---|
+| `VPS_FFMPEG_URL` | `https://watermark.sposi.live` (senza `/` finale) | Production |
+| `VPS_FFMPEG_API_KEY` | l'API key generata al punto 3 | Production |
+
+Poi Redeploy dell'ultimo commit.
+
+### 7. Test end-to-end
+
+1. Carica video >100MB su un evento di prova (`/events/[id]/upload`)
+2. Apri la galleria, condividi il video
+3. Verifica che il file scaricato abbia il watermark in basso
+
+Test rapido del solo sidecar (per verificare auth + pipeline):
+```bash
+# Sul VPS
+curl -H "X-API-Key: $API_KEY" -X POST http://localhost:8080/watermark \
+  -H "Content-Type: application/json" \
+  -d '{"downloadUrl":"https://invalid","uploadUrl":"https://invalid","branding":{"coupleNames":"T","date":"","primaryColor":"#000","wordmark":"w"}}'
+# Atteso: {"ok":false,"error":"Download failed: ..."} — significa che auth + pipeline rispondono correttamente.
+```
