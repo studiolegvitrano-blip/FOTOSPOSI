@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@fotosposi/core';
-import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
+import { getPresignedDownloadUrl, getPresignedUploadUrl } from '@fotosposi/r2-storage';
 import { watermarkFontFamily } from '@/lib/watermark-fonts';
 import { ensureWatermarkFonts, loadBrandLogo } from '@/lib/watermark-fonts.server';
 
@@ -107,10 +107,73 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     logoPng: brandLogoBuffer ?? undefined,
   };
 
-  let result: Buffer;
+  let result: Buffer | null = null;
   if (isVideo) {
-    const { applyVideoOverlay } = await import('@fotosposi/video-overlay');
-    result = await applyVideoOverlay(srcBuffer, { branding: brandingConfig });
+    // Path REMOTO (VPS con ffmpeg di sistema) se configurato. Video >50MB o >90s
+    // NON sono gestibili in lambda (maxDuration 60s + bundle 70MB ffmpeg-static): il
+    // VPS scarica da R2 via presigned GET, applica watermark, uploada via presigned
+    // PUT su una key temporanea, e noi rispondiamo con quel buffer. La dimensione del
+    // video originale può essere qualsiasi (200MB+): il limite reale è il timeout
+    // della nostra fetch interna (55s) — per clip molto lunghe il VPS risponde
+    // subito con 202 accepted e completa l'upload in background; qui attendiamo
+    // comunque il completamento per semplicità (da evolvere a job queue in futuro).
+    const {
+      applyVideoOverlay,
+      applyVideoOverlayRemote,
+      isVpsWatermarkConfigured,
+      brandingToRemote,
+    } = await import('@fotosposi/video-overlay');
+
+    const vpsActive = isVpsWatermarkConfigured();
+    let remoteOk = false;
+    if (vpsActive && media.r2_key) {
+      try {
+        // Presigned GET del video originale (valido 1h)
+        const downloadUrl = await getPresignedDownloadUrl(media.r2_key, 3600);
+        // Presigned PUT per la chiave watermarkata. safeKey nel package prefix/filename,
+        // qui passiamo prefix vuoto + filename = key watermarkata (.wm.mp4) cosi':
+        // la funzione restituisce { success, key, presignedUrl } con key determinata da lei.
+        // NO: safeKey genera timestamp, vogliamo una key STABILE legata all'originale.
+        // Usiamo invece la chiave reale via presigned-but-direct costruendo noi il path:
+        //   prefix = r2_key directory, filename = basename + '.wm.mp4'
+        const lastSlash = media.r2_key.lastIndexOf('/');
+        const prefix = lastSlash >= 0 ? media.r2_key.substring(0, lastSlash) : '';
+        const baseName = lastSlash >= 0 ? media.r2_key.substring(lastSlash + 1) : media.r2_key;
+        const wmFilename = baseName.replace(/\.mp4$/i, '') + '.wm.mp4';
+        const ul = await getPresignedUploadUrl(prefix, wmFilename, 'video/mp4');
+        if (downloadUrl && ul.success && ul.presignedUrl) {
+          const remoteResp = await applyVideoOverlayRemote({
+            downloadUrl,
+            uploadUrl: ul.presignedUrl,
+            branding: brandingToRemote(brandingConfig),
+            // maxDurationSeconds non passato: il VPS processa sempre (anche ceremony intera)
+          });
+          if (remoteResp.ok) {
+            // Recupera il watermarkato via un terzo presigned GET (in-memory per la response)
+            const wmDownloadUrl = await getPresignedDownloadUrl(ul.key, 60);
+            if (wmDownloadUrl) {
+              const wmResp = await fetch(wmDownloadUrl);
+              if (wmResp.ok) {
+                result = Buffer.from(await wmResp.arrayBuffer());
+                remoteOk = true;
+              }
+            }
+          } else {
+            console.warn('[share] VPS watermark failed:', remoteResp.error, '- fallback locale');
+          }
+        }
+      } catch (err) {
+        console.warn('[share] VPS watermark exception:', (err as Error).message, '- fallback locale');
+      }
+    }
+
+    if (!remoteOk) {
+      // Fallback locale: lambda con ffmpeg-static. Limite interno 90s per clip.
+      // Per video cerimonia intera (>90s) il fallback ritorna IL FILE ORIGINALE senza
+      // watermark — meglio un video senza marchio che un 504 timeout. Con VPS attivo
+      // invece i video grandi vengono watermarkati correttamente lato VPS.
+      result = await applyVideoOverlay(srcBuffer, { branding: brandingConfig });
+    }
   } else {
     const { applyOverlay } = await import('@fotosposi/photo-overlay');
     result = await applyOverlay(srcBuffer, { format: format as 'square' | 'story', branding: brandingConfig });
@@ -120,6 +183,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // rigenerato ad ogni richiesta — sharp è veloce (~50ms per foto). Per video è più lento
   // (ffmpeg) ma l'uso tipico è foto. Caching futuro su R2 con namespace dedicato se serve.
 
+  if (!result) {
+    return new NextResponse('Watermark processing failed', { status: 500 });
+  }
   return new NextResponse(new Blob([result.buffer as ArrayBuffer], { type: contentType }), {
     headers: {
       'Content-Type': contentType,

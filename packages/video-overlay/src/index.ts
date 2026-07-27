@@ -15,6 +15,9 @@ export interface VideoOverlayBranding {
   logoPng?: Buffer;
 }
 
+export { applyVideoOverlayRemote, isVpsWatermarkConfigured, VpsNotConfiguredError } from './remote';
+export type { RemoteWatermarkRequest, RemoteWatermarkResponse } from './remote';
+
 export interface VideoOverlayOptions {
   branding: VideoOverlayBranding;
   /** Skip processing (and just return the original buffer) if the source video is longer
@@ -162,4 +165,31 @@ export async function applyVideoOverlay(
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+/**
+ * Mapper VideoOverlayBranding (locale, con logoPng: Buffer) → RemoteBranding
+ * (serializzabile via JSON, con logoBase64). Usato dalla route share prima di
+ * chiamare applyVideoOverlayRemote. Se il logo manca o è malformato, ritorna
+ * branding senza logo: il VPS userà il wordmark testuale come fallback.
+ */
+export function brandingToRemote(
+  branding: VideoOverlayBranding,
+): import('./remote').RemoteBranding {
+  let logoBase64: string | undefined;
+  let logoMimeType: string | undefined;
+  if (branding.logoPng && branding.logoPng.length > 0) {
+    logoBase64 = branding.logoPng.toString('base64');
+    logoMimeType = 'image/png';
+  }
+  return {
+    coupleNames: branding.coupleNames,
+    date: branding.date,
+    primaryColor: branding.primaryColor,
+    textColor: branding.textColor,
+    wordmark: branding.wordmark,
+    fontFamily: branding.fontFamily,
+    logoBase64,
+    logoMimeType,
+  };
 }
