@@ -1,5 +1,44 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 27/07/2026 — Video watermark su VPS sidecar (no più lambda ffmpeg-static)
+
+### Architettura ibrida per video grandi (>100MB, >90s, ceremony/ricevimento interi)
+- **Problema limite**: Vercel lambda ha ffmpeg-static ~70MB nel bundle + `maxDuration = 60s`. Video lunghi di matrimonio (cerimonia intera) non erano elaborabili — prima ricadeva su fallback "ritorna video senza watermark". PROJECT_STATUS 19/07 aveva segnalato "per wedding con molti video guestbook il primo render ffmpeg può sforare".
+- **Soluzione scelta (utente)**: riusare il VPS che ha già per wa-automate-nodejs, stesso modello del provider WhatsApp (API key + HTTP POST). Comune zero costo (free tier Railway/fly.io o Raspberry casalinga).
+- **Commit**: `3bd3b70` (236/236 test pass, +11 nuovi).
+
+### HTTP sidecar
+- `vps-scripts/video-watermark-server.js` — server Node 18+ che scarica video da R2 via presigned GET, applica ffmpeg di sistema per compositare il watermark PNG, uploada via presigned PUT. Endpoint `/health`. Auth `X-API-Key` con `crypto.timingSafeEqual`.
+- `vps-scripts/overlay.js` — modulo CJS standalone (SVG→PNG via sharp, ffmpeg composita). Niente ffmpeg-static bundle, niente build TS. Da tenere allineato a `packages/video-overlay/src/index.ts` manualmente (vedi nota nel README).
+- `vps-scripts/README.md` — setup (`apt install ffmpeg` + `npm i sharp`), Cloudflare Tunnel per HTTPS senza aprire porte, security model.
+
+### Lambda adapter
+- `packages/video-overlay/src/remote.ts` — nuovo file, `applyVideoOverlayRemote()` POSTa il job al VPS con due presigned URL R2. Lambda non vede mai i byte del video (bypass 70MB bundle + timeout 60s + maxDuration). Timeout interno 55s.
+- `packages/video-overlay/src/index.ts` — `brandingToRemote()` mapper VideoOverlayBranding→RemoteBranding (logoPng Buffer → logoBase64).
+- `apps/web/src/app/api/photos/[id]/share/route.ts` — smart routing video: se `VPS_FFMPEG_URL` + `VPS_FFMPEG_API_KEY` configurate e media ha `r2_key`, usa remoto. Altrimenti fallback `applyVideoOverlay` locale. Errori dal VPS → warn + fallback.
+
+### Env vars richieste sul Vercel
+- `VPS_FFMPEG_URL` — es. `https://watermark.vps.example.com` (HTTPS obbligo, certificato via Cloudflare Tunnel o nginx + certbot)
+- `VPS_FFMPEG_API_KEY` — generata con `openssl rand -hex 32` sul VPS stesso
+- Da impostare in Vercel → Environment Variables. Niente secrets lato sorgente.
+
+### TODO utente (configurazione manuale, non automatizzabile)
+1. **VPS**: stesso Raspberry/VPS dove gira wa-automate, installare:
+   ```bash
+   mkdir -p ~/fotosposi-vps && cd ~/fotosposi-vps
+   npm init -y && npm install sharp
+   # Copia vps-scripts/{video-watermark-server.js,overlay.js}
+   API_KEY="$(openssl rand -hex 32)" PORT=8081 \
+     nohup node video-watermark-server.js > ~/watermark.log 2>&1 &
+   ```
+2. **HTTPS**: Cloudflare Tunnel `cloudflared tunnel route tcp://localhost:8081 --hostname watermark.vps.example.com`
+3. **Vercel env**: `VPS_FFMPEG_URL=https://watermark.vps.example.com` + `VPS_FFMPEG_API_KEY=<quello generato>`
+4. **Test**: condividere un video da `/api/photos/[id]/share?format=square&eventId=...` e verificare che il watermark appaia anche su clip 200MB+.
+
+### Test
+- 11 nuovi in `packages/video-overlay/src/remote.test.ts`: `brandingToRemote` mapping, `isVpsWatermarkConfigured` env check, `applyVideoOverlayRemote` con fetch mockato (POST URL, headers, ok/error body, trailing slash).
+- Totale monorepo: **236/236 test** (era 225).
+
 ## Sessione 25/07/2026 — Watermark MAX restyle + WhatsApp double-provider + Shot-list video 14"
 
 ### Acquisito e letto prompt sessione
