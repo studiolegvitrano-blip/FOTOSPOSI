@@ -9,6 +9,7 @@ function buildChain(data: any, error: any = null) {
     insert: vi.fn(() => chain),
     eq: vi.fn(() => chain),
     order: vi.fn(() => chain),
+    upsert: vi.fn(() => chain),
     single: vi.fn(() => Promise.resolve(chain)),
     maybeSingle: vi.fn(() => Promise.resolve(chain)),
     in: vi.fn(() => chain),
@@ -64,6 +65,26 @@ describe('createMediaRecord', () => {
     mockFrom.mockReturnValue(chain);
     const result = await createMediaRecord({ event_id: 'evt1', sub_event_id: 'se1', uploaded_by: 'u1', type: 'video', url: 'url' });
     expect(result.media?.sub_event_id).toBe('se1');
+  });
+
+  it('ripiega su INSERT semplice se manca il unique constraint per onConflict (drift DB)', async () => {
+    // Simula il caso scoperto 27/07/2026: la migration 00037 con uniq_media_event_r2key
+    // non è ancora stata applicata → Supabase rifiuta l'upsert con "ON CONFLICT specification"
+    // → prima il record andrebbe perso in galleria. Ora il fallback fa un INSERT semplice.
+    const conflictChain = buildChain(null, { message: 'there is no unique or exclusion constraint matching the ON CONFLICT specification' });
+    const insertedMedia = { id: 'm3', event_id: 'evt1', uploaded_by: 'u1', type: 'photo', url: 'r2key1', drive_sync_status: 'pending', created_at: new Date().toISOString(), r2_key: 'r2key1' };
+    const insertChain = buildChain(insertedMedia);
+    let callIdx = 0;
+    mockFrom.mockImplementation(() => {
+      callIdx++;
+      return callIdx === 1 ? conflictChain : insertChain;
+    });
+    const result = await createMediaRecord({ event_id: 'evt1', uploaded_by: 'u1', type: 'photo', url: 'r2key1', r2_key: 'r2key1' });
+    expect(result.error).toBeUndefined();
+    expect(result.media?.id).toBe('m3');
+    expect(mockFrom).toHaveBeenCalledTimes(2);
+    expect(conflictChain.upsert).toHaveBeenCalled();
+    expect(insertChain.insert).toHaveBeenCalled();
   });
 });
 

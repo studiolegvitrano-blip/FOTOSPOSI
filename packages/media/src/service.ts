@@ -32,7 +32,23 @@ export async function createMediaRecord(params: {
         .from('media_uploads')
         .upsert(baseRow, { onConflict: 'event_id,r2_key', ignoreDuplicates: false })
     : supabase.from('media_uploads').insert(baseRow);
-  const { data, error } = await query.select().single();
+  let { data, error } = await query.select().single();
+  // Fallback robusto: se il unique constraint `uniq_media_event_r2key` non è ancora
+  // stato applicato (DB drift tra repo e remote), Supabase rifiuta l'upsert con
+  // "there is no unique or exclusion constraint matching the ON CONFLICT specification".
+  // In quel caso ripieghiamo su un INSERT semplice: il record verrà creato e, se per
+  // caso un cron sweep riprocessa lo stesso r2_key, avremo un duplicato (accettabile
+  // per non perdere TUTTE le foto di un evento finché la migration non viene applicata).
+  if (error && /ON CONFLICT|unique or exclusion constraint/i.test(error.message)) {
+    console.error('createMediaRecord: ON CONFLICT constraint mancante, fallback INSERT semplice. Applica migration 00037_media_uploads_unique_event_r2key.sql per ripristinare l\'upsert idempotente.');
+    const fallback = await supabase
+      .from('media_uploads')
+      .insert(baseRow)
+      .select()
+      .single();
+    data = fallback.data;
+    error = fallback.error;
+  }
   if (error) return { error: error.message };
   return { media: data };
 }

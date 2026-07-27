@@ -1,5 +1,80 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 27/07/2026 (continua 4) — 4 bug segnalati utente + 1 NUOVO BUG CRITICO scoperto durante la diagnosi
+
+### Diagnosi eseguita (working tree aggiornato, NON ancora pushato — vedi "Strategia push" sotto)
+Verificato `upload_queue` per evento `13b5d266-a020-41ed-b4ad-a14f894b0f4b` (Agostino Sabrina, Premium): **15 record 'failed' con errore `there is no unique or exclusion constraint matching the ON CONFLICT specification`** (foto + video). Tutto già `r2_key` valorizzato, nessuna perdita di file su R2 — il problema è solo che `createMediaRecord` non riesce a scrivere in `media_uploads`, quindi la galleria resta vuota. 51 media con r2_key già presenti in tutto il DB, 0 duplicati → constraint applicabile senza rischi.
+
+### Bug 1 — Reazioni: emoji sbagliata su bottone like ✅ FIXATO (in working tree)
+- **Sintomo**: cliccando "Adoro" (❤) o "Wow" (😮), il testo sotto cambia ma l'icona resta `<ThumbsUp>`.
+- **Causa**: `apps/web/src/components/facebook-feed.tsx:299` — `<ThumbsUp size={18} />` statico.
+- **Fix applicato**: `{reaction ? REACTION_EMOJI[reaction] : <ThumbsUp size={18} />}` — quando l'utente ha selezionato una reaction, mostra l'emoji corrispondente; altrimenti il ThumbsUp come fallback "Mi piace" non selezionato.
+- File: `apps/web/src/components/facebook-feed.tsx:299`.
+
+### Bug 2 — Video 240MB: errore, NON caricato in galleria ❌ NON RISOLTO (workaround già in place, fix vero richiede VPS sidecar)
+- **Sintomo**: video 240MB → errore → NON in galleria. Foto con errore Drive sync invece appaiono.
+- **Causa nota**: Vercel lambda maxDuration=300s su `/api/r2/process-queue` → ffmpeg per ri-codificare il video watermarked → timeout → la funzione crasha PRIMA di arrivare a `createMediaRecord`.
+- **Workaround GIÀ PRESENTE in `apps/web/src/lib/process-queue.ts:201-205`** (aggiunto sessione 25/07):
+  ```ts
+  } catch (overlayErr) {
+    // Se ffmpeg fallisce (video corrotto, codec esotico) pubblichiamo comunque
+    // il video originale: meglio senza watermark che perso.
+    console.error('Video overlay fallito:', overlayErr);
+  }
+  ```
+  Il try/catch copre già `applyVideoOverlay`, ma il timeout della lambda uccide la funzione **prima** che il catch possa scattare → il workaround esiste nel codice ma non viene raggiunto quando il timeout colpisce.
+- **Fix vero richiesto**: VPS sidecar `packages/video-overlay/src/remote.ts` + `vps-scripts/video-watermark-server.js` (già implementati sessione 27/07, NON deployati). Richiede setup utente: VPS Railway/Raspberry + env `VPS_FFMPEG_URL` + `VPS_FFMPEG_API_KEY` su Vercel. Documentato in PROJECT_STATUS sessione 27/07 (continua 2).
+- **Stato**: ❌ Workaround codice OK ma timeout lambda lo aggira. Per video >100MB serve VPS sidecar.
+
+### Bug 3 — Drive: cartelle sempre vuote ❌ IMPOSSIBILE VERIFICARE (bloccato dal Bug 4)
+- **Sintomo**: 4 cartelle Drive create con folder_id nel DB MA zero file dentro.
+- **Causa nota (commit 91dd233)**: multipart upload a Drive API falliva con "Metadata p... not valid JSON" → fixato costruendo `multipart/related` con boundary esplicito invece di `new FormData()`.
+- **Verifica post-deploy**: impossibile — il processing dei file non arriva MAI alla fase Drive perché `createMediaRecord` fallisce PRIMA (vedi Bug 4). Le cartelle sono state create da una sessione precedente, i file non ci sono perché il processing muore sempre prima. Una volta fixato Bug 4, il prossimo sweep del cron processerà i 15 item `failed` e popolerà le cartelle Drive.
+
+### Bug 4 (NUOVO CRITICO) — Manca unique constraint su media_uploads → galleria vuota ✅ FIXATO (in working tree, MA SERVONO ENTRAMBI: codice + migration)
+- **Sintomo**: tutti i file caricati restano su R2 e `upload_queue` ha `status='failed'` con errore specifico → galleria completamente vuota per quell'evento.
+- **Root cause**: la migration `00022_r2_key_media.sql` aggiunge solo colonna + indice NON-unique, ma NON crea il constraint `uniq_media_event_r2key UNIQUE (event_id, r2_key)`. Il codice `packages/media/src/service.ts:33` usa `onConflict: 'event_id,r2_key'` che richiede un unique constraint su quelle colonne → PostgREST risponde 400 "there is no unique or exclusion constraint matching the ON CONFLICT specification" → il record NON viene mai scritto → `media_uploads` resta vuoto per l'evento.
+- **Fix doppio (codice + migration)**:
+  1. **`supabase/migrations/00037_media_uploads_unique_event_r2key.sql` (NUOVA)**: `ALTER TABLE media_uploads ADD CONSTRAINT uniq_media_event_r2key UNIQUE (event_id, r2_key);` — da applicare via Dashboard SQL Editor di Supabase.
+  2. **`packages/media/src/service.ts:30-50` (MODIFICATO)**: aggiunto fallback robusto. Se l'upsert fallisce con errore ON CONFLICT (cioè constraint non ancora applicato), ripiega su INSERT semplice: meglio un duplicato occasionale su retry che TUTTE le foto di un evento perse. Log `console.error` esplicito segnala che la migration 00037 va applicata.
+  3. **`packages/media/src/__tests__/service.test.ts` (MODIFICATO)**: aggiunto mock `upsert` nella `buildChain` + nuovo test "ripiega su INSERT semplice se manca il unique constraint per onConflict (drift DB)" — totale 248/248 test verdi (+1).
+
+### Bug 5 — Manca pulsante "Carica" in cima alla galleria ✅ FIXATO (in working tree)
+- **Sintomo**: il pulsante "Carica" esisteva solo nella sidebar sinistra.
+- **Fix**: aggiunto `<Button variant="default" size="sm" asChild><Link href={`/events/${eventId}/upload`}>{c('upload')}</Link></Button>` nel `CardHeader` della galleria (`apps/web/src/app/events/[id]/page.tsx:138-144`), con `flex flex-row items-center justify-between gap-2 flex-wrap` per restare allineato a destra del titolo "Galleria (N)" e andare a capo su mobile.
+
+### Stato
+- Tutti i bug fix sono nel working tree locale (NON ancora committati né pushati).
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Test: **248/248 verdi** (era 247: +1 nuovo test fallback ON CONFLICT).
+
+### ⚠️ AZIONE UTENTE RICHIESTA — Migration 00037 via Dashboard SQL (DNS blocca `supabase db push`)
+Il sandbox CLI di questa sessione non riesce a risolvere `db.krgqyluuiltckmhbeuue.supabase.co` (DNS bloccato dalla rete locale → `hostname resolving error`). Per applicare il constraint unico senza il quale il fallback INSERT può creare duplicati su retry:
+1. Vai su https://supabase.com/dashboard/project/krgqyluuiltckmhbeuue/sql/new
+2. Incolla:
+   ```sql
+   ALTER TABLE media_uploads
+     ADD CONSTRAINT uniq_media_event_r2key UNIQUE (event_id, r2_key);
+   ```
+3. Click "Run".
+4. Verifica con:
+   ```sql
+   SELECT conname FROM pg_constraint WHERE conrelid = 'media_uploads'::regclass AND contype = 'u';
+   ```
+   deve mostrare `uniq_media_event_r2key`.
+5. (Opzionale, ma consigliato dopo) Vai su https://supabase.com/dashboard/project/krgqyluuiltckmhbeuue/database/migrations e clicca "Apply" per la migration `00037_media_uploads_unique_event_r2key.sql` — così il prossimo `db push` non darà più errore di drift.
+
+### Strategia push proposta (in attesa di conferma utente)
+- **Opzione A (rapida)**: committa + pusha ORA solo Bug 1 (emoji) + Bug 5 (pulsante Carica) + Bug 4 fallback codice → l'utente può applicare la migration 00037 quando vuole. Le foto dell'evento Agostino Sabrina appariranno in galleria SUBITO grazie al fallback INSERT (anche senza constraint, con rischio duplicati su retry futuri).
+- **Opzione B (più pulita)**: utente applica la migration 00037 via Dashboard PRIMA del push → commit unico atomico con tutti i fix + constraint già applicato, zero duplicati.
+- **Opzione C (mista)**: pushare il fix fallback (così la galleria si sblocca SUBITO) e subito dopo applicare la migration via Dashboard → fallback non si attiva più, sistema in stato "pulito".
+
+### TODO post-push
+- [ ] Verificare che la galleria dell'evento `13b5d266-a020-41ed-b4ad-a14f894b0f4b` ora mostri le ~13 foto + 2 video che erano su R2 (dopo sweep del cron alle prossime 4h OPPURE forzando `POST /api/r2/process-queue?eventId=...` con i 15 record failed)
+- [ ] Verificare che il pulsante "Carica" sia visibile in cima alla galleria sia su desktop che mobile
+- [ ] Verificare che cliccando "Adoro" l'emoji diventi ❤ invece del ThumbsUp
+- [ ] (Opzionale) Verificare che il video 240MB continui a non apparire finché il VPS sidecar non è deployato — comportamento atteso
+
 ## Sessione 27/07/2026 (continua 3) — Fix Drive OAuth pushati + 2 bug critici emersi dal test live
 
 ### Push eseguito atomicamente

@@ -136,8 +136,11 @@ export default function EventDetailPage() {
             {/* COLONNA CENTRALE — feed timeline stile Facebook */}
             <section className="order-1 lg:order-2">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
                   <CardTitle>{c('gallery')} ({media.length + videos.length})</CardTitle>
+                  <Button variant="default" size="sm" asChild>
+                    <Link href={`/events/${eventId}/upload`}>{c('upload')}</Link>
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   {media.length === 0 && videos.length === 0 ? (

@@ -296,7 +296,7 @@ export default function FacebookFeed({
                     reaction ? 'text-like' : ''
                   }`}
                 >
-                  <ThumbsUp size={18} />
+                  <span className="text-[18px] leading-none">{reaction ? REACTION_EMOJI[reaction] : <ThumbsUp size={18} />}</span>
                   <span>{reaction ? t(`reaction_${reaction}`) : t('mi_piaci')}</span>
                 </button>
                 <ReactionsBar onPick={(r) => handleReact(p, r)} />
