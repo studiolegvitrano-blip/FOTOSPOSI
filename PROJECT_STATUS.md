@@ -1,5 +1,78 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 27/07/2026 (continua 3) — Fix Drive OAuth pushati + 2 bug critici emersi dal test live
+
+### Push eseguito atomicamente
+- Commit `715a673` "fix(drive): OAuth callback, brand param, case-sensitivity, auto-refresh token" pushato su `origin/master`. Deploy Vercel in automatico.
+- 247/247 test verdi (era 236: +5 ensureDriveFolders brand, +7 refreshDriveTokenIfExpired).
+
+### Fix contenuti nel push
+1. **`apps/web/src/app/api/auth/google/callback/route.ts`**
+   - Rimossa riga `update({drive_folder_id})` su `event_drive_tokens` (colonna inesistente → crash silenzioso)
+   - Aggiunto `encodeURIComponent` su redirect URL con error
+   - `ensureDriveFolders(tokens.access_token, 'Sposi.live')` ora passa il brand esplicito
+2. **`packages/media/src/tokens.ts`**: `ensureDriveFolders(accessToken, brand)` con parametro brand opzionale (default `'Sposi.live'`), necessario per JustMarry.live per creare la root folder corretta
+3. **`apps/web/src/lib/process-queue.ts`**:
+   - `folders['Foto']`/`folders['Video']` → `folders['foto']`/`folders['video']` (lowercase, come da `ensureDriveFolders`)
+   - Bug critico: in caso di errore Drive sync marcava `status: 'synced'` invece di `'failed'`. Fix.
+   - `refreshDriveTokenIfExpired` **estratto da closure a funzione top-level esportata** con dependency injection (`supabase client` come parametro) per testabilità. Importa `EventDriveToken` da `@fotosposi/media`.
+4. **`packages/time-capsule/src/service.ts`**: stesso bug case-sensitivity `folders['Foto']` → `folders['foto']`.
+
+### 🐛 BUG #1 — `redirect_uri_mismatch 400` su Google OAuth (segnalato dall'utente 27/07)
+- **Sintomo**: tentativo di connessione Drive restituisce "Accesso bloccato: la richiesta dell'app non è valida. Errore 400: redirect_uri_mismatch".
+- **Root cause**: l'URI `https://www.sposi.live/api/auth/google/callback` NON è registrato nella lista "Authorized redirect URIs" del OAuth 2.0 Client ID (Google Cloud Console → APIs & Services → Credentials). Codice corretto: il redirect_uri in `apps/web/src/app/api/auth/google/route.ts:13` e `callback/route.ts:18` è già dinamico da `host` della request.
+- **Stato azione richiesta**: ⚠️ **UTENTE DEVE AGGIUNGERE MANUALMENTE** in Google Cloud Console le URI redirect nella lista bianca dell'OAuth client (per ogni dominio):
+  ```
+  https://www.sposi.live/api/auth/google/callback
+  https://sposi.live/api/auth/google/callback
+  https://justmarry.live/api/auth/google/callback
+  https://www.justmarry.live/api/auth/google/callback
+  http://localhost:3000/api/auth/google/callback
+  ```
+- **Non automatizzabile**: richiede accesso al Google Cloud Console dell'utente.
+
+### 🐛 BUG #2 — Watermark NON applicato a foto/video caricati dopo la registrazione QR (segnalato dall'utente 27/07)
+- **Sintomo**: dopo che gli invitati hanno scansionato il QR, si sono registrati e hanno caricato foto + un video del guestbook, **i file NON mostrano il watermark** previsto (testo personalizzato "GIADA E GINO Sposi PALERMO 28/08/2026" + logo Sposi.live).
+- **Verifica DB sull'evento `d8053fdd-5301-4d00-8565-e82f74d74e04` (GIADA E GINO)**:
+  - `events.watermark_names = true`, `watermark_text = 'GIADA E GINO Sposi PALERMO 28/08/2026'`, `watermark_font = 'baby_time'` → configurazione corretta lato DB
+  - `upload_queue`: tutti i 17 item 'synced' hanno `retry_count = 0`, `error = NULL`, `has_processed_at = TRUE` → **la pipeline NON è crashata**
+  - `updateDriveSyncStatus` è chiamato ma tutti i `drive_sync_status = 'pending'` perché `event_drive_tokens` per quell'evento è vuoto (Drive non era connesso per quell'evento, normale)
+  - `media_uploads` popolata con righe, r2_key assegnati
+- **Quindi**: il watermark dovrebbe essere stato applicato in `process-queue.ts:208` (`applyWatermark(buffer, wmLine1, wmLine2, event?.brand, wmFont, brandLogo)`) prima del re-upload. Il flusso non ha errori, ma il file visibile sembra non avere watermark.
+- **Possibili cause root da investigare** (questa sessione NON le ha fixate — sono state solo identificate):
+  1. **Bucket R2 con caching/edge**: il client potrebbe star leggendo il file vecchio (pre-watermark) invece di quello ricaricato. Verificare se il bucket ha TTL cache aggressivo o se la presigned URL è cacheable.
+  2. **Race condition nel client gallery**: la `EventTimelineFeed` potrebbe star leggendo il file da `/api/media/[id]/download` che ha cache headers sbagliati.
+  3. **`applyWatermark` silent fail**: la funzione ha un `catch { return buffer }` (process-queue.ts:88) che restituisce il buffer ORIGINALE se sharp fallisce → se nel nuovo deploy Vercel qualche libreria (sharp.node binding all'immagine di fresh deploy) sta fallendo, viene restituita l'immagine non watermarked senza nessun errore loggato.
+  4. **Bug introdotto dal commit 715a673 stesso**: il refresh del token Drive è nuovo, ma non dovrebbe impattare direttamente il path watermark (che è separato). Da escludere con test isolato.
+- **Piano di diagnosi prossime sessioni**:
+  1. **Lato client scaricare il file R2 raw** di un media "synced" e vedere se contiene watermark
+  2. Aggiungere log dentro `applyWatermark` per catturare eccezioni sharp (attualmente swallow)
+  3. Re-processare forzando uno sweep `processQueueForEvent` dopo aver marcato come 'failed' tutti gli item 'synced' recenti di quell'evento → questo è un workaround rapido testabile
+  4. Verificare se il problema si presenta anche per VIDEO oltre alle FOTO (l'utente ha detto "foto e un video del guestbook")
+  5. Verificare se il deploy Vercel è davvero avvenuto con il commit `715a673` (controllare build log)
+- **Stato**: ❌ NON risolto. Workaround richiesto all'utente per le foto pubblicate finora — riapplicare watermark manualmente o ri-processare la coda.
+
+### File modificati nel push 715a673
+```
+ apps/web/src/app/api/auth/google/callback/route.ts |  8 ++--
+ apps/web/src/lib/process-queue.ts                  | 48 ++++++++++++++++++---
+ apps/web/src/lib/__tests__/refresh-drive-token.test.ts (NEW, 7 test)
+ packages/media/src/__tests__/tokens.test.ts        | 50 ++++++++++++++++++++++
+ packages/media/src/tokens.ts                       |  6 ++-
+ packages/time-capsule/src/service.ts               |  3 +-
+ 6 files changed, 224 insertions(+), 12 deletions(-)
+```
+
+### Todo per la prossima sessione
+- [ ] **CRITICO**: configurare Authorized redirect URIs in Google Cloud Console per i 4+domini (fix bug #1)
+- [ ] **CRITICO**: diagnosticare e fixare watermark mancante su foto/video (fix bug #2)
+- [ ] Dopo i due fix: riapplicare watermark alle foto già pubblicate che ne sono prive (re-process coda forzato)
+- [ ] Stress test role-aware (`stress-test-agenti/agent.js`) — script già pronto, mancava solo `.env` con `SUPABASE_SERVICE_ROLE_KEY`
+- [ ] Newsletter signup form nella home (Rete Partner/GTM lead magnet)
+- [ ] SEO/GEO struttura contenuti per citazioni AI
+
+---
+
 ## Sessione 27/07/2026 — Video watermark su VPS sidecar (no più lambda ffmpeg-static)
 
 ### Architettura ibrida per video grandi (>100MB, >90s, ceremony/ricevimento interi)

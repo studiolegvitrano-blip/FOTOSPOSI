@@ -3,6 +3,7 @@ import { createMediaRecord, getDriveToken, getEventDriveFolders, updateDriveSync
 import type { EventDriveToken } from '@fotosposi/media';
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
 import { applyVideoOverlay } from '@fotosposi/video-overlay';
+import { applyOverlay } from '@fotosposi/photo-overlay';
 import sharp from 'sharp';
 import { watermarkFontFamily } from '@/lib/watermark-fonts';
 import { ensureWatermarkFonts, loadBrandLogo } from '@/lib/watermark-fonts.server';
@@ -44,14 +45,13 @@ export async function refreshDriveTokenIfExpired(
 }
 
 function escapeXml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"');
 }
 
 /**
- * Watermark foto. `line1`/`line2` sono le righe centrali (nomi sposi + data, oppure il
- * testo personalizzato scelto dagli sposi in `events.watermark_text`). Se gli sposi hanno
- * disattivato i nomi (`events.watermark_names = false`) le righe arrivano vuote: niente
- * banda scura, resta impresso solo il logo Sposi.live in basso a destra.
+ * Watermark foto — proxy al modulo `@fotosposi/photo-overlay` (versione "MAX" del 25/07/2026).
+ * Mantiene la firma legacy per non toccare i call-site; sotto traduce nei campi
+ * `OverlayBranding` attesi dal nuovo modulo.
  */
 async function applyWatermark(
   buffer: Buffer,
@@ -62,58 +62,19 @@ async function applyWatermark(
   logoPng?: Buffer | null,
 ): Promise<Buffer> {
   try {
-    const meta = await sharp(buffer).metadata();
-    const w = meta.width || 1200;
-    const h = meta.height || 900;
-
-    const barHeight = Math.max(160, Math.round(h / 6));
-    // Il testo personalizzato può essere lungo ("Ciccia & Ciccio Sposi Palermo 06/07/2026"):
-    // riduciamo il font all'aumentare dei caratteri perché resti dentro la larghezza.
-    const fontSizeName = Math.min(Math.max(44, Math.round(w / 11)), Math.round((w * 1.6) / Math.max(line1.length, 8)));
-    const fontSizeDate = Math.max(32, Math.round(w / 16));
-    const fontSizeLogo = Math.max(24, Math.round(w / 22));
-
-    const nameY = h - barHeight + Math.round(barHeight * (line2 ? 0.38 : 0.55));
-    const dateY = nameY + fontSizeName + 6;
-
-    const hasBand = !!line1;
-
-    const svgOverlay = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="rgba(0,0,0,0.0)" />
-          <stop offset="30%" stop-color="rgba(0,0,0,0.5)" />
-          <stop offset="100%" stop-color="rgba(0,0,0,0.82)" />
-        </linearGradient>
-      </defs>
-      ${hasBand ? `<rect x="0" y="${h - barHeight}" width="${w}" height="${barHeight}" fill="url(#barGrad)" />
-      <text x="${w / 2}" y="${nameY}" text-anchor="middle"
-        font-family="${fontFamily}" font-weight="bold" font-size="${fontSizeName}"
-        fill="rgba(255,255,255,0.95)">${escapeXml(line1)}</text>` : ''}
-      ${hasBand && line2 ? `<text x="${w / 2}" y="${dateY}" text-anchor="middle"
-        font-family="${fontFamily}" font-size="${fontSizeDate}"
-        fill="rgba(255,255,255,0.85)">${escapeXml(line2)}</text>` : ''}
-      ${logoPng ? '' : `<text x="${w - 16}" y="${h - 16}" text-anchor="end"
-        font-family="Georgia, serif" font-size="${fontSizeLogo}"
-        fill="rgba(255,255,255,0.50)">${getBrandLabel(brand)}</text>`}
-    </svg>`;
-
-    const layers: import('sharp').OverlayOptions[] = [{ input: Buffer.from(svgOverlay), top: 0, left: 0 }];
-    if (logoPng) {
-      // Logo brand in basso a destra al posto del wordmark testuale.
-      try {
-        const logoH = Math.max(40, Math.round(fontSizeLogo * 2));
-        const logo = await sharp(logoPng).resize({ height: logoH }).png().toBuffer();
-        const logoMeta = await sharp(logo).metadata();
-        layers.push({ input: logo, top: h - logoH - 14, left: w - (logoMeta.width || logoH) - 14 });
-      } catch { /* logo illeggibile: watermark senza logo */ }
-    }
-
-    return await sharp(buffer)
-      .composite(layers)
-      .jpeg({ quality: 90 })
-      .toBuffer();
-  } catch {
+    return await applyOverlay(buffer, {
+      format: 'square',
+      branding: {
+        coupleNames: line1 || '',
+        date: line2 || '',
+        primaryColor: '#1a1a2e',
+        wordmark: getBrandLabel(brand),
+        fontFamily,
+        brandLogoBuffer: logoPng,
+      },
+    });
+  } catch (err) {
+    console.error('applyWatermark overlay fallito:', err);
     return buffer;
   }
 }
@@ -281,20 +242,40 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
           // NB: folder_name nel DB è lowercase ('foto'/'video'/...) da ensureDriveFolders.
           const driveFolderId = isVideo ? (folders['video'] || folders['root']) : (folders['foto'] || folders['root']);
 
-          const formData = new FormData();
-          const blob = new Blob([new Uint8Array(buffer)], { type: item.file_type || 'application/octet-stream' });
-          formData.append('file', blob, item.file_name);
+          // Google Drive multipart upload richiede `multipart/related` con boundary esplicito:
+          // non si può usare `new FormData()` perché (a) in Node 18 runtime il browser
+          // FormData non è disponibile, (b) anche su Edge runtime `application/x-www-form-urlencoded`
+          // vs `multipart/related` cambia il parsing di Drive API. Costruiamo il body a mano.
+          const boundary = `----fotosposi${Date.now().toString(16)}`;
           const metadata: Record<string, unknown> = { name: item.file_name };
           if (driveFolderId) metadata.parents = [driveFolderId];
-          formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+          const contentType = item.file_type || 'application/octet-stream';
+          const metaPart =
+            `--${boundary}\r\n` +
+            `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+            `${JSON.stringify(metadata)}\r\n`;
+          const fileHeader =
+            `--${boundary}\r\n` +
+            `Content-Type: ${contentType}\r\n\r\n`;
+          const closing = `\r\n--${boundary}--`;
+          const bodyBytes = Buffer.concat([
+            Buffer.from(metaPart, 'utf8'),
+            Buffer.from(fileHeader, 'utf8'),
+            buffer,
+            Buffer.from(closing, 'utf8'),
+          ]);
 
           const driveRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id%2Csize', {
             method: 'POST',
-            headers: { Authorization: `Bearer ${token!.access_token}` },
-            body: formData,
-            signal: AbortSignal.timeout(15000),
+            headers: {
+              Authorization: `Bearer ${token!.access_token}`,
+              'Content-Type': `multipart/related; boundary=${boundary}`,
+              'Content-Length': String(bodyBytes.length),
+            },
+            body: bodyBytes,
+            signal: AbortSignal.timeout(30000),
           });
-          const driveData = await driveRes.json();
+          const driveData = await driveRes.json().catch(() => ({ error: { message: 'JSON parse failed' } }));
           if (driveRes.ok && driveData.id) {
             await updateDriveSyncStatus(media.id, 'synced', driveData.id);
             await supabase.from('upload_queue').update({ status: 'synced', drive_file_id: driveData.id, processed_at: new Date().toISOString() }).eq('id', item.id);

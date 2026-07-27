@@ -12,21 +12,27 @@ export async function createMediaRecord(params: {
   r2_key?: string;
 }): Promise<{ media?: MediaUpload; error?: string }> {
   const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from('media_uploads')
- .insert({
+  // Upsert su (event_id, r2_key): se un retry della coda processa lo stesso r2_key
+  // (es. errore transiente di Drive sync), NON crea un duplicato in media_uploads.
+  // La constraint unique `uniq_media_event_r2key` assicura questo a livello DB.
+  // Per record senza r2_key (legacy) il fallback è INSERT con rischio di duplicato
+  // accettabile — il numero di questi casi è ormai prossimo a zero.
+  const baseRow = {
     event_id: params.event_id,
     sub_event_id: params.sub_event_id ?? null,
     uploaded_by: params.uploaded_by,
     type: params.type,
     url: params.url,
-    drive_sync_status: 'pending',
+    drive_sync_status: 'pending' as const,
     compressed: params.compressed ?? false,
     r2_key: params.r2_key ?? null,
-  })
- .select()
- .single();
-
+  };
+  const query = params.r2_key
+    ? supabase
+        .from('media_uploads')
+        .upsert(baseRow, { onConflict: 'event_id,r2_key', ignoreDuplicates: false })
+    : supabase.from('media_uploads').insert(baseRow);
+  const { data, error } = await query.select().single();
   if (error) return { error: error.message };
   return { media: data };
 }

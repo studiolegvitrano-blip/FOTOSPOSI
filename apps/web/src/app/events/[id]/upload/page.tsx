@@ -118,17 +118,20 @@ export default function UploadPage() {
       const hasPending = await loadQueue();
       if (hasPending) {
         triggerServerProcessing();
+        // Polling ridotto a max 6 round × 5s = 30s totali. Se dopo 30s la coda è ancora
+        // piena, il cron maintenance (ogni 4h) la finirà. Limite esplicito per evitare
+        // saturare il network e appesantire l'utente durante il suo upload attivo.
+        const MAX_POLLS = 6;
+        let pollsDone = 0;
         pollRef.current = setInterval(async () => {
-          // Continua a pingare il server: processQueueForEvent elabora max 5 item/round
-          // e ritorna 'remaining>0'. Qui sotto continuiamo a triggerarlo finché loadQueue
-          // non vede più pending — oppure fino al prossimo cron maintenance. Vedi
-          // stress test 26/07: il problema non era il rate-limit (era già 30/min/IP),
-          // era che dopo il PRIMO trigger, polling leggeva 'still pending' ma non
-          // inviava nuove richieste → coda viva ma nessuno la elaborava per 20min.
-          triggerServerProcessing();
+          pollsDone++;
+          await triggerServerProcessing();
           const stillPending = await loadQueue();
-          if (!stillPending) clearInterval(pollRef.current);
-        }, 3000);
+          if (!stillPending || pollsDone >= MAX_POLLS) {
+            if (pollRef.current) clearInterval(pollRef.current);
+            pollRef.current = undefined;
+          }
+        }, 5000);
       }
     };
     init();
@@ -137,16 +140,20 @@ export default function UploadPage() {
 
 const startPolling = () => {
   if (pollRef.current) clearInterval(pollRef.current);
+  // Limite massimo di round: se dopo N trigger la coda è ancora piena, fermati e
+  // lascia al cron maintenance il compito di finire. Evita di saturare il network e
+  // appesantire l'utente (fix bug "caricamento lento" segnalato 27/07).
+  const MAX_POLLS = 6;
+  let pollsDone = 0;
   pollRef.current = setInterval(async () => {
-    // Continua a triggerare il server finché c'è lavoro: il primo round processoQueueForEvent
-    // elabora al massimo 5 item × round, poi ritorna 'remaining>0' per richiedere un altro
-    // round. Da solo non basta → serve continuare a pingare /api/r2/process-queue ad ogni
-    // tick di poll (3s). Prima quando il polling finiva dopo il primo round, la coda
-    // rimaneva viva ma nessuno la elaborava fino al cron (20min).
-    triggerServerProcessing();
+    pollsDone++;
+    await triggerServerProcessing();
     const stillPending = await loadQueue();
-    if (!stillPending) { clearInterval(pollRef.current); pollRef.current = undefined; }
-  }, 3000);
+    if (!stillPending || pollsDone >= MAX_POLLS) {
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = undefined;
+    }
+  }, 5000);
 };
 
   const processFiles = async (selected: FileList | File[]) => {

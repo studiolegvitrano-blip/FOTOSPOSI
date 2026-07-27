@@ -19,11 +19,10 @@ type Props = {
 
 const PAGE_SIZE = 4;
 
-export default function EventTimelineFeed({ media, videos, event, onShareMedia, onOpenImage }: Props) {
+export default function EventTimelineFeed({ media, videos, event, eventId, onShareMedia, onOpenImage }: Props) {
   const t = useTranslations('feed');
   const c = useTranslations('common');
   const [page, setPage] = useState(1);
-  const [autoAdvance, setAutoAdvance] = useState(true);
 
   // Costruisce i post feed unendo foto e video, ordinati per created_at desc.
   const posts: FeedPost[] = useMemo(() => {
@@ -79,6 +78,15 @@ export default function EventTimelineFeed({ media, videos, event, onShareMedia, 
     [onShareMedia]
   );
 
+  // Apertura lightbox — l'URL è quello che FullGalleryLightbox usa per trovare l'index.
+  const handleOpenImage = useCallback(
+    (p: FeedPost) => {
+      if (!p.imageUrl) return;
+      onOpenImage?.(p.imageUrl);
+    },
+    [onOpenImage]
+  );
+
   return (
     <div className="max-w-xl mx-auto">
       <FacebookFeed
@@ -86,6 +94,8 @@ export default function EventTimelineFeed({ media, videos, event, onShareMedia, 
         hasMore={hasMore}
         onLoadMore={onLoadMore}
         onShare={handleShare}
+        onOpenImage={handleOpenImage}
+        eventId={eventId}
       />
     </div>
   );

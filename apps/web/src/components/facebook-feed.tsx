@@ -24,7 +24,11 @@ type Props = {
   onLoadMore?: () => void;
   hasMore?: boolean;
   onShare?: (p: FeedPost) => void;
+  /** Callback quando l'utente clicca sulla foto di un post — apre il lightbox fullscreen. */
+  onOpenImage?: (post: FeedPost) => void;
   containerClassName?: string;
+  /** event_id per persistere reazioni/commenti nel DB (vedi /api/feed/{reactions,comments}). */
+  eventId?: string;
 };
 
 /* Avatar con iniziali se manca la foto profilo */
@@ -68,15 +72,18 @@ export default function FacebookFeed({
   onLoadMore,
   hasMore = false,
   onShare,
+  onOpenImage,
   containerClassName = '',
-}: Props) {
+  eventId,
+}: Props & { eventId?: string }) {
   const t = useTranslations('feed');
   const [commentsOpen, setCommentsOpen] = useState<Set<string>>(new Set());
-  const [postLikes, setPostLikes] = useState<Record<string, number>>({});
   const [postReactions, setPostReactions] = useState<Record<string, ReactionType | undefined>>({});
+  const [reactionCounts, setReactionCounts] = useState<Record<string, Partial<Record<ReactionType, number>>>>({});
   const [popPostId, setPopPostId] = useState<string | null>(null);
   const [commentDraft, setCommentDraft] = useState<Record<string, string>>({});
-  const [extraComments, setExtraComments] = useState<Record<string, { author: string; text: string }[]>>({});
+  const [extraComments, setExtraComments] = useState<Record<string, { id?: string; author: string; text: string; created_at?: string }[]>>({});
+  const [commentsLoading, setCommentsLoading] = useState<Set<string>>(new Set());
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -95,47 +102,122 @@ export default function FacebookFeed({
     return () => io.disconnect();
   }, [onLoadMore, hasMore]);
 
+  // Carica le reazioni dal DB per tutti i media dei post visibili (persistenza).
+  useEffect(() => {
+    if (!eventId || posts.length === 0) return;
+    const ids = posts.map((p) => p.id).filter(Boolean);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    fetch(`/api/feed/reactions?event_id=${eventId}&media_ids=${ids.join(',')}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const counts: Record<string, Partial<Record<ReactionType, number>>> = {};
+        const mine: Record<string, ReactionType> = {};
+        for (const id of ids) {
+          const entry = data[id];
+          if (entry?.counts) counts[id] = entry.counts;
+          if (entry?.myReaction) mine[id] = entry.myReaction;
+        }
+        setReactionCounts(counts);
+        setPostReactions((s) => ({ ...s, ...mine }));
+      })
+      .catch(() => {/* silente: meglio UI senza reaction counter che error toast */});
+    return () => { cancelled = true; };
+  }, [eventId, posts.map((p) => p.id).join(',')]);
+
   const toggleComments = useCallback((id: string) => {
     setCommentsOpen((s) => {
       const next = new Set(s);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        // Lazy-load: prima volta che si apre → scarica i commenti dal DB.
+        if (eventId && !extraComments[id]) {
+          setCommentsLoading((c) => new Set(c).add(id));
+          fetch(`/api/feed/comments?event_id=${eventId}&media_id=${id}`)
+            .then((r) => (r.ok ? r.json() : { comments: [] }))
+            .then((data) => {
+              setExtraComments((s) => ({ ...s, [id]: data.comments ?? [] }));
+            })
+            .catch(() => {/* silente */})
+            .finally(() => setCommentsLoading((c) => { const n = new Set(c); n.delete(id); return n; }));
+        }
+      }
       return next;
     });
-  }, []);
+  }, [eventId, extraComments]);
 
-  const handleReact = (post: FeedPost, r: ReactionType) => {
+  const handleReact = async (post: FeedPost, r: ReactionType) => {
     const id = post.id;
     const prev = postReactions[id];
-    const base = postLikes[id] ?? post.likes;
-    let delta = 0;
-    if (prev === r) {
-      // togli
-      delta = -1;
-      setPostReactions((s) => ({ ...s, [id]: undefined }));
-    } else {
-      if (prev) delta = 0; else delta = 1;
-      setPostReactions((s) => ({ ...s, [id]: r }));
-    }
-    setPostLikes((s) => ({ ...s, [id]: Math.max(0, base + delta) }));
+    const isToggleOff = prev === r;
+
+    // Ottimistic: aggiorna subito UI
+    setPostReactions((s) => ({ ...s, [id]: isToggleOff ? undefined : r }));
+    setReactionCounts((s) => {
+      const counts = { ...(s[id] ?? {}) } as Partial<Record<ReactionType, number>>;
+      if (prev) counts[prev] = Math.max(0, (counts[prev] || 1) - 1);
+      if (!isToggleOff) counts[r] = (counts[r] || 0) + 1;
+      return { ...s, [id]: counts };
+    });
     setPopPostId(id);
     setTimeout(() => setPopPostId(null), 360);
+
+    // Persisti nel DB. Senza eventId → niente persistenza (fallback al vecchio comportamento).
+    if (!eventId) return;
+    try {
+      await fetch('/api/feed/reactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: eventId,
+          media_id: id,
+          reaction: isToggleOff ? null : r,
+        }),
+      });
+    } catch {
+      // silente: UI ha già l'aggiornamento ottimistico; errore di rete non blocca
+    }
   };
 
-  const submitComment = (id: string) => {
+  const submitComment = async (id: string) => {
     const text = (commentDraft[id] || '').trim();
     if (!text) return;
-    setExtraComments((s) => ({
-      ...s,
-      [id]: [...(s[id] || []), { author: 'Tu', text }],
-    }));
+    if (!eventId) {
+      // fallback locale se eventId non passato
+      setExtraComments((s) => ({
+        ...s,
+        [id]: [...(s[id] || []), { author: 'Tu', text }],
+      }));
+      setCommentDraft((s) => ({ ...s, [id]: '' }));
+      return;
+    }
+    try {
+      const res = await fetch('/api/feed/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_id: eventId, media_id: id, text }),
+      });
+      const data = await res.json();
+      if (res.ok && data?.comment) {
+        setExtraComments((s) => ({
+          ...s,
+          [id]: [...(s[id] || []), data.comment],
+        }));
+      }
+    } catch {
+      // silente
+    }
     setCommentDraft((s) => ({ ...s, [id]: '' }));
   };
 
   return (
     <div className={`space-y-4 ${containerClassName}`}>
       {posts.map((p) => {
-        const likes = postLikes[p.id] ?? p.likes;
+        const counts = reactionCounts[p.id] ?? {};
+        const likes = Object.values(counts).reduce<number>((sum, n) => sum + (n ?? 0), 0) || p.likes;
         const reaction = postReactions[p.id];
         const comments = [...p.comments, ...(extraComments[p.id] || [])];
         return (
@@ -161,7 +243,21 @@ export default function FacebookFeed({
             {/* Media (foto o video) */}
             {p.imageUrl && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={p.imageUrl} alt={p.caption || ''} className="w-full object-cover bg-muted max-h-[680px]" />
+              <img
+                src={p.imageUrl}
+                alt={p.caption || ''}
+                className="w-full object-cover bg-muted max-h-[680px] cursor-zoom-in"
+                loading="lazy"
+                onClick={() => onOpenImage?.(p)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onOpenImage?.(p);
+                  }
+                }}
+              />
             )}
             {p.videoUrl && (
               <video src={p.videoUrl} controls className="w-full object-cover bg-black max-h-[680px]" />
