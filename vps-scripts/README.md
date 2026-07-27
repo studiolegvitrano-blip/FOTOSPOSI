@@ -12,29 +12,179 @@ originale da R2 via presigned URL, applica il watermark con `ffmpeg` di sistema
   `brew install ffmpeg` su macOS, già presente su Raspberry Pi OS bookworm+)
 - `sharp` npm (per rendering del PNG overlay del watermark, come nella lambda)
 
-## Installazione
+## Installazione (una tantum)
 
 ```bash
 ssh user@vps
 mkdir -p ~/fotosposi-vps && cd ~/fotosposi-vps
 npm init -y
 npm install sharp
-# Copia qui gli ultimi due file:
-#   - video-watermark-server.js  (questo script)
-#   - overlay.js                 (logica SVG → PNG → ffmpeg composita, no dipendenze dal repo principale)
-
-# Avvia (consigliato: dietro nginx + certbot, oppure tunnel cloudflare)
-API_KEY="$(openssl rand -hex 32)" PORT=8081 node video-watermark-server.js
+# Copia qui i due file dal repo (vedi sezione "Copiare i file" sotto)
 ```
 
-Per protgeretro HTTPS gratis con Cloudflare Tunnel: `cloudflared tunnel ruta
-tcp://localhost:8081 --hostname watermark.vps.example.com` e puntare
-`VPS_FFMPEG_URL=https://watermark.vps.example.com` (no expose porta pubblica).
+### Copiare i file (3 modi)
+
+Da Windows, con PowerShell, i file sono in `C:\Users\agost\OneDrive\Documenti\FOTOSPOSI\vps-scripts\`:
+
+**Modo A — scp (richiede path server noto, es. utente@nas.local o IP):**
+```powershell
+scp "C:\Users\agost\OneDrive\Documenti\FOTOSPOSI\vps-scripts\video-watermark-server.js" user@vps:~/fotosposi-vps/
+scp "C:\Users\agost\OneDrive\Documenti\FOTOSPOSI\vps-scripts\overlay.js" user@vps:~/fotosposi-vps/
+```
+
+**Modo B — git pull sul VPS (se hai il repo clonato anche lì):**
+```bash
+git clone https://github.com/studiolegvitrano-blip/FOTOSPOSI.git ~/fotosposi-fork
+cp ~/fotosposi-fork/vps-scripts/*.{js,md} ~/fotosposi-vps/
+```
+
+**Modo C — copia-incolla `cat <<EOF > file.js`** dentro i due file della repo direttamente da SSH. Scomodo, ma funziona senza scp/git.
+
+## Gestione servizio: systemd (consigliato)
+
+Crea il unit file una volta sola, poi in 3 comandi è running forever:
+
+```bash
+sudo tee /etc/systemd/system/fotosposi-watermark.service > /dev/null <<'EOF'
+[Unit]
+Description=FOTOSPOSI video watermark sidecar
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USER
+WorkingDirectory=/home/YOUR_USER/fotosposi-vps
+Environment="PORT=8081"
+Environment="API_KEY=PUT_HERE_THE_OPENSSL_RAND_HEX_32_OUTPUT"
+ExecStart=/usr/bin/node /home/YOUR_USER/fotosposi-vps/video-watermark-server.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Ricava una chiave robusta: copiala (sarà incollata in Vercel come VPS_FFMPEG_API_KEY)
+openssl rand -hex 32   # output di 64 caratteri, copiarlo
+
+# Incolla quella chiave nel punto "PUT_HERE..." del file sopra, poi:
+sudo systemctl daemon-reload
+sudo systemctl enable fotosposi-watermark
+sudo systemctl start fotosposi-watermark
+sudo systemctl status fotosposi-watermark
+```
+
+**Comandi utili dopo:**
+- `sudo systemctl restart fotosposi-watermark` — riavvia dopo aver cambiato config
+- `sudo journalctl -u fotosposi-watermark -f` — log live (Ctrl+C per uscire)
+- `sudo journalctl -u fotosposi-watermark --since "1 hour ago"` — log ultima ora
+
+## HTTPS con sottodominio su `sposi.live` / `justmarry.live`
+
+Tre strade, dalla più semplice alla più sicura.
+
+### Strada 1 — Cloudflare Tunnel (consigliata, zero porta esposta)
+
+Prerequisito: dominio `sposi.live` o `justmarry.live` già su Cloudflare (gestito da loro, anche se registrato altrove). Se non è già su Cloudflare, la **Strada 2** è più rapida.
+
+```bash
+# Sul VPS
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg
+echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared bookworm main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
+sudo apt update && sudo apt install -y cloudflared
+
+cloudflared tunnel login                # si apre browser: autorizzo il dominio
+cloudflared tunnel create fotosposi-wm  # crea il tunnel
+cloudflared tunnel route dns fotosposi-wm watermark.sposi.live
+sudo cloudflared service install        # daemon systemd per il tunnel
+
+# Config tunnel (modificare dopo l'install):
+sudo mkdir -p /etc/cloudflared
+sudo tee /etc/cloudflared/config.yml > /dev/null <<'EOF'
+tunnel: TUNNEL_ID_DOPO_CREATE
+credentials-file: /home/YOUR_USER/.cloudflared/TUNNEL_ID.json
+
+ingress:
+  - hostname: watermark.sposi.live
+    service: http://localhost:8081
+  - service: http_status:404
+EOF
+sudo systemctl restart cloudflared
+```
+
+Risultato: `https://watermark.sposi.live` raggiunge il server su VPS tramite tunnel HTTPS automatico (certificato gestito da Cloudflare).
+
+### Strada 2 — nginx + certbot sul VPS (richiede porta 80/443 aperta)
+
+Più classica, ma richiede dal provider VPS: porta 80 e 443 aperte in ingresso + DNS A record che punta all'IP pubblico del VPS.
+
+```bash
+sudo apt install -y nginx certbot python3-certbot-nginx
+# Su Register.it (o Cloudflare DNS):
+#   A   watermark   VPS_PUBLIC_IP       TTL auto
+#   AAAA watermark   (se IPv6)
+# Dopo propagazione DNS (5-30 min), verifica:
+dig watermark.sposi.live +short   # deve mostrare VPS_PUBLIC_IP
+
+sudo tee /etc/nginx/sites-available/watermark > /dev/null <<'EOF'
+server {
+    listen 80;
+    server_name watermark.sposi.live;
+    client_max_body_size 1m;     # body POST sono solo JSON branding, niente video
+    proxy_read_timeout 120s;
+    proxy_send_timeout 120s;
+    location / {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+EOF
+sudo ln -sf /etc/nginx/sites-available/watermark /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d watermark.sposi.live   # Let's Encrypt HTTPS automatico
+```
+
+Risultato: `https://watermark.sposi.live` con certificato Let's Encrypt gratis, rinnovato automaticamente.
+
+### Strada 3 — Solo HTTP senza HTTPS (NON per produzione)
+
+Test locale / rete fidata. L'API key passa in chiaro sulla rete → solo per dev.
+
+## Env vars richieste sul Vercel
+
+Una volta che il sidecar è up su `https://watermark.sposi.live` (Strada 1) o `https://watermark.sposi.live` (Strada 2):
+
+| Variabile | Valore |
+|---|---|
+| `VPS_FFMPEG_URL` | `https://watermark.sposi.live` (NO slash finale) |
+| `VPS_FFMPEG_API_KEY` | l'output di `openssl rand -hex 32` che hai incollato nel unit file systemd |
+
+Da impostare in **Vercel → Settings → Environment Variables** di `fotosposi-web`. Redeploy richiesto per applicarla.
+
+## Test end-to-end
+
+Il sidecar deve rispondere a un health check prima di usarlo dalla lambda:
+
+```bash
+# Sul VPS
+curl http://127.0.0.1:8081/health
+# Atteso: {"ok":true,"service":"fotosposi-watermark","uptime":...}
+
+# Dall'esterno tramite dominio pubblico (dopo aver finito setup DNS+nginx/tunnel)
+curl -H "X-API-Key: <your key>" -X POST https://watermark.sposi.live/watermark \
+  -H "Content-Type: application/json" \
+  -d '{"downloadUrl":"...","uploadUrl":"...","branding":{"coupleNames":"Test & Co","date":"","primaryColor":"#000","wordmark":"test"}}'
+# Senza presigned URL reali risponderà errore download, ma il formato è giusto.
+```
+
+Poi dal browser: condividi un video da `/events/[id]/upload` con r2_key presente, condividi su WhatsApp/Facebook dalla galleria, controlla che il watermark appaia anche su file 200MB+.
 
 ## Logging
 
-stdout per ogni job: `[ISO] start bytes=X duration=Yms ok=1` → facilmente grep
-su systemd journal: `journalctl -u fotosposi-watermark -f`.
+stdout per ogni job: `[ISO] download bytes=X dlMs=...` poi `ffmpeg encodeMs=...` poi `upload uploadMs=...`. Visibile via `journalctl -u fotosposi-watermark -f`.
 
 ## Security model
 
@@ -46,3 +196,10 @@ su systemd journal: `journalctl -u fotosposi-watermark -f`.
   nessun accesso diretto a R2 / Supabase.
 - POST body limit 256KB (branding + URLs). Il video NON attraversa mai la POST:
   transita solo tra R2 e VPS.
+
+## Manutenzione overlay.js ↔ packages/video-overlay/src/index.ts
+
+I due file **non** sono collegati automaticamente. Quando modifichi la grafica
+del watermark nel package Vercel, ricopia i blocchi `escapeXml` e `renderWatermarkOverlay`
+in `overlay.js` qui. Drift = video_watermarked lato VPS avrà grafica diversa dalla foto
+lato lambda (branding disallineato per gli ospiti).
