@@ -103,6 +103,48 @@ COMMENT ON COLUMN media_uploads.watermark_missing IS
  PROJECT_STATUS.md                                        | +80 righe (questa sezione)
 ```
 
+### Sessione 28/07/2026 (continua 1) — Auto-retry backoff esponenziale upload (SW + client)
+
+**Contesto**: commit `5097fd9` pushato. L'utente chiede sviluppo continuo. Affrontato il TODO più impattante per scenari wedding reali: connessione ballerina (WiFi venue affollato, copertura cellulare debole in campagna).
+
+**Problema risolto**: il client `uploadSingleFile` ritentava UNA volta sola l'upload su R2; il Service Worker ritentava solo quando scattava `online`/`sync`/`flush-now` event → nessun backoff, banda sprecata per retry ravvicinati, e potenziale ban da R2 per troppe PUT in poco tempo.
+
+**Soluzione applicata**:
+
+1. **Helper testabile `computeBackoffMs(retryCount)` in `apps/web/src/lib/upload-queue.ts`**:
+   - Sequenza esponenziale: `1s → 2s → 4s → 8s → 16s → 32s → 60s (cap)` (`BACKOFF_CAP_MS`).
+   - `+ jitter 0..BACKOFF_BASE_MS` per evitare thundering herd su riconnessioni di molti client insieme.
+   - `BACKOFF_MAX_RETRIES = 5` per il client (gli invitati non possono aspettare oltre).
+   - Esportato + 9 test verdi (attempt 1/2/3/6/7+/0/-5, jitter random, cap esponente).
+
+2. **Retry con backoff in `uploadSingleFile`**:
+   - PUT verso R2: max 5 tentativi con sleep cancellabile via `AbortSignal` tra uno e l'altro.
+   - POST `/api/upload/init`: stesso pattern (raro fallire ma cold start Vercel lambda).
+   - Sleep helper `sleep(ms, signal?)` che rigetta con `AbortError` se l'utente annulla.
+
+3. **Backoff persistente nel Service Worker `apps/web/public/sw.js`**:
+   - `flushOne(record)` salta il record se `Date.now() < record.nextRetryAt`.
+   - Su fallimento: persistenza su IndexedDB di `retryCount++`, `nextRetryAt = Date.now() + computeBackoffMs(retryCount)`, `lastError`.
+   - `updateUploadRecord(record)` helper (IndexedDB.put su stessa keyPath).
+   - `BACKOFF_MAX_RETRIES = 20` per il SW (~1h max di backoff cumulativo prima di lasciare il record per ispezione manuale).
+   - Su successo: il record viene rimosso (retryCount si resetta automaticamente).
+
+**Limitazione documentata**: il SW ha una copia inline della logica `nextBackoffMs` (non può importare da moduli TS — file standalone). Stessi numeri di `BACKOFF_BASE_MS/CAP_MS` per coerenza lato client/SW. Se cambiamo le costanti nel client, vanno aggiornate anche nel SW.
+
+**Verifica**:
+- Typecheck: 0 errori.
+- Test: **265/265 verdi** (era 256: +9 nuovi test backoff).
+- Build: `next build` OK.
+- `next start` (production): homepage 200 OK, /events/[id] 200 OK.
+
+### File modificati in questa sotto-sessione
+```
+ apps/web/public/sw.js                          | +50 righe (nextBackoffMs, updateUploadRecord, backoff persistente su IndexedDB, skip se nextRetryAt futuro)
+ apps/web/src/lib/upload-queue.ts               | +60 righe (computeBackoffMs esportato, sleep cancellabile, retry PUT + init con backoff)
+ apps/web/src/lib/__tests__/upload-backoff.test.ts | NEW (+9 test computeBackoffMs deterministici)
+ PROJECT_STATUS.md                              | +50 righe (questa sotto-sessione)
+```
+
 ---
 
 ## Sessione 27/07/2026 (continua 6) — Upload resiliente (Service Worker + IndexedDB) + Drive naming convention

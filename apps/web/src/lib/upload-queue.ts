@@ -40,6 +40,39 @@ type InitPayload = {
   uploaded_by: string;
 };
 
+// ─────────────────────────────────────────────────────────────────────
+// Backoff esponenziale: riusato anche dal SW inline in /public/sw.js
+// (non può importare da qui — Service Worker standalone file). Stessi
+// numeri per coerenza lato client/SW.
+// ─────────────────────────────────────────────────────────────────────
+export const BACKOFF_BASE_MS = 1000;
+export const BACKOFF_CAP_MS = 60000;
+export const BACKOFF_MAX_RETRIES = 5; // max tentativi client (SW ne fa di più)
+
+/**
+ * Calcola il prossimo delay di retry in ms con backoff esponenziale + jitter.
+ * Sequenza (senza jitter): 1s → 2s → 4s → 8s → 16s → 32s → 60s (cap).
+ * + jitter 0..BACKOFF_BASE_MS per evitare thundering herd su riconnessioni
+ * di molti client simultaneamente (es. WiFi venue che torna dopo 5 min down).
+ */
+export function computeBackoffMs(retryCount: number): number {
+  const exp = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * Math.pow(2, Math.max(0, retryCount - 1)));
+  const jitter = Math.floor(Math.random() * BACKOFF_BASE_MS);
+  return exp + jitter;
+}
+
+/**
+ * Sleep cancellabile via AbortSignal: ritorna Promise che si risolve dopo `ms`
+ * o si rigetta con 'AbortError' se il signal triggera prima.
+ */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error('AbortError'));
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => { clearTimeout(t); reject(new Error('AbortError')); }, { once: true });
+  });
+}
+
 /**
  * Esegue un singolo upload:
  *  1. Chiede presigned URL a /api/r2/upload
@@ -73,22 +106,32 @@ export async function uploadSingleFile(
   if (!presign.presignedUrl || !presign.key) return { error: presign.error || 'presign senza URL' };
 
   // 2. PUT su R2 con XHR per progress (fetch() non supporta progress events nativi).
-  const putOk = await new Promise<boolean>((resolve) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', presign.presignedUrl);
-    xhr.setRequestHeader('Content-Type', contentType);
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 90));
-    };
-    xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 300);
-    xhr.onerror = () => resolve(false);
-    xhr.onabort = () => resolve(false);
-    if (signal) {
-      const onAbort = () => { xhr.abort(); resolve(false); };
-      if (signal.aborted) onAbort(); else signal.addEventListener('abort', onAbort, { once: true });
+  //    Wrappato in retry con backoff esponenziale: la rete WiFi venue spesso è
+  //    ballerina (150 persone connesse, interferenze, roaming passeggero).
+  let putOk = false;
+  for (let attempt = 1; attempt <= BACKOFF_MAX_RETRIES && !putOk; attempt++) {
+    putOk = await new Promise<boolean>((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', presign.presignedUrl);
+      xhr.setRequestHeader('Content-Type', contentType);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 90));
+      };
+      xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 300);
+      xhr.onerror = () => resolve(false);
+      xhr.onabort = () => resolve(false);
+      if (signal) {
+        const onAbort = () => { xhr.abort(); resolve(false); };
+        if (signal.aborted) onAbort(); else signal.addEventListener('abort', onAbort, { once: true });
+      }
+      xhr.send(file);
+    });
+    if (!putOk && attempt < BACKOFF_MAX_RETRIES) {
+      // Backoff prima del prossimo tentativo (salta l'ultimo per non attendere invano).
+      try { await sleep(computeBackoffMs(attempt), signal); }
+      catch { return { error: 'Upload interrotto' }; }
     }
-    xhr.send(file);
-  });
+  }
   if (!putOk) {
     // Best-effort: prova a passare al SW per background retry.
     try {
@@ -110,22 +153,37 @@ export async function uploadSingleFile(
   }
   onProgress?.(95);
 
-  // 3. /api/upload/init
-  const initBody: InitPayload = {
-    r2_key: presign.key,
-    event_id: eventId,
-    file_name: filename,
-    file_type: contentType,
-    file_size: file.size,
-    uploaded_by: uploadedBy,
-  };
-  const initRes = await fetch('/api/upload/init', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(initBody),
-    signal,
-  });
-  if (!initRes.ok) return { error: `init fallito HTTP ${initRes.status}` };
+  // 3. /api/upload/init — anche qui retry con backoff (più raro fallire, ma
+  //    se la lambda Vercel è in cold start il primo POST può timeoutare).
+  let initOk = false;
+  let initLastError = '';
+  for (let attempt = 1; attempt <= BACKOFF_MAX_RETRIES && !initOk; attempt++) {
+    const initBody: InitPayload = {
+      r2_key: presign.key,
+      event_id: eventId,
+      file_name: filename,
+      file_type: contentType,
+      file_size: file.size,
+      uploaded_by: uploadedBy,
+    };
+    try {
+      const initRes = await fetch('/api/upload/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(initBody),
+        signal,
+      });
+      if (initRes.ok) { initOk = true; break; }
+      initLastError = `init fallito HTTP ${initRes.status}`;
+    } catch (e) {
+      initLastError = e instanceof Error ? e.message : 'errore rete';
+    }
+    if (attempt < BACKOFF_MAX_RETRIES) {
+      try { await sleep(computeBackoffMs(attempt), signal); }
+      catch { return { error: 'Upload interrotto' }; }
+    }
+  }
+  if (!initOk) return { error: initLastError || 'init fallito' };
 
   onProgress?.(100);
   return { r2_key: presign.key };

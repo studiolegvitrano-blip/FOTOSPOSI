@@ -30,6 +30,20 @@ const UPLOAD_DB_VERSION = 1;
 const UPLOAD_STORE = 'pending';
 const SYNC_TAG = 'fotosposi-upload';
 
+// Backoff esponenziale per retry upload falliti. Sequenza:
+//   attempt 1 → 1s, 2 → 2s, 3 → 4s, 4 → 8s, 5 → 16s, 6 → 32s, 7+ → 60s (cap).
+// + jitter 0-1000ms per evitare thundering herd (molti client che si risvegliano
+// insieme dopo un outage del venue WiFi non martellano l'endpoint insieme).
+const BACKOFF_BASE_MS = 1000;
+const BACKOFF_CAP_MS = 60000;
+const BACKOFF_MAX_RETRIES = 20; // ~1h max di backoff cumulativo prima di rinuncia
+
+function nextBackoffMs(retryCount) {
+  const exp = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * Math.pow(2, Math.max(0, retryCount - 1)));
+  const jitter = Math.floor(Math.random() * BACKOFF_BASE_MS);
+  return exp + jitter;
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
  * Lifecycle
  * ────────────────────────────────────────────────────────────────────────── */
@@ -145,11 +159,37 @@ async function deleteUploadRecord(id) {
 }
 
 /**
+ * Aggiorna un record pendente (es. per segnare retryCount + nextRetryAt dopo un
+ * fallimento). IndexedDB.put() su un oggetto con la stessa keyPath sostituisce.
+ */
+async function updateUploadRecord(record) {
+  const db = await openUploadDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(UPLOAD_STORE, 'readwrite');
+    const store = tx.objectStore(UPLOAD_STORE);
+    const req = store.put(record);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/**
  * Tenta di caricare un singolo file pendente su R2 via presigned URL.
  * Se riesce, POSTa /api/upload/init per registrare upload_queue e rimuove
- * il record da IndexedDB. Se fallisce, lascia il record per un retry futuro.
+ * il record da IndexedDB. Se fallisce, aggiorna il record con retryCount
+ * incrementato e nextRetryAt calcolato via backoff esponenziale.
+ *
+ * Backoff: prima di tentare l'upload controlla `record.nextRetryAt`. Se il
+ * momento è nel futuro, salta (ritorneremo al prossimo sync/online/flush).
+ * Questo evita di martellare l'endpoint per connessioni ballerine (es. WiFi
+ * venue affollato, copertura cellulare debole in campagna).
  */
 async function flushOne(record) {
+  // Backoff guard: salta se non ancora ora di riprovare.
+  if (record.nextRetryAt && Date.now() < record.nextRetryAt) {
+    return { ok: false, id: record.id, skipped: true, retryAt: record.nextRetryAt };
+  }
+  const retryCount = (record.retryCount || 0) + 1;
   try {
     // 1) PUT del blob su R2 (presigned URL era stato pre-calcolato dal client prima
     //    di mettere in coda; lo memorizziamo nel record IndexedDB insieme al blob).
@@ -177,10 +217,20 @@ async function flushOne(record) {
 
     // 3) Tutto ok: rimuovi dalla coda locale.
     await deleteUploadRecord(record.id);
-    return { ok: true, id: record.id };
+    return { ok: true, id: record.id, retryCount };
   } catch (err) {
-    console.warn('[sw] flush fallito per record', record.id, err);
-    return { ok: false, id: record.id, error: err instanceof Error ? err.message : String(err) };
+    // Backoff: se abbiamo sforato il tetto massimo di tentativi, lasciamo il record
+    // per ispezione manuale (l'utente potrà forzare un retry tramite flush-now dal client
+    // o aprire la pagina upload per vederlo in coda). Su IndexedDB persistiamo comunque
+    // nextRetryAt così l'eventuale retry non avviene prima del dovuto.
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[sw] flush fallito per record ${record.id} (tentativo ${retryCount}):`, message);
+    if (retryCount >= BACKOFF_MAX_RETRIES) {
+      return { ok: false, id: record.id, error: message, retryCount, exhausted: true };
+    }
+    const nextRetryAt = Date.now() + nextBackoffMs(retryCount);
+    await updateUploadRecord({ ...record, retryCount, nextRetryAt, lastError: message });
+    return { ok: false, id: record.id, error: message, retryCount, nextRetryAt };
   }
 }
 
