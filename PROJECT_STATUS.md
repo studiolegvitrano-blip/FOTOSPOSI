@@ -145,7 +145,48 @@ COMMENT ON COLUMN media_uploads.watermark_missing IS
  PROJECT_STATUS.md                              | +50 righe (questa sotto-sessione)
 ```
 
-### Sessione 28/07/2026 (continua 2) — Notifica locale "upload completato" + Compressione foto auto >2MB
+### Sessione 28/07/2026 (continua 3) — Reset totale DB+R2 + 3 migration applicate + Fix OAuth callback
+
+**Contesto**: dopo il reset totale fatto dall'utente (TRUNCATE di tutte le tabelle + DELETE auth.users + 323 oggetti R2 cancellati), l'utente testa la registrazione da cellulare. Rileva 2 bug:
+1. **OAuth Google signup → "reindirizzamento" → ritorna a /signup**: bug fixato in questa sessione.
+2. **Salvataggio impostazioni evento (nome/cognome sposi) → "could not find the 'groom1_first_name' column"**: bug fixato da migration 00038 applicata in questa sessione.
+
+**Migration applicate (via Supabase MCP apply_migration + execute_sql)**:
+- **00037** `uniq_media_event_r2key`: PRIMO tentativo via apply_migration → errore "already exists" fuorviante (era solo un INDEX con stesso nome, non un CONSTRAINT). Risolto con DROP INDEX + ADD CONSTRAINT. Ora unique constraint vero.
+- **00038** `grooms_first_last_name`: 6 colonne nuove su events + backfill best-effort da `couple_name`. ✅
+- **00039** `watermark_missing`: applicata con execute_sql (apply_migration conflict su version tracking). ✅
+- Tutte e 3 confermate: `groom_cols=6`, `watermark_col=1`, `unique_constraint=1`.
+
+**Bug OAuth fix — root cause finale**:
+La callback `/auth/callback/page.tsx` per Google/Facebook/Apple NON chiamava `supabase.auth.exchangeCodeForSession(code)` che è il passaggio richiesto dal **Authorization Code Flow** per trasformare il `?code=...` (dalla query string OAuth) in una sessione Supabase valida. Risultato: l'utente completava Google OAuth → redirect a `/auth/callback` → callback NON scambiava il code → `getSession()` ritornava null → `getCurrentUser` ritornava null → `/dashboard` redirect a `/login`. L'utente vedeva "Reindirizzamento in corso..." per un istante (il messaggio iniziale del componente prima del useEffect) e poi... in realtà la pagina dice "Reindirizzamento in corso..." come testo del return JSX, MA contemporaneamente `router.push(redirect || '/dashboard')` parte in useEffect — quindi l'utente mobile vede brevemente "Reindirizzamento in corso..." poi va a `/dashboard` e siccome la sessione non c'è → `/login`.
+
+**Fix applicato** in `apps/web/src/app/auth/callback/page.tsx`:
+```ts
+const code = searchParams.get('code');
+if (code) {
+  const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+  if (exchangeErr) console.error('[auth/callback] exchangeCodeForSession fallito:', exchangeErr);
+} else if (window.location.hash) {
+  await supabase.auth.getSession();  // confirm email flow (token in hash)
+}
+```
+- `code` da query string → OAuth Google/Facebook/Apple (PKCE flow)
+- `hash` (#access_token=...) → conferma email dal magic link
+
+**Bug "Free scelto, tu trasforma in Deluxe"** — FALSO ALLARME:
+Verificato `createEvent` in `packages/events/src/service.ts`: `tier: params.tier ?? 'free'` rispetta sempre il parametro passato dal client. `events/new/page.tsx:18` ha `useState<Tier>('free')` come default e `setSelectedTier(tier)` su `choosePlan(tier)`. Non c'è logica che forza Deluxe. Probabilmente l'utente ha cliccato Premium o Deluxe per sbaglio nella scelta iniziale (UI mostra i 3 piani).
+
+**Verifica**:
+- Migration: tutte applicate e verificate nel DB.
+- OAuth fix: typecheck OK, build OK.
+- Test: 265/265 verdi (non toccati dal fix).
+
+### File modificati in questa sotto-sessione
+```
+ apps/web/src/app/auth/callback/page.tsx                | +6 righe (exchangeCodeForSession per OAuth flow)
+ PROJECT_STATUS.md                                       | +30 righe (questa sezione)
+```
+
 
 **Contesto**: commit `a7f46ed` pushato (backoff SW+client). L'utente chiede sviluppo continuo. Affrontati 2 TODO post-push 25e6541:
 - **Notifica push "upload completato"**: l'invitato che scansiona il QR, carica 5 foto, chiude il tab pensando "ok fatto" — se il SW sta ancora processando la coda, non ha feedback.

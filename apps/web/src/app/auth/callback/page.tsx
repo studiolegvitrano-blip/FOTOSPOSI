@@ -11,7 +11,20 @@ export default function AuthCallbackPage() {
     const handleHash = async () => {
       const { createClient } = await import('@fotosposi/core');
       const supabase = createClient();
-      if (window.location.hash) {
+      // OAuth Google/Facebook/Apple ritornano con `?code=...` nella query string
+      // (Authorization Code Flow, non PKCE fragments nell'hash). Senza l'exchange
+      // esplicito la sessione Supabase NON viene stabilita e l'utente resta "reindirizzamento"
+      // apparentemente per poi tornare a /login (perché getCurrentUser ritorna null).
+      // Conferma email dal link email: usa il flusso "token_hash + type" che arriva
+      // nell'hash (#access_token=...&refresh_token=...) e che Supabase gestisce
+      // automaticamente via onAuthStateChange.
+      const code = searchParams.get('code');
+      if (code) {
+        const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeErr) {
+          console.error('[auth/callback] exchangeCodeForSession fallito:', exchangeErr);
+        }
+      } else if (window.location.hash) {
         await supabase.auth.getSession();
       }
 
