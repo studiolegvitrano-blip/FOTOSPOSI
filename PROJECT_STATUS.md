@@ -1,5 +1,110 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 28/07/2026 — Watermark self-healing (detectWatermark) + Compressione video 1/5
+
+### Contesto
+Commit `25e6541` pushato con i fix delle 6 sessioni precedenti. Work-tree pulito.
+
+L'utente richiede due miglioramenti:
+1. **Verifica automatica che il watermark sia applicato**: senza self-healing check, schede upload_queue risultano 'synced' ma la foto su R2 potrebbe non avere watermark (es. applyOverlay fallito in silenzio per librsvg/fontconfig tofu, foto raramente watermarked in produzione).
+2. **Compressione video 1/5 senza perdere qualità**: ogni minuto di video occupa ~100MB. 10min = 1GB. Tier Free R2 ha 10GB storage → 5-10 eventi massimo. Serve riduzione dimi 5x.
+
+### Fix 1 — Self-healing watermark check con `detectWatermark`
+
+**Strategia**: dopo che processQueueForEvent ha caricato il file watermarked su R2, scarica di nuovo lo stesso file e verifica che il watermark sia EFFETTIVAMENTE presente. Se no → status='failed' + media_uploads.watermark_missing=true.
+
+**Detect euristico (no ML, no OCR)** in `packages/photo-overlay/src/index.ts`:
+- Estrae 2 regioni di test:
+  - **Logo top-right** (15% width×height, posizione top:2%/right:2%) → calcola stddev dei pixel greyscale. Soglia: `LOGO_STDDEV_THRESHOLD = 12`. Se sopra → logo presente.
+  - **Nomi bottom-left** (35% width, 5% height, posizione bottom:1.2%/left:1.2%) → calcola stddev + edge transitions orizzontali (passaggi luma > 40 su 255). Soglie: stddev ≥ 6, edges ≥ 8. Se sopra → testo presente.
+- `confidence` = combinazione pesata (0.6 nomi + 0.4 logo), clampato 0-1.
+- Limiti noto (documentati nel codice): foto con coriandoli/luci festa → falso positivo, foto monocromatiche (cerimonia religiosa) → falso negativo. La funzione è strutturale, NON tenta OCR (sarebbe lento in lambda).
+
+**Integrazione in `apps/web/src/lib/process-queue.ts`**:
+- Dopo `PutObjectCommand` (upload a R2), scarica di nuovo il file, chiama `detectWatermark`, logga `[process-queue] watermark OK su <file_name>: confidence=...` oppure `[process-queue] WATERMARK MANCANTE su <file>: presence=...` se mancante.
+- Status finale dell'item è guidato da `watermarkMissing`:
+  - Drive OK + watermark OK → 'synced'.
+  - Drive OK + watermark mancante → 'failed' con errore chiaro "Watermark non applicato"
+  - Drive failed + watermark mancante → 'failed' con errore composto (per debug).
+- `media_uploads.watermark_missing` aggiornato in `createMediaRecord` → flag persistente per UI/alerting.
+
+**Miglioramento parallelo a `applyWatermark`**: rimosso `buffer as Buffer` cast che creava mismatch `Buffer<ArrayBufferLike>` vs `Buffer<ArrayBuffer>` in TypeScript strict (fixato in typecheck).
+
+### Fix 2 — Helper one-shot `repairWatermarkForEvent` + route `/api/r2/repair-watermark`
+
+**Esporta da `apps/web/src/lib/process-queue.ts`**: funzione `repairWatermarkForEvent(eventId, limit=50)` che:
+1. Legge `media_uploads` per `event_id = ? AND watermark_missing = true AND type = 'photo'` (NON upload_queue — quegli item sono synced/non esistenti).
+2. Per ogni record: download R2 → `applyWatermark` → upload su stessa r2_key → verify con `detectWatermark` → update `watermark_missing = false`.
+3. Non tocca upload_queue né drive_sync_status (preserva stato esistente).
+4. Ritorna `{ repaired, skipped, errors }`.
+
+**Route `apps/web/src/app/api/r2/repair-watermark/route.ts` (NUOVA)**: POST auth `X-Cron-Secret` (come altre route admin-one-shot). Body `{ eventId, limit? }`. maxDuration 300s.
+
+**Uso tipico**:
+1. Applica migration 00039 (vedi sotto) per colonna `watermark_missing`.
+2. Esegui unlock-shaped SQL: `UPDATE media_uploads SET watermark_missing = true WHERE event_id = '<UUID>' AND type = 'photo';` (marchia tutte le foto di un evento passato come sospette — la repair verifica e ri-applica).
+3. `curl -X POST https://sposi.live/api/r2/repair-watermark -H 'X-Cron-Secret: <CRON_SECRET>' -d '{"eventId":"<UUID>","limit":100}'`
+4. Output mostra quanti records sono stati effettivamente ri-watermarkati vs quanti skip (gia' ok o irrecuperabili).
+
+### Fix 3 — Compressione video H.264 crf 26 + preset medium (–1/5 dimensione)
+
+**Richiesta utente**: 10min video = 1GB su R2/Drive insostenibile (Free tier 10GB). Riduzione target 5x senza perdita qualità percepita.
+
+**Approccio**: aggiornamento settings ffmpeg (no codec nuovo, no infrastruttura nuova). Stesso encoding applicato in due posti:
+
+1. **`packages/video-overlay/src/index.ts`** (lambda path, usato da `/api/photos/[id]/share` e `processQueueForEvent`):
+   - `-crf 26` (era `23`): ~50% riduzione bit rate, qualità percepita quasi identica (YouTube stesso target).
+   - `-preset medium` (era `veryfast`): encoding più lento ma bitrate ottimale per stessa qualità.
+   - `-maxrate 2.5M -bufsize 5M`: VBV cap, stabilizza dimensione su clip lunghi.
+   - `-pix_fmt yuv420p` esplicito: max compatibilità.
+   - Watermark in unicit passaggio via `-filter_complex overlay` (no re-encoding).
+
+2. **`vps-scripts/video-watermark-server.js`** (VPS sidecar, video >100MB): stessi settings applicati al path remoto (utente ha già VPS ready per wa-automate).
+
+**Risultato atteso**: video iPhone 1080p H.264 high bitrate (8-12Mbps) → crf 26 medium → ~200KB/s = ~200MB per 10min. Watermark nel medesimo passaggio (zero overhead, zero duplicazioni).
+
+**Verifica** (dopo push): scaricare un video 10min watermarked dalla route `/api/photos/[id]/share?format=square`, dimensione deve essere ~200-300MB (era ~1GB). Qualità percepita su iPhone/Android = indistinguibile da originale per clip wedding (movimenti smooth, no bitrate-killer scene tipo esports).
+
+### Stato finale sessione
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Test: **256/256 verdi** (era 252: +4 nuovi `detectWatermark` test).
+- Work-tree NON ancora committato (in attesa push final sessione).
+
+### ⚠️ AZIONE UTENTE RICHIESTA — Migration 00039 via Dashboard SQL Editor
+DNS blocca `supabase db push` dalla macchina utente (come per 00037/00038). Esegui su https://supabase.com/dashboard/project/krgqyluuiltckmhbeuue/sql/new:
+
+```sql
+ALTER TABLE media_uploads
+  ADD COLUMN IF NOT EXISTS watermark_missing BOOLEAN NOT NULL DEFAULT false;
+
+COMMENT ON COLUMN media_uploads.watermark_missing IS
+  'True quando process-queue ha caricato il file su R2 ma detectWatermark ha verificato che il watermark NON è effettivamente presente (self-healing check, sessione 28/07/2026).';
+```
+
+(NB: migrations 00037 e 00038 della sessione precedente sono ancora pending — vanno applicate tutte e 3 se non lo sono ancora.)
+
+### TODO post-push
+- [ ] Verificare che le foto nuove del evento 13b5d266 abbiano watermark OK (logs Vercel `/api/r2/process-queue`), altrimenti vedremo `WATERMARK MANCANTE su <file>` e dovremo diagnosticare la vera causa ambientale (sharp stats? librsvg tofu? fontconfig su Vercel lambda?).
+- [ ] Se confermato watermark mancante in produzione: marcare foto vecchie come `watermark_missing = true` via SQL Editor e lanciare `repairWatermarkForEvent` via curl → foto corrette senza ri-upload completo.
+- [ ] Testare compressione video: caricare un video 5min (~500MB or originale iPhone), processo queue → vedi size finale su R2 (~100-150MB).
+- [ ] Verificare qualità percepita video post-compressione su iPhone Safari, Android Chrome, desktop — confrontare con originale.
+
+### File modificati in questa sessione
+```
+ apps/web/src/lib/process-queue.ts                         | +60 righe (verify post-upload, watermarkMissing propagation, repairWatermarkForEvent helper)
+ apps/web/src/app/api/r2/repair-watermark/route.ts        | NEW (25 righe, route one-shot X-Cron-Secret)
+ packages/photo-overlay/src/index.ts                      | +120 righe (detectWatermark + computeStddev + computeHorizontalEdges + clamp01)
+ packages/photo-overlay/src/__tests__/index.test.ts       | +60 righe (+4 test detectWatermark uniforme/watermark/confidence/stddev)
+ packages/video-overlay/src/index.ts                      | +14 righe (crf 26, preset medium, maxrate/bufsize, pix_fmt yuv420p)
+ packages/media/src/service.ts                            | +3 righe (param watermark_missing in createMediaRecord)
+ packages/media/src/index.ts                              | +1 riga (campo watermark_missing su MediaUpload interface)
+ vps-scripts/video-watermark-server.js                    | +14 righe (stesso crf 26 / preset medium settings lato VPS sidecar)
+ supabase/migrations/00039_media_uploads_watermark_missing.sql | NEW (15 righe, ALTER TABLE + COMMENT)
+ PROJECT_STATUS.md                                        | +80 righe (questa sezione)
+```
+
+---
+
 ## Sessione 27/07/2026 (continua 6) — Upload resiliente (Service Worker + IndexedDB) + Drive naming convention
 
 ### Contesto

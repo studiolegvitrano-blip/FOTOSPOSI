@@ -10,6 +10,7 @@ export async function createMediaRecord(params: {
   url: string;
   compressed?: boolean;
   r2_key?: string;
+  watermark_missing?: boolean;
 }): Promise<{ media?: MediaUpload; error?: string }> {
   const supabase = createServiceClient();
   // Upsert su (event_id, r2_key): se un retry della coda processa lo stesso r2_key
@@ -26,6 +27,7 @@ export async function createMediaRecord(params: {
     drive_sync_status: 'pending' as const,
     compressed: params.compressed ?? false,
     r2_key: params.r2_key ?? null,
+    watermark_missing: params.watermark_missing ?? false,
   };
   const query = params.r2_key
     ? supabase

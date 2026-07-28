@@ -127,3 +127,123 @@ describe('applyOverlay', () => {
     expect(heartCount).toBe(1);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// detectWatermark — verifica euristica presenza watermark.
+// Test con bufferi simulati: uniforme (no watermark) vs varianza alta (watermark).
+// ─────────────────────────────────────────────────────────────────────
+
+const { detectWatermark } = await import('../index');
+
+describe('detectWatermark', () => {
+  // Costruisce un'immagine greyscale uniforme di dimensioni note.
+  function uniformBuffer(width: number, height: number, value: number): Buffer {
+    return Buffer.from(new Array(width * height).fill(value));
+  }
+
+  // Costruisce un'immagine con "segnale" nelle regioni campione del watermark:
+  // top-right (logo) e bottom-left (nomi) con varianza alta, resto uniforme.
+  function imageWithWatermark(imgW: number, imgH: number): Buffer {
+    const buf = Buffer.alloc(imgW * imgH, 100); // sfondo medio
+    const logoSize = Math.max(40, Math.round(Math.min(imgW, imgH) * 0.15));
+    const logoLeft = Math.max(0, imgW - logoSize - Math.round(imgW * 0.02));
+    const logoTop = Math.round(imgH * 0.02);
+    for (let r = 0; r < logoSize; r++) {
+      for (let c = 0; c < logoSize; c++) {
+        buf[(logoTop + r) * imgW + (logoLeft + c)] = ((r + c) % 2 === 0) ? 20 : 240;
+      }
+    }
+    const namesW = Math.max(80, Math.round(imgW * 0.35));
+    const namesH = Math.max(20, Math.round(imgH * 0.05));
+    const namesLeft = Math.round(imgW * 0.012);
+    const namesTop = Math.max(0, imgH - namesH - Math.round(imgH * 0.012));
+    for (let r = 0; r < namesH; r++) {
+      for (let c = 0; c < namesW; c++) {
+        const bar = Math.floor(c / 4) % 2 === 0;
+        buf[(namesTop + r) * imgW + (namesLeft + c)] = bar ? 30 : 220;
+      }
+    }
+    return buf;
+  }
+
+  // Variabile condivisa traccia l'ultimo buffer passato a sharp() e l'ultimo raw crop.
+  let lastInput: Buffer = Buffer.alloc(0);
+  let lastExtractedRaw: Buffer = Buffer.alloc(0);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // sharp(buf) traccia l'input e restituisce la chain.
+    mockSharp.mockImplementation((buf: Buffer) => {
+      lastInput = buf;
+      return chain;
+    });
+    // metadata interrogato da detectWatermark
+    chain.metadata = vi.fn().mockResolvedValue({ width: 1080, height: 1080 });
+    chain.stats = vi.fn().mockResolvedValue({ channels: [{ mean: 100 }, { mean: 100 }, { mean: 100 }] });
+    // extract(region) estrae i pixel dal buffer input e pone lastExtractedRaw (32x32).
+    chain.extract = vi.fn().mockImplementation(function (this: any, region: { left: number; top: number; width: number; height: number }) {
+      const { left, top, width, height } = region;
+      const out = Buffer.alloc(width * height);
+      for (let r = 0; r < height; r++) {
+        for (let c = 0; c < width; c++) {
+          const srcIdx = (top + r) * 1080 + (left + c); // ipotesi imgW = 1080
+          out[r * width + c] = lastInput[Math.min(srcIdx, lastInput.length - 1)] ?? 0;
+        }
+      }
+      return chain;
+    });
+    // resize(w,h) decide il target raw: 32x32 per logo, 128x16 per nomi.
+    chain.resize = vi.fn().mockImplementation(function (this: any, w: number, h: number) {
+      // produce un buffer w*h prendendo i sample da lastInput assoluto (perché extract </chain>
+      // ritorna chain ma non accumula stato che dica quale region è stato extracted).
+      // Rileggiamo la region dal lastInput usando il mapping default (ignoriamo extract).
+      const out = Buffer.alloc(w * h);
+      // Heuristic: le resize sono chiamate dopo extract; usiamo una mappa semplice
+      // crop-down → lastInput sample
+      for (let r = 0; r < h; r++) {
+        for (let c = 0; c < w; c++) {
+          const srcR = Math.floor((r / h) * 1080);
+          const srcC = Math.floor((c / w) * 1080);
+          out[r * w + c] = lastInput[srcR * 1080 + srcC] ?? 0;
+        }
+      }
+      lastExtractedRaw = out;
+      return chain;
+    });
+    chain.greyscale = vi.fn(() => chain);
+    chain.raw = vi.fn(() => chain);
+    chain.toBuffer = vi.fn().mockImplementation(async (opts?: any) => {
+      if (opts && (opts as any).resolveWithObject) {
+        return { data: lastExtractedRaw, info: { width: 32, height: 32, channels: 1 } };
+      }
+      return lastExtractedRaw;
+    });
+  });
+
+  it('restitituisce hasLogo=false e hasNames=false su immagine uniforme (no watermark)', async () => {
+    const presence = await detectWatermark(uniformBuffer(1080, 1080, 128));
+    expect(presence.hasLogo).toBe(false);
+    expect(presence.hasNames).toBe(false);
+    expect(presence.confidence).toBeLessThan(0.3);
+  });
+
+  it('restitituisce hasLogo=true e hasNames=true su immagine con watermark simulato', async () => {
+    const presence = await detectWatermark(imageWithWatermark(1080, 1080));
+    expect(presence.hasLogo).toBe(true);
+    expect(presence.hasNames).toBe(true);
+    expect(presence.confidence).toBeGreaterThan(0.5);
+  });
+
+  it('confidenza è un valore tra 0 e 1', async () => {
+    const presence = await detectWatermark(uniformBuffer(1080, 1080, 128));
+    expect(presence.confidence).toBeGreaterThanOrEqual(0);
+    expect(presence.confidence).toBeLessThanOrEqual(1);
+  });
+
+  it('stddev logo è 0 per immagine uniforme', async () => {
+    const presence = await detectWatermark(uniformBuffer(1080, 1080, 100));
+    expect(presence.logoStddev).toBe(0);
+    expect(presence.namesStddev).toBe(0);
+    expect(presence.namesEdgeScore).toBe(0);
+  });
+});

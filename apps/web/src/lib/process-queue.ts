@@ -3,7 +3,7 @@ import { createMediaRecord, getDriveToken, getEventDriveFolders, updateDriveSync
 import type { EventDriveToken } from '@fotosposi/media';
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
 import { applyVideoOverlay } from '@fotosposi/video-overlay';
-import { applyOverlay } from '@fotosposi/photo-overlay';
+import { applyOverlay, detectWatermark, type WatermarkPresence } from '@fotosposi/photo-overlay';
 import sharp from 'sharp';
 import { watermarkFontFamily } from '@/lib/watermark-fonts';
 import { ensureWatermarkFonts, loadBrandLogo } from '@/lib/watermark-fonts.server';
@@ -261,6 +261,43 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
         ContentType: contentType,
       }));
 
+      // ── Self-healing check: verifica che applyOverlay abbia EFFETTIVAMENTE
+      // scritto il watermark sul file appena caricato su R2. Se manca →
+      // log diagnostico e status='failed' (così l'utente vede il problema
+      // invece di credere che il watermark sia ok). La foto resta su R2
+      // e in galleria (meglio senza logo che persa) ma il flag failed
+      // permette a un cron successivo di ritentare. ──
+      let watermarkMissing = false;
+      if (!isVideo) {
+        try {
+          const verifyUrl = await getPresignedDownloadUrl(r2Key, 3600);
+          if (verifyUrl) {
+            const verifyResp = await fetch(verifyUrl);
+            if (verifyResp.ok) {
+              const verifyBuf = Buffer.from(await verifyResp.arrayBuffer());
+              const presence: WatermarkPresence = await detectWatermark(verifyBuf);
+              // La foto ha il watermark SOLO se è stato richiesto (wmLine1 != '' oppure c'è un logo).
+              const expectsWatermark = !!wmLine1 || !!brandLogo;
+              if (expectsWatermark && !presence.hasLogo && presence.confidence < 0.3) {
+                watermarkMissing = true;
+                console.error(
+                  `[process-queue] WATERMARK MANCANTE su ${item.file_name} (event=${eventId}): ` +
+                  `presence=${JSON.stringify(presence)} — applyOverlay probabilmente fallito in silenzio.`,
+                );
+              } else {
+                console.log(
+                  `[process-queue] watermark OK su ${item.file_name}: confidence=${presence.confidence.toFixed(2)} ` +
+                  `(logo=${presence.hasLogo}, names=${presence.hasNames})`,
+                );
+              }
+            }
+          }
+        } catch (verifyErr) {
+          // Non bloccare: la verifica è best-effort, se R2 è giù ci fidiamo dell'upload.
+          console.warn('[process-queue] detectWatermark verify fallita:', verifyErr instanceof Error ? verifyErr.message : verifyErr);
+        }
+      }
+
       const { media, error: recordError } = await createMediaRecord({
         event_id: eventId,
         uploaded_by: item.uploaded_by,
@@ -268,6 +305,7 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
         url: r2Key,
         compressed: item.compressed ?? false,
         r2_key: r2Key,
+        watermark_missing: watermarkMissing || undefined,
       });
 
       if (recordError || !media) {
@@ -334,20 +372,38 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
           const driveData = await driveRes.json().catch(() => ({ error: { message: 'JSON parse failed' } }));
           if (driveRes.ok && driveData.id) {
             await updateDriveSyncStatus(media.id, 'synced', driveData.id);
-            await supabase.from('upload_queue').update({ status: 'synced', drive_file_id: driveData.id, processed_at: new Date().toISOString() }).eq('id', item.id);
+            // Watermark mancante ha priorità sul successo Drive: l'utente vede il flag.
+            const finalStatus = watermarkMissing ? 'failed' : 'synced';
+            const finalError = watermarkMissing ? 'Watermark non applicato (rilevato da detectWatermark)' : null;
+            await supabase.from('upload_queue').update({
+              status: finalStatus,
+              drive_file_id: driveData.id,
+              processed_at: watermarkMissing ? null : new Date().toISOString(),
+              error: finalError,
+              retry_count: watermarkMissing ? (item.retry_count || 0) + 1 : item.retry_count || 0,
+            }).eq('id', item.id);
           } else {
             // Bug precedente: status='synced' nonostante Drive sync fallito. Adesso il
             // file placeholder potrebbe mancare di Drive_replica ma lo stato dice la verità
             // e un prossimo cron/sweep può riprovare con retry_count+1.
             await updateDriveSyncStatus(media.id, 'failed');
-            await supabase.from('upload_queue').update({ status: 'failed', error: `Drive sync fallito: HTTP ${driveRes.status}`, retry_count: (item.retry_count || 0) + 1 }).eq('id', item.id);
+            const driveError = `Drive sync fallito: HTTP ${driveRes.status}`;
+            const compositeError = watermarkMissing ? `Watermark mancante + ${driveError}` : driveError;
+            await supabase.from('upload_queue').update({ status: 'failed', error: compositeError, retry_count: (item.retry_count || 0) + 1 }).eq('id', item.id);
           }
         } catch (err) {
           await updateDriveSyncStatus(media.id, 'failed');
-          await supabase.from('upload_queue').update({ status: 'failed', error: `Drive sync exception: ${(err as Error).message}`, retry_count: (item.retry_count || 0) + 1 }).eq('id', item.id);
+          const driveErr = `Drive sync exception: ${(err as Error).message}`;
+          const compositeError = watermarkMissing ? `Watermark mancante + ${driveErr}` : driveErr;
+          await supabase.from('upload_queue').update({ status: 'failed', error: compositeError, retry_count: (item.retry_count || 0) + 1 }).eq('id', item.id);
         }
       } else {
-        await supabase.from('upload_queue').update({ status: 'synced', processed_at: new Date().toISOString() }).eq('id', item.id);
+        // Nessun Drive: lo status è guidato solo da watermarkMissing.
+        if (watermarkMissing) {
+          await supabase.from('upload_queue').update({ status: 'failed', error: 'Watermark non applicato (rilevato da detectWatermark)', retry_count: (item.retry_count || 0) + 1 }).eq('id', item.id);
+        } else {
+          await supabase.from('upload_queue').update({ status: 'synced', processed_at: new Date().toISOString() }).eq('id', item.id);
+        }
       }
       processed++;
     } catch (err: unknown) {
@@ -357,4 +413,137 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
   }
 
   return { processed, remaining: items.length - processed };
+}
+
+/**
+ * Helper one-shot: ri-applica il watermark a tutte le foto di un evento
+ * già caricate su R2 con `media_uploads.watermark_missing = true` (foto
+ * processate prima del fix del 28/07/2026, o dove applyOverlay è caduto
+ * silenziosamente). NON è un cron: l'utente deve invocarlo esplicitamente
+ * quando sa che le foto del bug-sessione vanno ri-processate.
+ *
+ * Strategia (diversa da processQueueForEvent):
+ *   - NON legge da upload_queue (quegli item sono già 'synced' o non
+ *     esistono più): legge direttamente da media_uploads filtering per
+ *     `watermark_missing = true AND event_id = ?`.
+ *   - Per ogni record: download R2 → applyWatermark → upload R2 (stessa r2_key)
+ *     → update media_uploads.watermark_missing = false.
+ *   - NON tocca upload_queue né drive_sync_status (preserva lo stato esistente).
+ *
+ * È limitato (default 50 foto per run) per evitare timeout lambda.
+ */
+export async function repairWatermarkForEvent(
+  eventId: string,
+  limit = 50,
+): Promise<{ repaired: number; skipped: number; errors: string[] }> {
+  const supabase = createServiceClient();
+  const errors: string[] = [];
+
+  const [{ data: event }, { data: media }] = await Promise.all([
+    supabase.from('events').select('couple_name, date, brand, watermark_names, watermark_text, watermark_font, groom1_first_name, groom1_last_name, groom2_first_name, groom2_last_name').eq('id', eventId).single(),
+    supabase
+      .from('media_uploads')
+      .select('id, r2_key, uploaded_by, type')
+      .eq('event_id', eventId)
+      .eq('watermark_missing', true)
+      .eq('type', 'photo')
+      .order('created_at', { ascending: true })
+      .limit(limit),
+  ]);
+
+  if (!media || media.length === 0) {
+    return { repaired: 0, skipped: 0, errors };
+  }
+
+  // Composizione watermark (stessa logica di processQueueForEvent — duplicata
+  // per evitare refactoring espansivo: questa funzione è one-shot).
+  const namesEnabled = event?.watermark_names !== false;
+  const customText = (event?.watermark_text || '').trim();
+  const groom1 = [event?.groom1_first_name, event?.groom1_last_name].filter(Boolean).join(' ').trim();
+  const groom2 = [event?.groom2_first_name, event?.groom2_last_name].filter(Boolean).join(' ').trim();
+  let wmLine1 = '';
+  if (namesEnabled) {
+    if (groom1 && groom2) wmLine1 = `${groom1} ❤ ${groom2}`;
+    else if (customText) wmLine1 = customText;
+    else wmLine1 = event?.couple_name || '';
+  }
+  const wmFont = watermarkFontFamily(event?.watermark_font);
+  const brandLogo = loadBrandLogo(event?.brand);
+
+  let repaired = 0;
+  let skipped = 0;
+
+  for (const m of media) {
+    const r2Key = m.r2_key;
+    if (!r2Key) {
+      skipped++;
+      errors.push(`media ${m.id}: r2_key mancante`);
+      continue;
+    }
+    try {
+      const downloadUrl = await getPresignedDownloadUrl(r2Key, 3600);
+      if (!downloadUrl) { skipped++; errors.push(`media ${m.id}: presigned fallito`); continue; }
+      const resp = await fetch(downloadUrl);
+      if (!resp.ok) { skipped++; errors.push(`media ${m.id}: download HTTP ${resp.status}`); continue; }
+      const buffer = Buffer.from(await resp.arrayBuffer()) as Buffer;
+
+      let watermarked: Buffer = buffer;
+      try {
+        watermarked = await applyWatermark(buffer, wmLine1, '', event?.brand, wmFont, brandLogo);
+      } catch (wmErr) {
+        // Verifica post-fix: l'errore ora è loud (non più silente). Logghiamo ma
+        // non marchiamo il record come repaired: rimarrà watermark_missing=true.
+        console.error(`[repairWatermark] fallito su media ${m.id}:`, wmErr);
+        skipped++; errors.push(`media ${m.id}: ${wmErr instanceof Error ? wmErr.message : 'errore watermark'}`);
+        continue;
+      }
+
+      // Ricarica su R2 (stessa key = sovrascrive l'originale non watermarkato).
+      const { PutObjectCommand, S3Client } = await import('@aws-sdk/client-s3');
+      const client = new S3Client({
+        region: 'auto',
+        endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        credentials: {
+          accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+        },
+      });
+      await client.send(new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET || 'fotosposi-uploads',
+        Key: r2Key,
+        Body: watermarked,
+        ContentType: 'image/jpeg',
+      }));
+
+      // Verifica post-upload: detectWatermark check (ricavato come in processQueueForEvent).
+      let verifiedOk = false;
+      try {
+        const verifyUrl = await getPresignedDownloadUrl(r2Key, 3600);
+        if (verifyUrl) {
+          const vResp = await fetch(verifyUrl);
+          if (vResp.ok) {
+            const vBuf = Buffer.from(await vResp.arrayBuffer());
+            const presence = await detectWatermark(vBuf);
+            verifiedOk = presence.hasLogo || presence.confidence > 0.3;
+          }
+        }
+      } catch {
+        // Verifica best-effort: se R2 giù, ci fidiamo dell'upload.
+        verifiedOk = true;
+      }
+
+      if (verifiedOk) {
+        await supabase.from('media_uploads').update({ watermark_missing: false }).eq('id', m.id);
+        repaired++;
+      } else {
+        skipped++;
+        errors.push(`media ${m.id}: watermark ancora assente dopo repair`);
+      }
+    } catch (err) {
+      skipped++;
+      errors.push(`media ${m.id}: ${err instanceof Error ? err.message : 'errore generico'}`);
+    }
+  }
+
+  return { repaired, skipped, errors };
 }

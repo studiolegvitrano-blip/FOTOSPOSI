@@ -181,3 +181,139 @@ function escapeXml(s: string): string {
 function escapeXmlAttr(s: string): string {
   return escapeXml(s);
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// detectWatermark — verifica euristica presenza watermark su un'immagine
+// già processata. Usata da process-queue.ts come self-healing check:
+// se dopo applyOverlay il file su R2 NON ha traccia visibile del watermark,
+// marchiamo l'item come failed invece di 'synced' (così l'utente vede il
+// problema invece di credere che tutto sia ok).
+//
+// Strategia (veloce, no ML, no OCR pesante):
+//   1. Campiono 2 regioni: top-right (logo brand) e bottom-left (nomi).
+//   2. Per ogni regione calcolo stddev luma: il watermark introduce
+//      discontinuità → stddev più alto rispetto allo sfondo uniforme.
+//   3. Logo region: stddev > LOGO_STDDEV_THRESHOLD (colori vividi logo).
+//   4. Names region: stddev > NAMES_STDDEV_THRESHOLD + presenza di edge
+//      orizzontali (testo = tanti cambi chiaro/scuro ravvicinati).
+//   5. Confidence = combinazione dei due segnali.
+//
+// Limiti noti (documentati):
+//   - Foto con molto rumore/alta varianza naturale (es. coriandoli, luci
+//     festa) può dare falso positivo → meglio essere conservativi.
+//   - Foto quasi monocromatiche (es. cerimonia religiosa toni beige)
+//     possono dare falso negativo → confidence < 0.5 = "incerto, riprova".
+//   - Non tenta OCR reale (sarebbe lento in lambda): la verifica è
+//     strutturale (qualcosa è stato disegnato nella zona attesa).
+// ─────────────────────────────────────────────────────────────────────
+export interface WatermarkPresence {
+  hasLogo: boolean;
+  hasNames: boolean;
+  confidence: number;
+  logoStddev: number;
+  namesStddev: number;
+  namesEdgeScore: number;
+}
+
+const LOGO_STDDEV_THRESHOLD = 12;
+const NAMES_STDDEV_THRESHOLD = 6;
+const NAMES_EDGE_THRESHOLD = 8;
+
+/**
+ * Verifica se un'immagine (JPEG/PNG buffer) mostra tracce del watermark.
+ * NON riapplica il watermark: serve solo a diagnosticare se
+ * applyOverlay ha effettivamente scritto qualcosa.
+ */
+export async function detectWatermark(imageBuffer: Buffer): Promise<WatermarkPresence> {
+  const sharp = (await import('sharp')).default;
+  const meta = await sharp(imageBuffer).metadata();
+  const imgWidth = meta.width || 1080;
+  const imgHeight = meta.height || 1080;
+
+  // ── Regione top-right: dove va il logo brand ──
+  const logoSize = Math.max(40, Math.round(Math.min(imgWidth, imgHeight) * 0.15));
+  const logoLeft = Math.max(0, imgWidth - logoSize - Math.round(imgWidth * 0.02));
+  const logoTop = Math.round(imgHeight * 0.02);
+  const logoStats = await sharp(imageBuffer)
+    .extract({ left: logoLeft, top: logoTop, width: logoSize, height: logoSize })
+    .resize(32, 32, { fit: 'fill' })
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const logoStddev = computeStddev(logoStats.data);
+
+  // ── Regione bottom-left: dove vanno i nomi (testo piccolo) ──
+  const namesW = Math.max(80, Math.round(imgWidth * 0.35));
+  const namesH = Math.max(20, Math.round(imgHeight * 0.05));
+  const namesLeft = Math.round(imgWidth * 0.012);
+  const namesTop = Math.max(0, imgHeight - namesH - Math.round(imgHeight * 0.012));
+  const namesRaw = await sharp(imageBuffer)
+    .extract({ left: namesLeft, top: namesTop, width: namesW, height: namesH })
+    .resize(128, 16, { fit: 'fill' })
+    .greyscale()
+    .raw()
+    .toBuffer();
+  const namesStddev = computeStddev(namesRaw);
+  const namesEdgeScore = computeHorizontalEdges(namesRaw, 128);
+
+  const hasLogo = logoStddev >= LOGO_STDDEV_THRESHOLD;
+  const hasNames = namesStddev >= NAMES_STDDEV_THRESHOLD && namesEdgeScore >= NAMES_EDGE_THRESHOLD;
+  // confidence: pesato 60% nomi + 40% logo (i nomi sono il segnale più affidabile)
+  const namesConf = clamp01(
+    0.6 * (namesStddev / (NAMES_STDDEV_THRESHOLD * 3)) +
+    0.4 * (namesEdgeScore / (NAMES_EDGE_THRESHOLD * 3)),
+  );
+  const logoConf = clamp01(logoStddev / (LOGO_STDDEV_THRESHOLD * 3));
+  const confidence = clamp01(0.6 * namesConf + 0.4 * logoConf);
+
+  return {
+    hasLogo,
+    hasNames,
+    confidence,
+    logoStddev,
+    namesStddev,
+    namesEdgeScore,
+  };
+}
+
+function computeStddev(raw: Buffer): number {
+  if (raw.length === 0) return 0;
+  let sum = 0;
+  for (let i = 0; i < raw.length; i++) sum += raw[i] ?? 0;
+  const mean = sum / raw.length;
+  let variance = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const d = (raw[i] ?? 0) - mean;
+    variance += d * d;
+  }
+  return Math.sqrt(variance / raw.length);
+}
+
+/**
+ * Conta "edge transitions" orizzontali: passaggi ripidi luma-alto → luma-basso
+ * in colonne adiacenti. Il testo genera molti edge ravvicinati; uno sfondo
+ * uniforme ne genera pochi. Restituisce il numero totale di edge nella riga
+ * (somma su tutte le 16 righe del buffer 128x16).
+ */
+function computeHorizontalEdges(raw: Buffer, width: number): number {
+  if (raw.length < width * 2) return 0;
+  const height = Math.floor(raw.length / width);
+  let totalEdges = 0;
+  for (let row = 0; row < height; row++) {
+    for (let col = 1; col < width; col++) {
+      const prev = raw[row * width + col - 1] ?? 0;
+      const curr = raw[row * width + col] ?? 0;
+      const diff = Math.abs(curr - prev);
+      // edge se differenza > 40 su 255 (testo vs sfondo = forte contrasto)
+      if (diff > 40) totalEdges++;
+    }
+  }
+  return totalEdges;
+}
+
+function clamp01(n: number): number {
+  if (Number.isNaN(n)) return 0;
+  if (n < 0) return 0;
+  if (n > 1) return 1;
+  return n;
+}

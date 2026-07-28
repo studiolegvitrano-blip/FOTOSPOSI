@@ -9,6 +9,7 @@ export interface MediaUpload {
   drive_sync_status: 'pending' | 'synced' | 'failed';
   compressed: boolean;
   r2_key: string | null;
+  watermark_missing?: boolean;
   created_at: string;
 }
 

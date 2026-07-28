@@ -73,7 +73,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="theme-color" content="#c4956a" />
       </head>
       <body suppressHydrationWarning>
-        <NextIntlClientProvider locale={messages}>
+        <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
         </NextIntlClientProvider>
         {/* Service Worker registration per upload resiliente (pattern Immich):
