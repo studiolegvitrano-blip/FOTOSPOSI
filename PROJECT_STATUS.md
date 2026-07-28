@@ -1,5 +1,230 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 27/07/2026 (continua 6) — Upload resiliente (Service Worker + IndexedDB) + Drive naming convention
+
+### Contesto
+Commit `736a0a0` pushato. Testando l'utente su evento `13b5d266...` dopo i fix della sessione precedente, emersi 2 problemi extra:
+
+1. **Upload non resilienti**: l'utente carica più foto, naviga su altre app → le foto restanti in coda NON vengono caricate (il fetch asincrono del browser si interrompe quando il tab perde visibilità o viene chiuso).
+2. **Naming Drive non significativo**: i file finiscono su Drive con il nome originale del dispositivo (es. `DSC_0001.jpg`, `camera_1785185694.jpg`) → impossibile sapere CHI ha caricato cosa e QUANDO.
+
+### Fix 5 — Upload resiliente con pattern Immich (Service Worker + IndexedDB + Background Sync)
+
+**Architettura a 3 livelli (ispirata a Immich https://github.com/immich-app/immich):**
+
+1. **`apps/web/public/sw.js` (NUOVA VERSIONE completa)**: Service Worker che gestisce IndexedDB queue + Background Sync API + periodicsync + online event.
+   - Cache offline aggiornata (versione bumped a `spositive-v2`).
+   - IndexedDB store `fotosposi-upload-queue.pending` con auto-increment ID.
+   - Handler `sync` con tag `fotosposi-upload` → Chrome/Edge possono rischedulare l'upload anche con tab chiuso, fino a quando il sistema operativo non dà connettività.
+   - Handler `periodicsync` → retry periodici anche con tab completamente chiuso (Chrome desktop).
+   - Handler `online` → retry immediato al tornare online.
+   - Handler `message` → API dal client: `queue-upload` (metti in coda blob+presigned URL), `flush-now` (ritenta adesso), `skip-waiting` (forza update SW).
+2. **`apps/web/src/app/layout.tsx` (MODIFICATO)**: rimosso lo script che unregister-ava TUTTI i service worker (era il bug che impediva al SW di funzionare anche in passato, non solo per gli upload). Ora c'è lo script che REGISTRA `/sw.js` correttamente. Lo script è commentato per spiegare perché serve (iOS Safari non supporta Background Sync → fallback IndexedDB + retry lato client).
+3. **`apps/web/src/lib/upload-queue.ts` (NUOVO modulo)**: helper client che esegue upload con:
+   - 3 step: presign → PUT R2 (XHR per progress) → POST `/api/upload/init`.
+   - Su errore di rete: push automatico al SW via postMessage per background retry (best-effort).
+   - Hook `useUploadResilience()` per ascoltare online/offline/visibilitychange e triggerare `flush-now` automaticamente.
+   - Progress callback per UI (0-100%).
+
+**Limitazioni browser documentate nel codice**:
+- Background Sync API funziona SOLO se il sito è installato come PWA (`beforeinstallprompt` + manifest valid). Su browser non-PWA fallback a IndexedDB + retry visibility.
+- iOS Safari NON supporta Background Sync API (né periodicsync) → solo fallback IndexedDB + retry su `online`/visibility event dal client.
+- Chrome Android supporta Background Sync SOLO se il sito è "installabile" (ha manifest + icone + display: standalone).
+
+### Fix 6 — Drive file naming convention `AAAA_MM_GG_HH_MM_SS_NOME_COGNOME_<original>`
+
+**Modifica in `apps/web/src/lib/process-queue.ts`**:
+1. Query aggiuntiva: dopo aver letto gli `items` da `upload_queue`, prelevo i `core_users.first_name/last_name/email` degli `uploaded_by` distinti in un `uploaderMap` (la colonna `upload_queue.uploaded_by` non ha FK formale, quindi due query separate sono più affidabili di un join PostgREST).
+2. Costruzione del nome Drive:
+   ```
+   const now = new Date();
+   const pad = n => String(n).padStart(2, '0');
+   const datePrefix = `${now.getFullYear()}_${pad(now.getMonth()+1)}_${pad(now.getDate())}_${pad(now.getHours())}_${pad(now.getMinutes())}_${pad(now.getSeconds())}`;
+   const uploaderName = [first_name, last_name].filter(Boolean).join(' ').trim()
+     .replace(/\s+/g, '_')              // spazi → underscore
+     .replace(/[\/\\?%*:|"<>]/g, '');    // Drive non ammette questi caratteri
+   const safeOriginal = (file_name || 'file').replace(/[\/\\?%*:|"<>]/g, '_');
+   const driveName = `${datePrefix}_${uploaderName}_${safeOriginal}`;
+   ```
+3. Esempio output: `20260727_143015_Giuseppe_Vitrano_DSC_0001.jpg`
+4. Fallback: se l'utente non ha nome+cognome compilati (es. guest anonimo), usa la parte locale dell'email (`agospe@blu.it` → `agospe`) o `Anonimo`.
+
+### Stato finale sessione
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Test: **252/252 verdi** (invariato: nessun test cambiato per questi fix, sono feature nuove a UI/service).
+- Working tree NON ancora committato (in attesa commit finale sessione).
+
+### TODO post-push
+- [ ] Testare da telefono reale: installare la PWA dal browser (Chrome Android → "Aggiungi a Home"), caricare 3-5 foto, navigare su un'altra app o spegnere lo schermo per 30 secondi → verificare che tutte le foto arrivino comunque su R2 e in galleria. Monitorare la console del SW (`chrome://serviceworker-internals` per debug).
+- [ ] Verificare Drive per l'evento test: dopo un nuovo upload, il file Drive deve chiamarsi `20260728_HHMMSS_NOME_COGNOME_<original>`. Per Agostino Sabrina che usa account `agospe@blu.it` senza first/last name, deve risultare `20260728_HHMMSS_agospe_<original>`.
+- [ ] Applicare migration 00037 + 00038 (ancora pending, DNS blocca `db push`).
+
+### TODO sessioni future
+- [ ] **Auto-retry con backoff esponenziale** nello SW: ora il sync ritenta su `online` event, ma per connessioni instabili serve un backoff (1s → 2s → 5s → 10s).
+- [ ] **Notifica push "upload completato"** quando il SW finisce la coda in background (utile per invitati che chiudono subito).
+- [ ] **Compressione foto automatica lato client** (già presente in alcuni path, verificare copertura): per foto >2MB, riduci a 1920px lato lungo prima dell'upload → risparmio banda e storage R2.
+- [ ] **Progress UI nativa iOS**: iOS Safari non supporta progress in `<progress>` se il file è via Service Worker. Workaround: stimare con ETA basato su dimensione/velocità media upload.
+
+### File modificati in questa sessione
+```
+ apps/web/public/sw.js                                 | COMPLETA REWRITE (156 righe, da 52 → 208)
+ apps/web/src/app/layout.tsx                           | 4 righe (rimozione unregister + script register SW)
+ apps/web/src/lib/upload-queue.ts                      | NEW (160 righe, helper upload + hook resilience)
+ apps/web/src/lib/process-queue.ts                     | +35 righe (uploaderMap query + drive naming logic)
+ PROJECT_STATUS.md                                     | +80 righe (questa sezione)
+```
+
+---
+
+## Sessione 27/07/2026 (continua 5) — Watermark NON applicato (root cause trovata) + Nome/Cognome separati + Video guestbook doppio upload
+
+### Push eseguito
+- Commit `736a0a0` della sessione precedente pushato — 248/248 test verdi.
+- L'utente testa su evento `13b5d266-a020-41ed-b4ad-a14f894b0f4b` (Agostino Sabrina, Premium).
+- Migration 00037 (unique constraint `event_id,r2_key`) NON ancora applicata dall'utente (DNS blocca supabase CLI su questa macchina; utente deve applicarla via Dashboard SQL Editor).
+
+### Bug segnalati (test live dopo commit 736a0a0)
+1. **Video Guestbook: stessa registrazione caricata 2 volte**
+2. **Watermark NON applicato a NESSUN media** — né foto 100KB, né foto 5MB, né video 21MB, né video 240MB
+3. **Nuova feature richiesta**: campo Nome + Cognome SEPARATI per i due sposi, termini neutri per matrimonio stesso-sesso
+4. **Watermark**: usare SOLO i nomi (no data, no wordmark)
+
+### Bug 1 (FIXED) — Watermark non applicato: root cause trovata
+- **Sintomo**: nessun media ha il watermark applicato, neanche foto piccole (100KB, 5MB).
+- **Root cause *(FINALE)***: `apps/web/src/lib/process-queue.ts:76-79` aveva un **catch silente**:
+  ```ts
+  } catch (err) {
+    console.error('applyWatermark overlay fallito:', err);
+    return buffer;  // ← ritornava l'originale senza watermark
+  }
+  ```
+  Se `applyOverlay` falliva per qualsiasi motivo (sharp, font mancanti, librsvg, ecc.), il codice loggava l'errore ma restituiva il buffer ORIGINALE → veniva caricato su R2 senza watermark → galleria mostrava foto senza watermark, senza alcun errore visibile all'utente.
+- **Verifica locale**: `applyOverlay` funziona perfettamente in dev locale (con sharp + 29 TTF + logo `public/logo-sposi-trans.png`), quindi il bug è ambientale (Vercel), MA soft-catch silente è comunque la root cause del "watermark sempre mancante": mai sapremo quale fase di ambiente falle senza log.
+- **Fix applicato**:
+  1. **`apps/web/src/lib/process-queue.ts` (applyWatermark)**: rimosso il catch silente. Ora se `applyOverlay` lancia errore, l'errore si propaga. Il caller conserva try/catch indipendente per NON perdere la foto (file salvato su R2 anche senza watermark), MA logga esplicito `[process-queue] watermark foto fallito per <file_name> (event=<eventId>): <err>`.
+  2. **`packages/photo-overlay/src/index.ts` (applyOverlay)**: aggiunto try/catch granulare intorno a `composite + jpeg + toBuffer`. Se crash log diagnostico completo: `imgWidth, imgHeight, compositeOpsCount, fontFamily, wordmark, hasLogo, svgLength, svgStart` → capiremo subito quale fase di ambiente falla (sharp libvips, SVG malformato, encoder).
+  3. **Log OK**: `console.log('[applyOverlay] OK: ...')` ad ogni render riuscito.
+  4. **Sostituito `catch silent`** per `sharp.stats()` (luminanza fascia bassa) con `console.warn` non bloccante — prima era catless → caduta impercettibile su ambienti estratti.
+
+### Bug 2 (FIXED) — Video Guestbook: stessa registrazione caricata 2 volte
+- **Sintomo**: una registrazione → 2 upload separati su R2 + 2 righe in `video_messages`.
+- **Causa**: l'utente poteva cliccare il bottone "Invia messaggio" del `VideoRecorder` 2 volte durante l'upload asincrono (`saveVideo` fa `setUploading(true)` MA il bottone restava cliccabile).
+- **Fix applicato** in `apps/web/src/components/video-recorder.tsx`:
+  1. Aggiunto prop `disabled?: boolean` al componente `VideoRecorder`.
+  2. Bottone "Invia messaggio" → `disabled={disabled}` + label dinamica `"Invio in corso..."` quando `disabled=true`.
+  3. Bottone "Riprova" → `disabled={disabled}` durante l'upload (no doppio trigger).
+  4. Ref `sendingRef` come guard contro doppi-clic rapidi anche indipendentemente dalla prop `disabled`: se `sendingRef.current === true` → return. Reset dopo 10s come safety net per upload falliti silenziosamente.
+- **Caller** `apps/web/src/app/events/[id]/guestbook/page.tsx`: passa `disabled={uploading}` a `<VideoRecorder>`.
+
+### Feature (NEW) — Nome + Cognome separati per i due sposi, supporto matrimonio stesso-sesso
+- **Richiesta utente**: termini neutri (sposo/sposo o sposa/sposa) oltre a sposo/sposa classico; campo nome e cognome SEPARATI per ogni partner.
+- **Schema DB**:
+  - **Migration `00038_grooms_first_last_name.sql` (NUOVA)**: 6 nuove colonne su `events`:
+    - `groom1_first_name TEXT`, `groom1_last_name TEXT`, `groom1_role TEXT NOT NULL DEFAULT 'groom' CHECK (in ('groom','bride'))`
+    - `groom2_first_name TEXT`, `groom2_last_name TEXT`, `groom2_role TEXT NOT NULL DEFAULT 'groom' CHECK (in ('groom','bride'))`
+  - Backfill best-effort: splitta `couple_name` su ` ' & ' ` o ` ' e ' `, primi/secondi token come nome partner. Es. "Marco Rossi & Luca Bianchi" → `groom1_first_name='Marco', groom1_last_name='Rossi', groom2_first_name='Luca', groom2_last_name='Bianchi'`. Eventi con formato inconsistente (`Agostino Sabrina`, `Ciccio & Ciccia`) resteranno NULL finché l'utente non compila dal settings.
+  - **DA APPLICARE via Dashboard SQL Editor** (DNS blocca supabase CLI anche per questa sessione).
+- **Codice**:
+  - `packages/events/src/index.ts`: nuovi campi + nuovo type `PartnerRole = 'groom' | 'bride'` esposto dal `WeddingEvent` interface.
+  - `packages/events/src/service.ts`: funzione `updateEventNames(eventId, settings)` — persiste i 6 campi + ricalcola `couple_name` come display name auto-calcolato `"Nome Cognome & Nome Cognome"` (mantenuto per retrocompatibilità con tutti gli altri reader del monorepo che usano `couple_name`).
+  - `packages/events/src/index.ts`: esporta `updateEventNames`.
+  - `apps/web/src/app/events/[id]/settings/page.tsx`: NUOVA sezione "Dati degli sposi" in cima alla pagina con 2 card (Partner 1, Partner 2), ciascuna con:
+    - 2 input testo (`Nome`, `Cognome`)
+    - 2 radio (`Sposo`/`Sposa`)
+    - Bottone "Salva dati sposi" con stato salvato
+- **Test**:
+  - `packages/events/src/__tests__/service.test.ts`: 3 nuovi test `updateEventNames` (coppia groom+groom calcola display_name, coppia bride+groom funziona, tutti null → return null).
+
+### Feature (NEW) — Watermark SOLO nomi (no data, no wordmark)
+- **Richiesta utente**: nel watermark delCodice NON includere più la data dell'evento né il wordmark (Sposi.live/JustMarry.live), SOLO i nomi dei due sposi separati da cuore ❤.
+- **Composizione finale** (esempio sposi Marco Rossi + Luca Bianchi): `Marco Rossi ❤ Luca Bianchi`.
+- **Codice**:
+  - `apps/web/src/lib/process-queue.ts`: nuova logica `wmLine1/wmLine2`:
+    1. **Priorità**: nomi separati `groom1_*` + `groom2_*` (campo Nome+Cognome dal settings 27/07) → se valorizzati: `wmLine1 = '{groom1} ❤ {groom2}'`.
+    2. **Fallback 1**: se l'utente HA compilato `watermark_text` (custom) → usa quello.
+    3. **Fallback 2**: se solo `couple_name` valorizzato (legacy) → usa `couple_name`.
+    4. Se `watermark_names = false` → stringa vuota (niente testo, resta solo il logo brand).
+    5. `wmLine2 = ''` sempre (no data — richiesta esplicita utente).
+  - `packages/photo-overlay/src/index.ts`: aggiornato il costruttore SVG:
+    - Sostituisce il `❤` (U+2764 unicode) della stringa con entità XML `&#10084;` wrappata in `<tspan fill="#d9534f">`.
+    - Splitta `branding.coupleNames` sul `❤` e wrappa SOLO quello nel tspan rosso — il resto resta testo semplice (escape XML per nomi con `&`, `<`).
+    - Rimossi i suffissi ` · wordmark` dal testo watermark (erano lì dalla sessione 25/07, ora rimossi).
+    - JSDoc aggiornato.
+- **Compatibilità**: il logo brand in alto a destra A COLORI (no mix-blend, no opacità forzata) resta sempre impresso su ogni foto, a prescindere dalla scelta dei nomi.
+- **Test**:
+  - `packages/photo-overlay/src/__tests__/index.test.ts`: aggiustato il vecchio test "cuore ❤ è XML-safe" (ora il caller passa già la stringa con ❤ inline) + NUOVO test "watermark SOLO nomi" verifica che ci sia UN solo cuore `&#10084;` (no data con altri cuori) + test contiene `Marco` AND `Luca`.
+
+### Stato finale sessione
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Test: **252/252 verdi** (era 248: +1 nuovo test photo-overlay "solo nomi", +3 nuovi test updateEventNames).
+- Working tree NON ancora committato (in attesa domanda utente: pushare ora o dopo applicazione manuali migration SQL 00037+00038).
+
+### ⚠️ AZIONE UTENTE RICHIESTA — Migration 00037 + 00038 via Dashboard SQL Editor
+Vai su https://supabase.com/dashboard/project/krgqyluuiltckmhbeuue/sql/new e incolla in due query separate:
+
+**Query 1** (fix galleria vuota, già richiesta sessione precedente):
+```sql
+ALTER TABLE media_uploads
+  ADD CONSTRAINT uniq_media_event_r2key UNIQUE (event_id, r2_key);
+```
+
+**Query 2** (NUOVA — campi nomi sposi separati per settings + backfill best-effort):
+```sql
+ALTER TABLE events
+  ADD COLUMN IF NOT EXISTS groom1_first_name TEXT,
+  ADD COLUMN IF NOT EXISTS groom1_last_name TEXT,
+  ADD COLUMN IF NOT EXISTS groom1_role TEXT NOT NULL DEFAULT 'groom'
+    CHECK (groom1_role IN ('groom', 'bride')),
+  ADD COLUMN IF NOT EXISTS groom2_first_name TEXT,
+  ADD COLUMN IF NOT EXISTS groom2_last_name TEXT,
+  ADD COLUMN IF NOT EXISTS groom2_role TEXT NOT NULL DEFAULT 'groom'
+    CHECK (groom2_role IN ('groom', 'bride'));
+```
+NB: il blocco `DO $$ ... $$` per il backfill automatico da `couple_name` è opzionale — se saltato, gli sposi compilano manualmente i campi dal settings (lo faranno una volta sola).
+
+### Verifica query (post-migration):
+```sql
+SELECT conname FROM pg_constraint WHERE conrelid = 'media_uploads'::regclass AND contype = 'u';
+-- deve mostrare: uniq_media_event_r2key
+
+\d events
+-- deve mostrare: groom1_first_name, groom1_last_name, groom1_role, groom2_first_name, groom2_last_name, groom2_role
+```
+
+### TODO post-push
+- [ ] Verificare che i 15 record `failed` di `upload_queue` (evento `13b5d266...`) vengano processati dal prossimo cron sweep (alle 04:20 UTC di domani) dopo che l'utente applica la migration 00037. Oppure forzare con `POST /api/r2/process-queue?eventId=...`.
+- [ ] Verificare che le foto ora appaiano nella galleria dell'evento Agostino Sabrina.
+- [ ] Verificare che cliccando "Adoro" la reaction cambi (Bug 1 sessione precedente).
+- [ ] Verificare il pulsante "Carica" in cima alla galleria (Bug 5 sessione precedente).
+- [ ] Compilare dal settings i campi Nome/Cognome/Sposo-Sposa per entrambi i partner dell'evento Agostino Sabrina → verificare che `couple_name` si aggiorni a `"Agostino <cognome> ❤ Sabrina <cognome>"` (backfill non funziona su `couple_name='Agostino Sabrina'` perché lo split su ' & '/' e ' non matcha).
+- [ ] Dopo aver compilato i nomi separati → verificare che il watermark sulle nuove foto contenga SOLO `Marco ❤ Sabrina` (no data, no wordmark). Per le foto già caricate: dovranno essere ri-processate forzando `POST /api/r2/process-queue` (viamente r2_key watermarkato vs originale: ogetto statico, non vanno persi).
+- [ ] Verificare il video guestbook: fatto 1 upload video → deve comparire UN solo messaggio (no doppio).
+- [ ] Verificare che NESSUN upload venga duplicato: dopo il cliccare "Invia messaggio" il bottone deve mostrare "Invio in corso..." (disabled).
+- [ ] Leggere i log Vercel delle route `/api/r2/process-queue` e `/api/cron/maintenance` per vedere se il watermark ora funziona: se resta fallito vedremo `[process-queue] watermark foto fallito per <file>: <err>` + `[applyOverlay] render fallito: <err>` + contesto completo → capire la vera causa ambientale su Vercel.
+
+### TODO sessioni future
+- [ ] **Bug watermark residuo ambientale**: se le foto caricate dopo il push continuano a non avere watermark, l'azione succede perché l'ambiente Vercel non ha font TTF / libvips / ecc. I log granulari di questa sessione ci diranno esattamente quale fase faila (sharp.stats, sharp.composite, sharp.jpeg encoder, librsvg toxor SVG). Futura sessione: fixare la causa specifica, probabilmente rinforzando `outputFileTracingIncludes` oppure usando SVG testuale "rasterizzato" via `@font-face` inline (invece di fare affidamento su fontconfig).
+- [ ] **Re-processare foto già caricate senza watermark**: dopo fix ambientale, marcare tutti gli `upload_queue.status='synced'` degli eventi con `watermark_names=true` come `status='failed'` e `retry_count=0` → il cron ri-processa e ri-applica il watermark alle foto esistenti su R2.
+- [ ] **VPS sidecar per video >100MB** (Bug 2 sessione precedente, NON risolto da questa sessione): anche questa sessione non ha fixato il video 240MB — resta workaround già presente in `process-queue.ts:201-205` (catch overlay → comunque salvato su R2). Per watermark vero serve VPS sidecar.
+
+### File modificati in questa sessione
+```
+ apps/web/src/app/events/[id]/events/[id]/settings/page.tsx   | +85 righe (sezione "Dati degli sposi")
+ apps/web/src/app/events/[id]/guestbook/page.tsx            | +1 prop disabled su VideoRecorder
+ apps/web/src/components/video-recorder.tsx                 | +20 righe (disabled, sendingRef, label dinamica)
+ apps/web/src/lib/process-queue.ts                          | +25 righe (wmLine1/wmLine2 nuovi, try/catch watermark foto)
+ apps/web/src/lib/watermark-fonts.server.ts                 | +2 log diagnostici
+ packages/events/src/index.ts                               | +9 righe (PartnerRole + nuovi campi WeddingEvent + export updateEventNames)
+ packages/events/src/service.ts                             | +40 righe (funzione updateEventNames)
+ packages/events/src/__tests__/service.test.ts              | +35 righe (+3 test updateEventNames)
+ packages/photo-overlay/src/index.ts                       | +20 righe (split ❤ , try/catch granulare, log OK)
+ packages/photo-overlay/src/__tests__/index.test.ts         | +20 righe (+1 test "solo nomi")
+ supabase/migrations/00038_grooms_first_last_name.sql       | NEW (60 righe,backfill DO $$)
+ PROJECT_STATUS.md                                          | +80 righe (questa sezione)
+```
+
+---
+
 ## Sessione 27/07/2026 (continua 4) — 4 bug segnalati utente + 1 NUOVO BUG CRITICO scoperto durante la diagnosi
 
 ### Diagnosi eseguita (working tree aggiornato, NON ancora pushato — vedi "Strategia push" sotto)

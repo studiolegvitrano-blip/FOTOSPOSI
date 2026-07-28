@@ -93,15 +93,37 @@ describe('applyOverlay', () => {
   });
 
   it('cuore ❤ è XML-safe come entità &#10084; nel watermark', async () => {
+    // 27/07/2026: il caller passa già la stringa "Nome1 ❤ Nome2" completa.
+    // applyOverlay splitta sul ❤ e wrappa solo quello in <tspan fill="#d9534f">.
     chain.toBuffer = vi.fn().mockResolvedValue(Buffer.from('emoji'));
     await applyOverlay(Buffer.from('test'), {
       format: 'square',
-      branding: { ...baseBranding, coupleNames: 'Guido', date: '25/08/2026', wordmark: 'Sposi.live' },
+      branding: { ...baseBranding, coupleNames: 'Guido ❤ Melissa', date: '25/08/2026', wordmark: 'Sposi.live' },
     });
     expect(chain.composite).toHaveBeenCalled();
     const call = chain.composite.mock.calls[0][0] as Array<{ input: Buffer }>;
     const svgText = call[0].input.toString('utf8');
     expect(svgText).toContain('&#10084;'); // cuore come entità XML
     expect(svgText).toContain('fill="#d9534f"'); // tspan rosso
+    expect(svgText).toContain('Guido');
+    expect(svgText).toContain('Melissa');
+  });
+
+  it('watermark SOLO nomi (27/07): coupleNames con ❤ inline → un solo tspan rosso, no date/wordmark', async () => {
+    chain.toBuffer = vi.fn().mockResolvedValue(Buffer.from('only-names'));
+    await applyOverlay(Buffer.from('test'), {
+      format: 'square',
+      // Il caller passa già la stringa formattata "Nome1 ❤ Nome2"
+      branding: { coupleNames: 'Marco ❤ Luca', primaryColor: '#1a1a2e', wordmark: 'Sposi.live' },
+    });
+    const call = chain.composite.mock.calls[0][0] as Array<{ input: Buffer }>;
+    const svgText = call[0].input.toString('utf8');
+    expect(svgText).toContain('Marco');
+    expect(svgText).toContain('Luca');
+    expect(svgText).toContain('&#10084;'); // cuore XML
+    expect(svgText).toContain('fill="#d9534f"'); // cuore rosso
+    // Più di un ❤ (es. data nel watermark) sarebbe un bug della nuova specifica
+    const heartCount = (svgText.match(/&#10084;/g) || []).length;
+    expect(heartCount).toBe(1);
   });
 });

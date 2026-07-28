@@ -8,6 +8,8 @@ interface VideoRecorderProps {
   onRecordingComplete: (blob: Blob) => void;
   maxDuration?: number;
   suggestedText?: string;
+  /** Quando true, il bottone "Invia" è disabilitato per evitare doppio upload (bug 27/07). */
+  disabled?: boolean;
 }
 
 // iOS Safari does not support 'video/webm' — hardcoding it makes `new MediaRecorder(...)`
@@ -46,16 +48,19 @@ function playBeep(freq = 880, durationMs = 120) {
   } catch { /* audio non disponibile, ignora */ }
 }
 
-export function VideoRecorder({ onRecordingComplete, maxDuration = 30, suggestedText }: VideoRecorderProps) {
+export function VideoRecorder({ onRecordingComplete, maxDuration = 30, suggestedText, disabled = false }: VideoRecorderProps) {
   const [state, setState] = useState<'idle' | 'countdown' | 'recording' | 'preview'>('idle');
   const [countdown, setCountdown] = useState(3);
   const [timeLeft, setTimeLeft] = useState(maxDuration);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout>(undefined);
   const countdownRef = useRef<NodeJS.Timeout>(undefined);
+  // Guard contro doppio invio (bug 27/07/2026: stessa registrazione caricata 2 volte
+  // perché il bottone "Invia" restava cliccabile durante l'upload asincrono).
+  const sendingRef = useRef(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [unsupported, setUnsupported] = useState(false);
 
@@ -180,10 +185,14 @@ export function VideoRecorder({ onRecordingComplete, maxDuration = 30, suggested
   }, []);
 
   const confirmAndSend = useCallback(() => {
-    if (recordedBlob) {
-      onRecordingComplete(recordedBlob);
-    }
-  }, [recordedBlob, onRecordingComplete]);
+    if (!recordedBlob) return;
+    if (disabled) return;
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    onRecordingComplete(recordedBlob);
+    // Reset guard dopo 10s come safety net (es. se l'upload fallisce silenziosamente).
+    setTimeout(() => { sendingRef.current = false; }, 10000);
+  }, [recordedBlob, onRecordingComplete, disabled]);
 
   const reset = useCallback(() => {
     clearInterval(countdownRef.current);
@@ -288,8 +297,10 @@ export function VideoRecorder({ onRecordingComplete, maxDuration = 30, suggested
             {state === 'recording' && <Button variant="destructive" size="lg" onClick={stopRecording}>Ferma</Button>}
             {state === 'preview' && (
               <>
-                <Button size="lg" onClick={confirmAndSend}>Invia messaggio</Button>
-                <Button variant="outline" size="lg" onClick={startRecording}>Riprova</Button>
+                <Button size="lg" onClick={confirmAndSend} disabled={disabled}>
+                  {disabled ? 'Invio in corso...' : 'Invia messaggio'}
+                </Button>
+                <Button variant="outline" size="lg" onClick={startRecording} disabled={disabled}>Riprova</Button>
               </>
             )}
           </div>

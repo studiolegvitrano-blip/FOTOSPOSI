@@ -30,8 +30,10 @@ export function ensureWatermarkFonts(): void {
 `);
     process.env.FONTCONFIG_PATH = confDir;
     process.env.FOTOSPOSI_FONTS_READY = '1';
-  } catch {
+    console.log('[watermark-fonts] fontconfig pronto:', { fontsDir, confDir });
+  } catch (e) {
     // Se /tmp non è scrivibile meglio watermark coi quadrati che far fallire l'upload.
+    console.error('[watermark-fonts] setup fontconfig fallito:', e instanceof Error ? e.message : e);
   }
 }
 

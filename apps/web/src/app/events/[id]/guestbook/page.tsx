@@ -184,7 +184,7 @@ export default function GuestbookPage() {
             {loadingText ? (
               <p className="text-sm text-text-muted text-center">Generazione testo suggerito...</p>
             ) : (
-              <VideoRecorder onRecordingComplete={handleVideoComplete} maxDuration={30} suggestedText={suggestedText} />
+              <VideoRecorder onRecordingComplete={handleVideoComplete} maxDuration={30} suggestedText={suggestedText} disabled={uploading} />
             )}
             <div className="text-center pt-2 border-t border-border">
               <Button variant="outline" onClick={() => fileRef.current?.click()}>

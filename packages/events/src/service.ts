@@ -192,6 +192,46 @@ export async function updateEventWatermark(
   return { error: error?.message };
 }
 
+/**
+ * Aggiorna nome/cognome/role dei due partner (richiesto 27/07/2026 per supportare
+ * matrimonio stesso-sesso e watermark con soli nomi). Le colonne sono state aggiunte
+ * dalla migration 00038_grooms_first_last_name.sql.
+ *
+ * NB: aggiorna anche `couple_name` come display name calcolato (es. "Marco Rossi & Luca Bianchi"),
+ * perché altri punti del codice (timeline, galleria) lo usano come fallback quando i
+ * campi groom* non sono valorizzati.
+ */
+export async function updateEventNames(
+  eventId: string,
+  settings: {
+    groom1_first_name: string | null;
+    groom1_last_name: string | null;
+    groom1_role: 'groom' | 'bride';
+    groom2_first_name: string | null;
+    groom2_last_name: string | null;
+    groom2_role: 'groom' | 'bride';
+  },
+): Promise<{ error?: string; couple_name?: string | null }> {
+  const supabase = createClient();
+  // Display name auto-calcolato per retrocompatibilità: "Nome Cognome & Nome Cognome"
+  const n1 = [settings.groom1_first_name, settings.groom1_last_name].filter(Boolean).join(' ').trim();
+  const n2 = [settings.groom2_first_name, settings.groom2_last_name].filter(Boolean).join(' ').trim();
+  const coupleName = [n1, n2].filter(Boolean).join(' & ') || null;
+  const { error } = await supabase
+    .from('events')
+    .update({
+      groom1_first_name: settings.groom1_first_name,
+      groom1_last_name: settings.groom1_last_name,
+      groom1_role: settings.groom1_role,
+      groom2_first_name: settings.groom2_first_name,
+      groom2_last_name: settings.groom2_last_name,
+      groom2_role: settings.groom2_role,
+      couple_name: coupleName,
+    })
+    .eq('id', eventId);
+  return { error: error?.message, couple_name: coupleName };
+}
+
 export async function getEventWindow(eventId: string): Promise<{ window?: EventWindow; error?: string }> {
   const supabase = createClient();
   const { data, error } = await supabase

@@ -32,6 +32,20 @@ export default function EventSettingsPage() {
   const [wmSaving, setWmSaving] = useState(false);
   const [wmSaved, setWmSaved] = useState(false);
 
+  // Dati separati dei due partner (richiesto dall'utente 27/07/2026 per supportare
+  // matrimonio stesso-sesso e watermark con soli nomi). Default: 'groom' (neutro);
+  // gli sposi specificano il ruolo corretto (es. una coppia eterosessuale metterà
+  // partner1=bride + partner2=groom; una coppia stessa-sesso può mettere entrambi groom).
+  type PartnerRole = 'groom' | 'bride';
+  const [p1First, setP1First] = useState('');
+  const [p1Last, setP1Last] = useState('');
+  const [p1Role, setP1Role] = useState<PartnerRole>('groom');
+  const [p2First, setP2First] = useState('');
+  const [p2Last, setP2Last] = useState('');
+  const [p2Role, setP2Role] = useState<PartnerRole>('groom');
+  const [namesSaving, setNamesSaving] = useState(false);
+  const [namesSaved, setNamesSaved] = useState(false);
+
   // I font vanno caricati anche nel browser per l'anteprima della scelta.
   // 1) Per i 7 font disponibili su Google Fonts: un singolo <link> CSS2.
   // 2) Per i restanti 21 font (non su Google Fonts): @font-face inline che referenzia
@@ -75,6 +89,17 @@ export default function EventSettingsPage() {
         setWmNames(d.event.watermark_names !== false);
         setWmText(d.event.watermark_text || '');
         setWmFont((d.event as { watermark_font?: string }).watermark_font || 'classico');
+        const ev = d.event as typeof d.event & {
+          groom1_first_name?: string | null; groom1_last_name?: string | null;
+          groom1_role?: PartnerRole | null; groom2_first_name?: string | null;
+          groom2_last_name?: string | null; groom2_role?: PartnerRole | null;
+        };
+        setP1First(ev.groom1_first_name || '');
+        setP1Last(ev.groom1_last_name || '');
+        setP1Role((ev.groom1_role as PartnerRole) || 'groom');
+        setP2First(ev.groom2_first_name || '');
+        setP2Last(ev.groom2_last_name || '');
+        setP2Role((ev.groom2_role as PartnerRole) || 'groom');
         setLoading(false);
       })
       .catch(() => router.push(`/events/${eventId}`));
@@ -90,6 +115,23 @@ export default function EventSettingsPage() {
     });
     setWmSaving(false);
     if (!error) { setWmSaved(true); setTimeout(() => setWmSaved(false), 3000); }
+    else alert(`Salvataggio non riuscito: ${error}`);
+  };
+
+  const saveNames = async () => {
+    setNamesSaving(true);
+    setNamesSaved(false);
+    const { updateEventNames } = await import('@fotosposi/events');
+    const { error } = await updateEventNames(eventId, {
+      groom1_first_name: p1First.trim() || null,
+      groom1_last_name: p1Last.trim() || null,
+      groom1_role: p1Role,
+      groom2_first_name: p2First.trim() || null,
+      groom2_last_name: p2Last.trim() || null,
+      groom2_role: p2Role,
+    });
+    setNamesSaving(false);
+    if (!error) { setNamesSaved(true); setTimeout(() => setNamesSaved(false), 3000); }
     else alert(`Salvataggio non riuscito: ${error}`);
   };
 
@@ -118,6 +160,86 @@ export default function EventSettingsPage() {
         <h1 className="text-2xl font-bold flex items-center gap-2"><Settings className="w-6 h-6" /> Impostazioni</h1>
         <Button variant="ghost" onClick={() => router.push(`/events/${eventId}`)}>← Torna all'evento</Button>
       </div>
+
+      {/* Dati dei partner (separati per supportare matrimonio stesso-sesso) */}
+      <Card>
+        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="w-4 h-4" /> Dati degli sposi</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-text-muted">
+            Inserisci nome e cognome di ciascun partner: verranno usati dal watermark su foto e video.
+            Termini neutri (sposo/sposo o sposa/sposa) per supportare qualsiasi tipo di unione.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Partner 1 */}
+            <div className="space-y-2 border border-border rounded-md p-3 bg-background">
+              <p className="text-xs uppercase tracking-wide text-text-muted">Partner 1</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  value={p1First}
+                  onChange={(e) => setP1First(e.target.value)}
+                  placeholder="Nome"
+                  className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+                />
+                <input
+                  type="text"
+                  value={p1Last}
+                  onChange={(e) => setP1Last(e.target.value)}
+                  placeholder="Cognome"
+                  className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+                />
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <label className="flex items-center gap-1">
+                  <input type="radio" checked={p1Role === 'groom'} onChange={() => setP1Role('groom')} />
+                  <span>Sposo</span>
+                </label>
+                <label className="flex items-center gap-1">
+                  <input type="radio" checked={p1Role === 'bride'} onChange={() => setP1Role('bride')} />
+                  <span>Sposa</span>
+                </label>
+              </div>
+            </div>
+            {/* Partner 2 */}
+            <div className="space-y-2 border border-border rounded-md p-3 bg-background">
+              <p className="text-xs uppercase tracking-wide text-text-muted">Partner 2</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  value={p2First}
+                  onChange={(e) => setP2First(e.target.value)}
+                  placeholder="Nome"
+                  className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+                />
+                <input
+                  type="text"
+                  value={p2Last}
+                  onChange={(e) => setP2Last(e.target.value)}
+                  placeholder="Cognome"
+                  className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+                />
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <label className="flex items-center gap-1">
+                  <input type="radio" checked={p2Role === 'groom'} onChange={() => setP2Role('groom')} />
+                  <span>Sposo</span>
+                </label>
+                <label className="flex items-center gap-1">
+                  <input type="radio" checked={p2Role === 'bride'} onChange={() => setP2Role('bride')} />
+                  <span>Sposa</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button size="sm" onClick={saveNames} disabled={namesSaving}>
+              {namesSaving ? 'Salvataggio...' : 'Salva dati sposi'}
+            </Button>
+            {namesSaved && <span className="text-sm text-success">Salvato ✓</span>}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle className="text-base flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Watermark su foto e video</CardTitle></CardHeader>

@@ -52,6 +52,12 @@ function escapeXml(s: string): string {
  * Watermark foto — proxy al modulo `@fotosposi/photo-overlay` (versione "MAX" del 25/07/2026).
  * Mantiene la firma legacy per non toccare i call-site; sotto traduce nei campi
  * `OverlayBranding` attesi dal nuovo modulo.
+ *
+ * IMPORTANTE: se l'overlay fallisce NON ritorniamo più silenziosamente il buffer
+ * originale (era il bug che faceva credere all'utente che il watermark non venisse
+ * applicato — in realtà sharp andava in catch e noi riscrivevamo l'originale su R2).
+ * Ora lanciamo l'errore: il chiamante processQueueForEvent decide se salvare
+ * comunque l'originale (per non perdere la foto) oppure marcare failed.
  */
 async function applyWatermark(
   buffer: Buffer,
@@ -61,22 +67,17 @@ async function applyWatermark(
   fontFamily = 'Playfair Display',
   logoPng?: Buffer | null,
 ): Promise<Buffer> {
-  try {
-    return await applyOverlay(buffer, {
-      format: 'square',
-      branding: {
-        coupleNames: line1 || '',
-        date: line2 || '',
-        primaryColor: '#1a1a2e',
-        wordmark: getBrandLabel(brand),
-        fontFamily,
-        brandLogoBuffer: logoPng,
-      },
-    });
-  } catch (err) {
-    console.error('applyWatermark overlay fallito:', err);
-    return buffer;
-  }
+  return await applyOverlay(buffer, {
+    format: 'square',
+    branding: {
+      coupleNames: line1 || '',
+      date: line2 || '',
+      primaryColor: '#1a1a2e',
+      wordmark: getBrandLabel(brand),
+      fontFamily,
+      brandLogoBuffer: logoPng,
+    },
+  });
 }
 
 /**
@@ -96,7 +97,7 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
   const supabase = createServiceClient();
 
   const [{ data: event }, { data: items }] = await Promise.all([
-    supabase.from('events').select('couple_name, date, brand, watermark_names, watermark_text, watermark_font').eq('id', eventId).single(),
+    supabase.from('events').select('couple_name, date, brand, watermark_names, watermark_text, watermark_font, groom1_first_name, groom1_last_name, groom2_first_name, groom2_last_name').eq('id', eventId).single(),
     supabase
       .from('upload_queue')
       .select('*')
@@ -110,19 +111,47 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
       .limit(limit),
   ]);
 
+  // Lookup nome+cognome di chi ha caricato ciascun file (per naming Drive).
+  // upload_queue.uploaded_by non ha FK formale verso core_users.id, quindi
+  // preleviamo i dati utente in una query separata.
+  const uploaderIds = Array.from(new Set((items ?? []).map((i: any) => i.uploaded_by).filter(Boolean)));
+  let uploaderMap: Record<string, { first_name?: string; last_name?: string; email?: string }> = {};
+  if (uploaderIds.length > 0) {
+    const { data: users } = await supabase
+      .from('core_users')
+      .select('id, first_name, last_name, email')
+      .in('id', uploaderIds);
+    uploaderMap = Object.fromEntries((users ?? []).map((u: any) => [u.id, u]));
+  }
+
   if (!items || items.length === 0) {
     return { processed: 0, remaining: 0 };
   }
 
   const coupleName = event?.couple_name || '';
   const eventDate = event?.date ? new Date(event.date).toLocaleDateString('it-IT') : '';
-  // Testo impresso su foto/video: se gli sposi hanno disattivato i nomi → righe vuote
-  // (resta solo il logo Sposi.live); se hanno scelto un testo personalizzato → quello
-  // su una riga sola; altrimenti nomi sposi + data come default.
+  // Watermark (richiesto dall'utente 27/07/2026):
+  //   - SOLO i nomi separati da ❤ (es. "Marco ❤ Luca"), niente data, niente wordmark.
+  //   - Priorità: nomi separati groom1/groom2 (compilati dal settings 27/07) →
+  //     custom watermark_text → fallback couple_name (legacy).
+  //   - Se gli sposi hanno disattivato i nomi (`watermark_names = false`) → stringa vuota.
   const namesEnabled = event?.watermark_names !== false;
   const customText = (event?.watermark_text || '').trim();
-  const wmLine1 = !namesEnabled ? '' : (customText || coupleName);
-  const wmLine2 = !namesEnabled || customText ? '' : eventDate;
+  const groom1 = [event?.groom1_first_name, event?.groom1_last_name].filter(Boolean).join(' ').trim();
+  const groom2 = [event?.groom2_first_name, event?.groom2_last_name].filter(Boolean).join(' ').trim();
+  // Se entrambi i campi groom sono compilati, usa quelli (con cuore). Altrimenti fallback
+  // a customText o couple_name.
+  let wmLine1 = '';
+  if (namesEnabled) {
+    if (groom1 && groom2) {
+      wmLine1 = `${groom1} ❤ ${groom2}`;
+    } else if (customText) {
+      wmLine1 = customText;
+    } else {
+      wmLine1 = coupleName;
+    }
+  }
+  const wmLine2 = ''; // rimossa la data (richiesta utente: solo nomi)
   const wmFont = watermarkFontFamily(event?.watermark_font);
   const brandLogo = loadBrandLogo(event?.brand);
 
@@ -174,10 +203,19 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
 
       // Watermark: SEMPRE applicato, su TUTTE le foto e TUTTI i video (il logo
       // Sposi.live/JustMarry.live è impresso a prescindere dalle scelte degli sposi);
-      // nomi+data o testo personalizzato solo se gli sposi non li hanno disattivati
-      // (events.watermark_names / watermark_text).
+      // nomi separati solo se gli sposi non li hanno disattivati
+      // (events.watermark_names). vedi `wmLine1/wmLine2` sopra per i dettagli.
       if (!isVideo) {
-        buffer = await applyWatermark(buffer as Buffer, wmLine1, wmLine2, event?.brand, wmFont, brandLogo);
+        try {
+          buffer = await applyWatermark(buffer as Buffer, wmLine1, wmLine2, event?.brand, wmFont, brandLogo);
+        } catch (watermarkErr) {
+          // Bug fix 27/07/2026: prima applyWatermark aveva un catch silente che
+          // restituiva il buffer originale (l'utente vedeva foto senza watermark
+          // senza capire perché). Ora l'errore viene loggato esplicitamente e la
+          // foto viene comunque salvata su R2 (meglio senza watermark che persa),
+          // ma il log permette di diagnosticare la vera causa (sharp/fonte/lambda).
+          console.error(`[process-queue] watermark foto fallito per ${item.file_name} (event=${eventId}):`, watermarkErr);
+        }
       } else {
         try {
           const branded = await applyVideoOverlay(buffer as Buffer, {
@@ -247,7 +285,25 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
           // FormData non è disponibile, (b) anche su Edge runtime `application/x-www-form-urlencoded`
           // vs `multipart/related` cambia il parsing di Drive API. Costruiamo il body a mano.
           const boundary = `----fotosposi${Date.now().toString(16)}`;
-          const metadata: Record<string, unknown> = { name: item.file_name };
+          // Naming convention Drive (richiesto 27/07/2026): i file arrivano come
+          //   "AAAA_MM_GG_HH_MM_SS_NOME_COGNOME_<originalName>"
+          // Dove NOME_COGNOME è di chi ha caricato il file (leggo da core_users).
+          // Esempio: "20260727_143015_Giuseppe_Vitrano_DSC_0001.jpg"
+          const uploader = uploaderMap[item.uploaded_by];
+          const uploaderName = [uploader?.first_name, uploader?.last_name]
+            .filter(Boolean)
+            .join(' ')
+            .trim()
+            .replace(/\s+/g, '_')
+            // Rimuovi caratteri non ammessi in Drive: / \ ? % * : | " < >
+            .replace(/[\/\\?%*:|"<>]/g, '')
+            || (uploader?.email ? uploader.email.split('@')[0] : 'Anonimo');
+          const now = new Date();
+          const pad = (n: number) => String(n).padStart(2, '0');
+          const datePrefix = `${now.getFullYear()}_${pad(now.getMonth() + 1)}_${pad(now.getDate())}_${pad(now.getHours())}_${pad(now.getMinutes())}_${pad(now.getSeconds())}`;
+          const safeOriginal = (item.file_name || 'file').replace(/[\/\\?%*:|"<>]/g, '_');
+          const driveName = `${datePrefix}_${uploaderName}_${safeOriginal}`;
+          const metadata: Record<string, unknown> = { name: driveName };
           if (driveFolderId) metadata.parents = [driveFolderId];
           const contentType = item.file_type || 'application/octet-stream';
           const metaPart =

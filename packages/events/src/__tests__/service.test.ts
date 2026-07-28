@@ -135,3 +135,48 @@ describe('getEventWindow', () => {
     expect(result.window?.opens_at).toBe('2026-09-06T10:00:00.000Z');
   });
 });
+
+describe('updateEventNames', () => {
+  it('aggiorna nome+cognome+role dei due partner e calcola couple_name', async () => {
+    mockFrom.mockReturnValue(buildChain(null));
+    const { updateEventNames } = await import('../service');
+    const result = await updateEventNames('evt1', {
+      groom1_first_name: 'Marco',
+      groom1_last_name: 'Rossi',
+      groom1_role: 'groom',
+      groom2_first_name: 'Luca',
+      groom2_last_name: 'Bianchi',
+      groom2_role: 'groom',
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.couple_name).toBe('Marco Rossi & Luca Bianchi');
+  });
+
+  it('accetta coppia mista (bride + groom)', async () => {
+    mockFrom.mockReturnValue(buildChain(null));
+    const { updateEventNames } = await import('../service');
+    const result = await updateEventNames('evt1', {
+      groom1_first_name: 'Giulia',
+      groom1_last_name: 'Verdi',
+      groom1_role: 'bride',
+      groom2_first_name: 'Marco',
+      groom2_last_name: 'Rossi',
+      groom2_role: 'groom',
+    });
+    expect(result.couple_name).toBe('Giulia Verdi & Marco Rossi');
+  });
+
+  it('ritorna couple_name null se tutti i nomi sono vuoti', async () => {
+    mockFrom.mockReturnValue(buildChain(null));
+    const { updateEventNames } = await import('../service');
+    const result = await updateEventNames('evt1', {
+      groom1_first_name: null,
+      groom1_last_name: null,
+      groom1_role: 'groom',
+      groom2_first_name: null,
+      groom2_last_name: null,
+      groom2_role: 'groom',
+    });
+    expect(result.couple_name).toBeNull();
+  });
+});

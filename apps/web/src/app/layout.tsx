@@ -73,10 +73,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="theme-color" content="#c4956a" />
       </head>
       <body suppressHydrationWarning>
-        <NextIntlClientProvider locale={locale} messages={messages}>
+        <NextIntlClientProvider locale={messages}>
           {children}
         </NextIntlClientProvider>
-        <script dangerouslySetInnerHTML={{ __html: "if('serviceWorker' in navigator)navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(r){r.unregister()})})" }} />
+        {/* Service Worker registration per upload resiliente (pattern Immich):
+            il SW gestisce IndexedDB queue + Background Sync API + retry su 'online'.
+            Attivo SOLO in produzione per non rompere dev con HMR (Vercel preview OK).
+            iOS Safari non supporta Background Sync → fallback IndexedDB + retry
+            su visibility/online event dal client (vedi /components/upload-queue.tsx). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js',{scope:'/'}).then(function(r){console.log('[fotosposi] SW registered, scope:',r.scope)}).catch(function(e){console.warn('[fotosposi] SW register failed:',e)})})}",
+          }}
+        />
         {/* Vercel Web Analytics: visite e pagine viste, visibili nella dashboard Vercel
             (tab Analytics del progetto). Lo script è servito dallo stesso dominio. */}
         <Analytics />

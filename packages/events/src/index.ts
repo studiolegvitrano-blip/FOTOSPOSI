@@ -2,6 +2,8 @@ import type { Tier } from '@fotosposi/core';
 
 export type SubEventType = 'addio_celibato' | 'matrimonio' | 'brunch' | 'cena_prova';
 
+export type PartnerRole = 'groom' | 'bride';
+
 export interface WeddingEvent {
   id: string;
   tenant_id: string;
@@ -25,8 +27,18 @@ export interface WeddingEvent {
   watermark_names?: boolean;
   /** Testo personalizzato es. "Ciccia & Ciccio Sposi Palermo 06/07/2026"; null = nomi+data. */
   watermark_text?: string | null;
+  /** Font watermark selezionato (es. 'classico', 'great_vibes'); vedi WATERMARK_FONTS. */
+  watermark_font?: string | null;
   /** Cartella R2 dedicata (formato YYYY_MM_DD_Surname1_Surname2). Stabile dall'evento create. */
   r2_folder_name?: string;
+  /** Partner 1 — nome/cognome separati per supportare matrimonio stesso-sesso. */
+  groom1_first_name?: string | null;
+  groom1_last_name?: string | null;
+  groom1_role?: PartnerRole;
+  /** Partner 2 — nome/cognome separati per supportare matrimonio stesso-sesso. */
+  groom2_first_name?: string | null;
+  groom2_last_name?: string | null;
+  groom2_role?: PartnerRole;
 }
 
 export interface SubEvent {
@@ -68,5 +80,6 @@ export {
   getSubEvents,
   getEventWindow,
   updateEventWatermark,
+  updateEventNames,
   buildR2FolderName,
 } from './service';

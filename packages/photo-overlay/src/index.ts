@@ -20,11 +20,14 @@ export interface OverlayOptions {
 }
 
 /**
- * Watermark come da specifica utente (sessione 25/07/2026):
- *   - Una sola riga in basso a sinistra: "{coupleNames} ❤ {date} · {wordmark}"
- *     (Nel nostro standard "Guido ❤ Melissa · Sposi · 25/08/2026")
+ * Watermark come da specifica utente (sessione 27/07/2026):
+ *   - SOLO i nomi separati da ❤, su una sola riga in basso a sinistra.
+ *     Es. "Marco ❤ Luca" (no data, no wordmark, niente banda colorata).
+ *     Il campo `branding.coupleNames` deve contenere già la stringa formattata
+ *     (il caller in process-queue.ts compone "Marco Rossi ❤ Luca Bianchi" se ha
+ *     i campi groom1/groom2, altrimenti fallback a couple_name).
  *   - Font piccolo (~3% dell'altezza foto, clampato 10–18px su square, 16–28 su story)
- *   - Cuore SEMPRE rosso (#d9534f), testo resto auto black/white in base alla luminanza
+ *   - Cuore SEMPRE rosso (#d9534f), testo auto black/white in base alla luminanza
  *     della fascia bassa della foto (campionata via sharp.stats sulla region bottom-25%)
  *   - Opacità testo 50%
  *   - nessuna banda colorata di sfondo (filigrana integrata sulla foto)
@@ -76,19 +79,28 @@ export async function applyOverlay(
     const g = channels[1]?.mean ?? 128;
     const b = channels[2]?.mean ?? 128;
     avgLuma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  } catch {
-    // fallback: safe default (testo bianco)
+  } catch (statsErr) {
+    // Non bloccare: la luminanza serve solo per scegliere il colore testo, fallback safe.
+    console.warn('[applyOverlay] sharp.stats() fallito, uso luma default 0.5:', statsErr instanceof Error ? statsErr.message : statsErr);
   }
   const autoText = avgLuma < 0.5 ? '#ffffff' : '#000000';
   const textColor = branding.textColor && branding.textColor !== 'auto' ? branding.textColor : autoText;
 
-  // ── Costruisce la riga monogramma con cuore sempre rosso (entità XML &#10084; per il ❤) ──
-  // Escapizza separatamente le parti utente — il <tspan> strutturale resta raw (XML valido).
+  // ── Costruisce la riga monogramma: SOLO i nomi separati da ❤ ──
+  // Il `coupleNames` dal caller (process-queue.ts) è già una stringa tipo
+  // "Marco ❤ Luca" con il cuore unicode ❤ (U+2764). Lo sostituiamo con l'entità
+  // XML &#10084; (rosso) wrappata in un <tspan> per il colore. Il resto della
+  // stringa resta testo semplice (escape XML per nomi con &/<).
+  const RAW_HEART = '\u2764'; // ❤
   const HEART_ENTITY = '&#10084;';
-  const monoLine =
-    escapeXml(branding.coupleNames) +
-    ' <tspan fill="#d9534f">' + HEART_ENTITY + '</tspan> ' +
-    escapeXml(branding.date) + ' · ' + escapeXml(branding.wordmark);
+  const splitMono = branding.coupleNames.split(RAW_HEART);
+  let monoLine = '';
+  for (let i = 0; i < splitMono.length; i++) {
+    monoLine += escapeXml(splitMono[i] || '');
+    if (i < splitMono.length - 1) {
+      monoLine += ' <tspan fill="#d9534f">' + HEART_ENTITY + '</tspan> ';
+    }
+  }
   // Dimensione testo: ~3% altezza foto, clampato
   const textPx = Math.min(
     Math.max(10, Math.round(imgHeight * 0.018)),
@@ -128,11 +140,32 @@ export async function applyOverlay(
     }
   }
 
-  const result = await image
-    .composite(compositeOps)
-    .jpeg({ quality: 92 })
-    .toBuffer();
+  let result: Buffer;
+  try {
+    result = await image
+      .composite(compositeOps)
+      .jpeg({ quality: 92 })
+      .toBuffer();
+  } catch (renderErr) {
+    // Log granulare per capire se il problema è sharp.composite, l'SVG malformato,
+    // l'encoder jpeg o la libreria sharp stessa. Su Vercel lambda spesso è
+    // sharp libvips non disponibile o font TTF mancanti (fontconfig cade → librsvg
+    // rasterizza tofu senza errori, ma il composite fallisce se il buffer SVG è 0 byte).
+    console.error('[applyOverlay] render fallito:', renderErr instanceof Error ? renderErr.message : renderErr);
+    console.error('[applyOverlay] contesto:', {
+      imgWidth,
+      imgHeight,
+      compositeOpsCount: compositeOps.length,
+      fontFamily: branding.fontFamily,
+      wordmark: branding.wordmark,
+      hasLogo: !!branding.brandLogoBuffer,
+      svgLength: watermarkSvg.length,
+      svgStart: watermarkSvg.slice(0, 200),
+    });
+    throw renderErr;
+  }
 
+  console.log(`[applyOverlay] OK: ${imgWidth}x${imgHeight} → ${result.length} bytes (input ${imageBuffer.length})`);
   return result;
 }
 
