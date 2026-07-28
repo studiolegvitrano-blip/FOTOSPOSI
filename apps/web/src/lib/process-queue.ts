@@ -6,7 +6,7 @@ import { applyVideoOverlay } from '@fotosposi/video-overlay';
 import { applyOverlay, detectWatermark, type WatermarkPresence } from '@fotosposi/photo-overlay';
 import sharp from 'sharp';
 import { watermarkFontFamily } from '@/lib/watermark-fonts';
-import { ensureWatermarkFonts, loadBrandLogo } from '@/lib/watermark-fonts.server';
+import { ensureWatermarkFonts, loadBrandLogo, loadWatermarkFontBuffer } from '@/lib/watermark-fonts.server';
 
 // I glifi dei watermark richiedono font presenti nella lambda (vedi watermark-fonts.ts).
 ensureWatermarkFonts();
@@ -66,6 +66,7 @@ async function applyWatermark(
   brand?: string,
   fontFamily = 'Playfair Display',
   logoPng?: Buffer | null,
+  fontBuffer?: Buffer | null,
 ): Promise<Buffer> {
   return await applyOverlay(buffer, {
     format: 'square',
@@ -75,6 +76,7 @@ async function applyWatermark(
       primaryColor: '#1a1a2e',
       wordmark: getBrandLabel(brand),
       fontFamily,
+      fontBuffer,
       brandLogoBuffer: logoPng,
     },
   });
@@ -154,6 +156,9 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
   const wmLine2 = ''; // rimossa la data (richiesta utente: solo nomi)
   const wmFont = watermarkFontFamily(event?.watermark_font);
   const brandLogo = loadBrandLogo(event?.brand);
+  // FIX 28/07/2026: bytes del TTF reale, per l'embedding @font-face che bypassa
+  // fontconfig di sistema (vedi packages/photo-overlay/src/index.ts).
+  const wmFontBuffer = loadWatermarkFontBuffer(event?.watermark_font);
 
   const tokenResp = await getDriveToken(eventId);
   let token = tokenResp.token;
@@ -205,15 +210,21 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
       // Sposi.live/JustMarry.live è impresso a prescindere dalle scelte degli sposi);
       // nomi separati solo se gli sposi non li hanno disattivati
       // (events.watermark_names). vedi `wmLine1/wmLine2` sopra per i dettagli.
+      // FIX 28/07/2026: il bug reale non era (solo) il catch silente — applyOverlay
+      // spesso NON lanciava affatto (sharp/rsvg usa un font di fallback bundolato
+      // invece di errore quando fontconfig non risolve il font richiesto), quindi
+      // il buffer tornava "riuscito" ma privo del cuore ❤ (glifo assente nel
+      // fallback). Con il fix a monte (cuore vettoriale + font embeddato via
+      // fontBuffer) applyWatermark ora produce SEMPRE il cuore quando non lancia.
+      // Se lancia comunque (sharp/R2/rete giù), NON nascondiamo più l'errore:
+      // impostiamo watermarkFailed=true subito, senza aspettare il self-heal
+      // downstream (che può essere ingannato da varianza naturale della foto).
+      let watermarkFailed = false;
       if (!isVideo) {
         try {
-          buffer = await applyWatermark(buffer as Buffer, wmLine1, wmLine2, event?.brand, wmFont, brandLogo);
+          buffer = await applyWatermark(buffer as Buffer, wmLine1, wmLine2, event?.brand, wmFont, brandLogo, wmFontBuffer);
         } catch (watermarkErr) {
-          // Bug fix 27/07/2026: prima applyWatermark aveva un catch silente che
-          // restituiva il buffer originale (l'utente vedeva foto senza watermark
-          // senza capire perché). Ora l'errore viene loggato esplicitamente e la
-          // foto viene comunque salvata su R2 (meglio senza watermark che persa),
-          // ma il log permette di diagnosticare la vera causa (sharp/fonte/lambda).
+          watermarkFailed = true;
           console.error(`[process-queue] watermark foto fallito per ${item.file_name} (event=${eventId}):`, watermarkErr);
         }
       } else {
@@ -267,8 +278,15 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
       // invece di credere che il watermark sia ok). La foto resta su R2
       // e in galleria (meglio senza logo che persa) ma il flag failed
       // permette a un cron successivo di ritentare. ──
-      let watermarkMissing = false;
-      if (!isVideo) {
+      // FIX 28/07/2026: se applyWatermark ha già lanciato un errore sopra, il
+      // risultato è certo — non serve (anzi, è rischioso) ri-derivarlo da un
+      // euristico sui pixel. La foto 40/40 dell'evento di test aveva
+      // watermark_missing=false proprio perché questa verifica usava un OR
+      // permissivo (hasLogo O confidence>0.3) che la varianza naturale della
+      // foto bastava a soddisfare anche SENZA alcun watermark reale.
+      let watermarkMissing = watermarkFailed;
+      const expectsWatermark = !!wmLine1 || !!brandLogo;
+      if (!isVideo && !watermarkFailed && expectsWatermark) {
         try {
           const verifyUrl = await getPresignedDownloadUrl(r2Key, 3600);
           if (verifyUrl) {
@@ -276,18 +294,24 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
             if (verifyResp.ok) {
               const verifyBuf = Buffer.from(await verifyResp.arrayBuffer());
               const presence: WatermarkPresence = await detectWatermark(verifyBuf);
-              // La foto ha il watermark SOLO se è stato richiesto (wmLine1 != '' oppure c'è un logo).
-              const expectsWatermark = !!wmLine1 || !!brandLogo;
-              if (expectsWatermark && !presence.hasLogo && presence.confidence < 0.3) {
+              // AND esplicito sulle singole componenti effettivamente attese,
+              // non una media/OR: se sono attesi sia nomi (con cuore) sia logo,
+              // devono essere rilevati ENTRAMBI. Il cuore (hasHeart, colore
+              // deterministico #d9534f) è il segnale più affidabile e da solo
+              // può bastare a bocciare la foto se manca.
+              const namesExpected = !!wmLine1;
+              const namesOk = !namesExpected || presence.hasHeart; // il cuore è sempre presente se i nomi sono richiesti
+              const logoOk = !brandLogo || presence.hasLogo;
+              if (!namesOk || !logoOk) {
                 watermarkMissing = true;
                 console.error(
                   `[process-queue] WATERMARK MANCANTE su ${item.file_name} (event=${eventId}): ` +
-                  `presence=${JSON.stringify(presence)} — applyOverlay probabilmente fallito in silenzio.`,
+                  `presence=${JSON.stringify(presence)} namesOk=${namesOk} logoOk=${logoOk}.`,
                 );
               } else {
                 console.log(
                   `[process-queue] watermark OK su ${item.file_name}: confidence=${presence.confidence.toFixed(2)} ` +
-                  `(logo=${presence.hasLogo}, names=${presence.hasNames})`,
+                  `(logo=${presence.hasLogo}, heart=${presence.hasHeart}, names=${presence.hasNames})`,
                 );
               }
             }
@@ -469,6 +493,7 @@ export async function repairWatermarkForEvent(
   }
   const wmFont = watermarkFontFamily(event?.watermark_font);
   const brandLogo = loadBrandLogo(event?.brand);
+  const wmFontBuffer = loadWatermarkFontBuffer(event?.watermark_font);
 
   let repaired = 0;
   let skipped = 0;
@@ -489,7 +514,7 @@ export async function repairWatermarkForEvent(
 
       let watermarked: Buffer = buffer;
       try {
-        watermarked = await applyWatermark(buffer, wmLine1, '', event?.brand, wmFont, brandLogo);
+        watermarked = await applyWatermark(buffer, wmLine1, '', event?.brand, wmFont, brandLogo, wmFontBuffer);
       } catch (wmErr) {
         // Verifica post-fix: l'errore ora è loud (non più silente). Logghiamo ma
         // non marchiamo il record come repaired: rimarrà watermark_missing=true.
@@ -515,7 +540,9 @@ export async function repairWatermarkForEvent(
         ContentType: 'image/jpeg',
       }));
 
-      // Verifica post-upload: detectWatermark check (ricavato come in processQueueForEvent).
+      // Verifica post-upload: stessa logica AND di processQueueForEvent (fix
+      // 28/07/2026) — prima usava `hasLogo || confidence > 0.3`, lo stesso OR
+      // permissivo che ha fatto passare i 40 file del bug originale.
       let verifiedOk = false;
       try {
         const verifyUrl = await getPresignedDownloadUrl(r2Key, 3600);
@@ -524,7 +551,9 @@ export async function repairWatermarkForEvent(
           if (vResp.ok) {
             const vBuf = Buffer.from(await vResp.arrayBuffer());
             const presence = await detectWatermark(vBuf);
-            verifiedOk = presence.hasLogo || presence.confidence > 0.3;
+            const namesOk = !wmLine1 || presence.hasHeart;
+            const logoOk = !brandLogo || presence.hasLogo;
+            verifiedOk = namesOk && logoOk;
           }
         }
       } catch {
