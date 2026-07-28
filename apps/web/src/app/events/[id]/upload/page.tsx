@@ -206,8 +206,19 @@ const startPolling = () => {
       let compressed = false;
 
       if (file.type.startsWith('image/')) {
+        // Compressione foto automatica:
+        //   - tier Free → SEMPRE comprime a 1200px (limite di piano: SD quality)
+        //   - tier Premium/Deluxe → comprime SOLO se >2MB a 1920px (risparmio banda
+        //     venue WiFi senza sacrificare qualità originale del salvataggio finale:
+        //     il watermark in process-queue.ts è già applicato su copia compressa,
+        //     ma il file originale resta in Drive backup se l'utente ha connesso Drive)
         if (isFree) {
           try { uploadFile = await compressImage(file, 1200); compressed = true; } catch { }
+        } else if (file.size > 2 * 1024 * 1024) {
+          // Soglia 2MB: foto moderne iPhone/Android sono 4-8MB, riduciamo a 1920px
+          // lato lungo (~500KB-1MB finali, qualità visiva praticamente identica
+          // per display web e social).
+          try { uploadFile = await compressImage(file, 1920); compressed = true; } catch { }
         }
       }
 
@@ -266,6 +277,20 @@ const startPolling = () => {
     triggerServerProcessing();
     startPolling();
   };
+
+  // Chiedi permesso notifiche SOLO dopo il primo upload andato a buon fine:
+  // momento più naturale (l'utente ha già visto che funziona) e massima
+  // conversione. Una sola volta per sessione (controllo in useEffect su stats.synced).
+  useEffect(() => {
+    if (stats.synced < 1) return;
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission !== 'default') return; // già granted o denied
+    // Piccolo delay per non infastidire l'utente proprio mentre festeggia l'upload OK.
+    const t = setTimeout(() => {
+      Notification.requestPermission().catch(() => {});
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [stats.synced]);
 
   const handleSelectFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) processFiles(e.target.files);

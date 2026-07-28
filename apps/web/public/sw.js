@@ -246,13 +246,39 @@ async function flushAll() {
   for (const record of pending) {
     results.push(await flushOne(record));
   }
+  const remaining = (await getAllPending()).length;
   // Notifica tutti i client (se ce ne sono aperti) con l'esito.
   const clients = await self.clients.matchAll({ includeUncontrolled: true });
   clients.forEach((client) => client.postMessage({
     type: 'upload-flushed',
     results,
-    remaining: (await getAllPending()).length,
+    remaining,
   }));
+  // Notifica di sistema "tutti i caricamenti sono andati a buon fine" SOLO quando:
+  //  - c'era almeno un record pendente (non spam a vuoto)
+  //  - non ci sono più record in coda (tutti flushati con successo)
+  //  - nessun client aperto (se l'utente è già sulla pagina vede il toast inline)
+  //  - il Notification.permission è 'granted' (precedentemente autorizzato)
+  // Utile per chi chiude il tab subito dopo aver scelto le foto, vedendo la
+  // notifica riapparire anche da un'altra app / schermata home.
+  const okCount = results.filter((r) => r.ok).length;
+  if (okCount > 0 && remaining === 0 && clients.length === 0) {
+    try {
+      await self.registration.showNotification('Foto caricate', {
+        body: `${okCount} foto salvate con successo. Apri la galleria per vederle.`,
+        icon: '/favicon-sposi-192.png',
+        badge: '/favicon-sposi-32.png',
+        tag: 'fotosposi-upload-complete',
+        // Rinotifica sempre (non raggruppare): un invito scarica foto, vuole feedback.
+        renotify: true,
+        data: { type: 'upload-complete', count: okCount },
+      });
+    } catch (notifErr) {
+      // notifErr.name = 'NotAllowedError' se il permesso non è stato concesso
+      // dall'utente: silenzioso, va a chiedere il permesso prossima volta che apre l'app.
+      console.warn('[sw] notifica upload completato non riuscita:', notifErr instanceof Error ? notifErr.message : notifErr);
+    }
+  }
   return results;
 }
 
@@ -272,6 +298,24 @@ self.addEventListener('periodicsync', (event) => {
 
 // Online: ritenta subito.
 self.addEventListener('online', () => { flushAll(); });
+
+// Click su notifica di upload completato: apri/porta in primo piano la galleria evento.
+// NB: qui NON abbiamo l'event_id nel contesto (la notifica è generica); apriamo la homepage
+// e lasciamo che il client legga l'ultimo evento da localStorage (vedi PwaEventRedirect).
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const all = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+    if (all.length > 0) {
+      // Porta in primo piano la prima finestra già aperta (galleria evento).
+      all[0].focus();
+    } else {
+      // Nessuna finestra aperta: apri la homepage. Il client reindirizza all'evento
+      // corrente via PwaEventRedirect (salvato in localStorage dall'ultima visita).
+      await self.clients.openWindow('/');
+    }
+  })());
+});
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Client ↔ SW messaging

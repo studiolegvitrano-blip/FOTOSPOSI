@@ -145,6 +145,43 @@ COMMENT ON COLUMN media_uploads.watermark_missing IS
  PROJECT_STATUS.md                              | +50 righe (questa sotto-sessione)
 ```
 
+### Sessione 28/07/2026 (continua 2) — Notifica locale "upload completato" + Compressione foto auto >2MB
+
+**Contesto**: commit `a7f46ed` pushato (backoff SW+client). L'utente chiede sviluppo continuo. Affrontati 2 TODO post-push 25e6541:
+- **Notifica push "upload completato"**: l'invitato che scansiona il QR, carica 5 foto, chiude il tab pensando "ok fatto" — se il SW sta ancora processando la coda, non ha feedback.
+- **Compressione foto automatica >2MB**: foto iPhone/Android moderne 4-8MB saturano la banda venue (150 invitati collegati al WiFi insieme).
+
+**Soluzione applicata**:
+
+1. **Notifica locale "upload completato" (no VAPID/push server)** in `apps/web/public/sw.js`:
+   - `flushAll()` ora, dopo aver flushato tutti i record con successo E con `clients.length === 0` (nessuna finestra aperta), chiama `self.registration.showNotification('Foto caricate', { body: '${okCount} foto salvate con successo.', tag: 'fotosposi-upload-complete' })`.
+   - Fallback gracioso se `Notification.permission !== 'granted'` → `console.warn` silenzioso (no NotAllowedError throw).
+   - Handler `notificationclick`: porta in primo piano una finestra già aperta O apre `/` (PwaEventRedirect reindirizza all'ultimo evento).
+   - **Nessuna nuova infrastruttura push server richiesta**: è una notifica locale (in-app), non push remoto.
+   - In `apps/web/src/app/events/[id]/upload/page.tsx`: dopo il primo `stats.synced >= 1`, chiede `Notification.requestPermission()` con delay 1.5s (non infastidisce l'utente mentre festeggia l'upload OK). Controlla `Notification.permission !== 'default'` per non richiedere due volte.
+
+2. **Compressione foto automatica >2MB** in `apps/web/src/app/events/[id]/upload/page.tsx`:
+   - **Tier Free**: SEMPRE comprime a 1200px (già esistente, mantenuto).
+   - **Tier Premium/Deluxe**: NUOVO — comprime SOLO se `file.size > 2MB` a 1920px lato lungo. Risultato: foto iPhone 8MB → ~800KB (-90%), qualità visiva praticamente identica per display web/social. Skip sotto 2MB (non spreca CPU per foto piccole).
+   - Video skippati (già compressi H.264, ulteriore riduzione richiederebbe re-encode = troppa CPU client).
+
+**Verifica**:
+- Typecheck: 0 errori.
+- Test: **265/265 verdi** (invariato: niente test cambiati, sono feature UI/service).
+- Build `next build`: OK.
+- Nessuna rotta nuova, nessuna migration DB.
+
+### Limitazioni documentate
+- La notifica è **locale** (no push remoto) → se l'utente chiude completamente il browser, la notifica ovviamente non arriva (i Service Worker di Chrome persistono solo se il SW è registrato e il browser non è stato "killato"). Per push vero serve VAPID keys + tabella `push_subscriptions` + API dedicate (roadmap post-MVP).
+- La compressione client usa Canvas (`compressImage` in `@fotosposi/media`) → su foto >20MB può richiedere 2-3s prima dell'upload. Se l'utente ha fretta può annullare (non implementato esplicitamente, ma il default behaviour è "show progress + cancella con X").
+
+### File modificati in questa sotto-sessione
+```
+ apps/web/public/sw.js                          | +30 righe (showNotification in flushAll + notificationclick handler)
+ apps/web/src/app/events/[id]/upload/page.tsx  | +25 righe (compressione >2MB + useEffect Notification.requestPermission)
+ PROJECT_STATUS.md                              | +30 righe (questa sotto-sessione)
+```
+
 ---
 
 ## Sessione 27/07/2026 (continua 6) — Upload resiliente (Service Worker + IndexedDB) + Drive naming convention
