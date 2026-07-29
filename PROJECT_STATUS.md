@@ -1,5 +1,76 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 30/07/2026 — FIX 6 cuore come carattere + inizio FIX 7 solidità operativa
+
+### FIX 6 ✅ PUSHATO (commit `6172bb2`)
+**Richiesta utente**: "il cuore ed eventuale emoticon nel watermark deve essere come un carattere, quindi nessuna sovrapposizione nessuno spazio aggiuntivo".
+
+**Cosa è cambiato in `packages/photo-overlay/src/index.ts`**:
+- `HEART_PATH_DATA`: costante con path cuore normalizzato bounding-box 20×20 (origine top-left).
+- `applyOverlay`: il cuore ❤ viene ora renderizzato come `<path fill="#d9534f">` SEPARATO dal `<text>` MA con `transform="translate(...) scale(...)"` posizionato esattamente al centro di uno slot largo `CHAR_WIDTH_ESTIMATE` (= larghezza media di un carattere del font). Niente gap, niente offset.
+- `heartSize` ora = `textPx` (non più `0.85 * textPx`): il cuore è grande quanto un singolo carattere del font scelto, integrato nel layout tipografico.
+
+**Iterazione scartata**: avevo provato prima con `<tspan dx="0" dy="0">` wrappando il path del cuore dentro `<text>`, ma `librsvg` su sharp NON rendeva il path annidato (restituiva 0 pixel rossi → `detectWatermark.hasHeart = false`). La soluzione "due elementi separati" (text + path) è quella che funziona realmente.
+
+**Test**: 18/18 verdi per `packages/photo-overlay` (incluso integration test `hasHeart=true` su sharp reale, fixture `Agostino ❤ Danila`).
+
+### FIX 7 🟡 WIP (commit `8110a95` migration; CODICE PARALLELISMO NON SCRITTO)
+**Richiesta utente**: "i messaggi di errori in fase di caricamento aumentano, ricorda il sistema deve essere solido resistente, deve gradualmente gestire migliaia di matrimoni con centinaia di invitati se un solo invitato da problemi immagine in fase operativa".
+
+**Scelta implementativa approvata dall'utente**: Retry esponenziale con DLQ (più Isolamento per-batch + Telemetry come garanzie minime).
+
+**Cosa è stato fatto**:
+- ✅ Migration `00041_upload_queue_dead_letter.sql` applicata su Supabase live. Tabella `upload_queue_dead_letter` con: `original_upload_queue_id`, `event_id`, `retry_count`, `dlq_retry_count`, `dlq_next_retry_at`, `last_failure_class`, `last_failure_message`. Indici su `event_id`, `dlq_next_retry_at` (partial WHERE NOT NULL), `last_failure_class`. RLS solo service_role.
+- ❌ Refactor `processQueueForEvent` in `apps/web/src/lib/process-queue.ts`: estrarre `processSingleItem(item, ctx)`, usare `Promise.allSettled` con concorrenza 4 (`pLimit`-style inline, niente dipendenze nuove).
+- ❌ Backoff esponenziale (1s → 2s → 4s → 8s → 16s → 32s → 64s, max 7 tentativi = ~127s cumulativi).
+- ❌ Spostamento in DLQ dopo max retry: copia item in `upload_queue_dead_letter`, cancella da `upload_queue`.
+- ❌ Telemetry strutturata in `system_health_log` (tabella già esistente dalla migration 00029): per ogni fallimento logga `kind='upload_processing_failure'`, `event_id`, `file_name`, `failure_class`, `error_message`, `retry_count`.
+- ❌ Route admin `/api/cron/dlq-retry` (auth X-Cron-Secret) che riprova gli item della DLQ con backoff più lento (1h → 24h, max 5).
+- ❌ Update `vercel.json` per schedulare `/api/cron/dlq-retry` ogni 6 ore.
+
+**Test da scrivere**:
+- `processSingleItem` con mock R2/Drive/sharp: successo, watermark fallito (watermark_missing=true), Drive fallito (retry_count++), 7 retry → DLQ.
+- Backoff esponenziale: tentativo 1 = 1s, 2 = 2s, 3 = 4s, ..., 7 = 64s.
+- Concorrrenza 4: 10 item → tutti processati in 3 round (4+4+2).
+- Telemetry: ogni fallimento scrive 1 riga in system_health_log.
+
+### Decisioni architetturali per FIX 7
+- **Niente dipendenze nuove**: `pLimit` non installato, implementato inline con `for await` chunking (più semplice, niente supply-chain risk).
+- **DLQ in tabella separata**, non colonna su `upload_queue`: cron sweep resta veloce (legge solo item pending/retry, non tutta la DLQ).
+- **`failure_class` enum-style**: `r2_download_failed | watermark_apply_failed | drive_sync_failed | detect_watermark_missing | invalid_image | other`. Permette dashboard admin per categoria.
+
+### Stato riassuntivo
+- ✅ Commit pushati: `6172bb2` (FIX 6 cuore), `8110a95` (migration 00041 FIX 7).
+- 🟡 WIP: refactor `processQueueForEvent` per parallelismo + DLQ + telemetry (NON committato).
+- Vercel deploy `8110a95`: da verificare READY (vedi TODO sotto).
+
+### TODO per la prossima chat
+1. Verificare che il deploy `8110a95` sia READY su Vercel (token Vercel presente in `ECCOLO FOTOSPOSI.txt` riga "vercel fotosposi-web vcp_...").
+2. **FIX 7 codice**: estrarre `processSingleItem` da `processQueueForEvent`, parallelismo 4, backoff esponenziale, DLQ dopo 7 retry, telemetry in `system_health_log`.
+3. Aggiungere cron `/api/cron/dlq-retry` + aggiornare `vercel.json`.
+4. Test del nuovo flow + commit + push.
+5. **Foto vecchie `ee2cc954`**: l'utente vuole ricaricarle per evitare watermark sovrapposto (le foto pre-migration 00040 non hanno `original_r2_key`). Suggerimento operativo: scaricare le 28 foto da `https://sposi.live/events/ee2cc954-98d7-4e11-828b-668a52e738e2`, cancellare i record `media_uploads`, ricaricare. Il nuovo upload avrà automaticamente `original_r2_key` valorizzato.
+6. **Test badge "Backup temporaneo"**: caricare una nuova foto di test, verificare che appaia il badge amber sopra la foto finché Drive sync non completa.
+7. **Curl `/api/r2/orphans`**: contare gli orfani R2 (FIX 5 deployato). Auth: `X-Cron-Secret: <CRON_SECRET>`.
+
+### File modificati in questa sotto-sessione
+```
+ packages/photo-overlay/src/index.ts                                     | +120/-40 righe (HEART_PATH_DATA + refactor cuore)
+ packages/photo-overlay/src/__tests__/index.integration.test.ts           | +5/-5 righe (rimozione debug log)
+ packages/photo-overlay/src/__tests__/heart-inline.test.ts                | NEW (95 righe, 4 test FIX 6)
+ supabase/migrations/00041_upload_queue_dead_letter.sql                   | NEW (68 righe, FIX 7 — migration applicata)
+ PROJECT_STATUS.md                                                        | +70 righe (questa sezione)
+```
+
+### Comando vercel per prossima chat
+```powershell
+$env:VERCEL_TOKEN = "<vedi ECCOLO FOTOSPOSI.txt>"
+vercel ls --prod | Select-String "Ready|Error"
+vercel inspect fotosposi-rbqf5hrh7-studiolegvitrano-blip1.vercel.app
+```
+
+---
+
 ## Sessione 29/07/2026 (continua 1) — FIX watermark_text custom ignorato (priorità invertita)
 
 ### Contesto
