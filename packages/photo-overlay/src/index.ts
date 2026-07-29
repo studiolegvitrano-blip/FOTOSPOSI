@@ -109,15 +109,16 @@ export async function applyOverlay(
   // vettoriale non dipende da NESSUN font ed è sempre renderizzato.
   const RAW_HEART = '\u2764'; // ❤ — usato solo per fare lo split della stringa in input
   const splitMono = branding.coupleNames.split(RAW_HEART);
-  // Dimensione testo: ~3% altezza foto, clampato
+  // Dimensione testo (FIX 29/07/2026: raddoppiato su richiesta utente):
+  // ~3.6% altezza foto (era 1.8%), clampato 20-36px square / 20-56px story.
   const textPx = Math.min(
-    Math.max(10, Math.round(imgHeight * 0.018)),
-    format === 'story' ? 28 : 18,
+    Math.max(20, Math.round(imgHeight * 0.036)),
+    format === 'story' ? 56 : 36,
   );
   const heartSize = Math.round(textPx * 0.85);
-  // Padding piccolo dal bordo
-  const padBottom = Math.round(imgHeight * 0.012);
-  const padLeft = Math.round(imgWidth * 0.012);
+  // Padding piccolo dal bordo (proporzionato, lievemente aumentato)
+  const padBottom = Math.round(imgHeight * 0.018);
+  const padLeft = Math.round(imgWidth * 0.018);
   const baselineY = imgHeight - padBottom;
 
   // Costruiamo la riga come sequenza di <tspan> di testo intervallati da un
@@ -148,17 +149,28 @@ export async function applyOverlay(
 
   // ── Font embeddato via @font-face (bypassa fontconfig di sistema) ──
   // Se il caller (process-queue.ts) ci passa i bytes del TTF selezionato dagli
-  // sposi, lo incorporiamo come data URI: rendering identico ovunque, non
-  // dipende da quali font sono installati nella lambda. Se assente, fallback
-  // sul comportamento legacy (font-family testuale + fontconfig/sharp).
+  // sposi, lo incorporiamo come data URI. Inoltre specifichiamo SEMPRE anche
+  // il family testuale come fallback nella lista font-family: librsvg/inkscape
+  // su Vercel lambda non risolve sempre @font-face con data URI, ma se il
+  // fontconfig di sistema (configurato da ensureWatermarkFonts per puntare a
+  // apps/web/assets/fonts) conosce il family del TTF, lo usa come fallback.
+  // Risultato: il font corretto viene applicato in entrambi i casi.
   let fontFaceDefs = '';
-  let resolvedFontFamily = escapeXmlAttr(branding.fontFamily || 'Georgia, serif');
+  const requestedFamily = branding.fontFamily || 'Georgia, serif';
+  let resolvedFontFamily = escapeXmlAttr(requestedFamily);
   if (branding.fontBuffer && branding.fontBuffer.length > 0) {
     const fontB64 = branding.fontBuffer.toString('base64');
-    resolvedFontFamily = 'WatermarkEmbeddedFont';
+    // Font-family = embedded PRIMA + family testuale come fallback. Così se
+    // librsvg ignora @font-face data URI (caso osservato su Vercel), fontconfig
+    // intercetta tramite il family testuale e usa il TTF già installato in
+    // assets/fonts/.
+    resolvedFontFamily = `'WatermarkEmbeddedFont', ${escapeXmlAttr(requestedFamily)}`;
     fontFaceDefs = `<defs><style>
       @font-face { font-family: 'WatermarkEmbeddedFont'; src: url(data:font/ttf;base64,${fontB64}) format('truetype'); }
     </style></defs>`;
+    console.log(`[applyOverlay] font: embedded base64 (${branding.fontBuffer.length} bytes), family='${requestedFamily}'`);
+  } else {
+    console.log(`[applyOverlay] font: NO buffer (font='${branding.fontFamily}'), uso family testuale`);
   }
 
   // SVG watermark (una sola riga, in basso a sinistra) — dimensioni assolute (non 100%)
@@ -173,8 +185,10 @@ export async function applyOverlay(
   ];
 
   // ── Logo brand in alto a destra, A COLORI (no mix-blend, no opacità forzata) ──
+  // FIX 29/07/2026: raddoppiato su richiesta utente — da 15% a 30% larghezza foto,
+  // clamp 160-800px (era 80-400px). Visibilità premium anche su miniature piccole.
   if (branding.brandLogoBuffer) {
-    const targetLogoW = branding.brandLogoWidth ?? Math.min(400, Math.max(80, Math.round(imgWidth * 0.15)));
+    const targetLogoW = branding.brandLogoWidth ?? Math.min(800, Math.max(160, Math.round(imgWidth * 0.30)));
     try {
       const resizedLogo = await sharp(branding.brandLogoBuffer)
         .resize(targetLogoW, null, { fit: 'inside' })
@@ -185,6 +199,7 @@ export async function applyOverlay(
       const logoTop = Math.round(imgHeight * 0.02);
       const logoRight = Math.round(imgWidth * 0.02);
       const logoLeft = Math.max(0, imgWidth - logoW - logoRight);
+      console.log(`[applyOverlay] logo: img=${imgWidth}x${imgHeight}, targetW=${targetLogoW}, resized=${logoW}x${logoH}, top=${logoTop}, left=${logoLeft}`);
       compositeOps.push({ input: resizedLogo, top: logoTop, left: logoLeft });
     } catch (e) {
       console.error('watermark brand logo err:', e);
