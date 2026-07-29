@@ -1,5 +1,75 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 29/07/2026 (continua 1) — FIX watermark_text custom ignorato (priorità invertita)
+
+### Contesto
+Dopo il push del fix sharp (sessione precedente), l'utente testa l'evento `ee2cc954-98d7-4e11-828b-668a52e738e2` (Agostino e Danila). Le foto ora hanno watermark applicato (logo + scritta cuore), MA il testo è **sempre** "Agostino Spera ❤ Danila Villa" invece del testo custom impostato nei settings: **"W gli Sposi! Agostino Spera & Danila Villa 30/07/2026 ❤️"**.
+
+### Diagnosi
+Verificato l'evento nel DB:
+- `events.watermark_text = 'W gli Sposi! Agostino Spera & Danila Villa 30/07/2026 ❤️'`
+- `events.watermark_font = 'classico'`
+- `events.watermark_names = true`
+- `events.groom1_first_name = 'Agostino'`, `groom1_last_name = 'Spera'`
+- `events.groom2_first_name = 'Danila'`, `groom2_last_name = 'Villa'`
+
+Root cause: in `apps/web/src/lib/process-queue.ts` (e nella copia in `repairWatermarkForEvent`) la priorità era:
+
+1. `groom1 + groom2` → "Agostino Spera ❤ Danila Villa" (VINCENTE)
+2. `watermark_text` custom → ignorato se i campi groom sono compilati
+3. `couple_name` → fallback legacy
+
+Scelta del 27/07/2026 per gestire automaticamente la formattazione "Nome ❤ Nome" senza costringere l'utente a scriverla. MA questo **sovrascrive il testo custom** che l'utente ha esplicitamente scelto (inclusa la data 30/07/2026 e la frase "W gli Sposi!"), che è proprio il caso d'uso principale dei settings.
+
+Inoltre, il testo custom dell'utente contiene già un cuore ❤️ (U+2764) — questo è OK perché `applyOverlay` (packages/photo-overlay) ora splitta il cuore e lo renderizza come path vettoriale rosso indipendente dai font (fix 28/07), quindi non cade su font Dingbats mancanti.
+
+Il font `"classico"` viene risolto correttamente da `watermarkFontFamily('classico')` → `'"Playfair Display"'`, e `loadWatermarkFontBuffer('classico')` → `Buffer` del TTF `PlayfairDisplay-Regular.ttf` da `apps/web/public/fonts/`. **Il font è stato sempre passato, il bug era solo nel testo**.
+
+### Fix applicato
+**1. Estratto helper puro `composeWatermarkLine1(event)` in `apps/web/src/lib/process-queue.ts`** (esportato, testabile). Logica prioritaria INVERTITA:
+
+```ts
+if (!namesEnabled) return '';
+const customText = (event.watermark_text || '').trim();
+if (customText) return customText;            // 1. custom VINCE
+const groom1 = [event.groom1_first_name, event.groom1_last_name].filter(Boolean).join(' ').trim();
+const groom2 = [event.groom2_first_name, event.groom2_last_name].filter(Boolean).join(' ').trim();
+if (groom1 && groom2) return `${groom1} ❤ ${groom2}`;   // 2. nomi separati (formattazione automatica)
+return (event.couple_name || '').trim();                  // 3. fallback legacy
+```
+
+**2. Rimosse le duplicazioni inline** in `processQueueForEvent` e `repairWatermarkForEvent` (entrambi ora chiamano `composeWatermarkLine1(event)` — singola fonte di verità).
+
+**3. 13 nuovi test** in `apps/web/src/lib/__tests__/process-queue-watermark-priority.test.ts`:
+- `watermark_text` custom vince sempre sui nomi separati
+- `watermark_text` whitespace-only cade su nomi separati
+- `watermark_names=false` → stringa vuota anche con custom presente
+- Caduta su `couple_name` se custom vuoto e groom mancanti
+- Trim applicato ovunque
+- Scenario esatto utente (Agostino+Danila+30/07/2026) — verifica presenza di ❤️ e data nel risultato
+- `event null/undefined/vuoto` → stringa vuota
+- Default `watermark_names` (undefined) si comporta come true
+
+### Verifica
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Test: **281/281 verdi** (era 268: +13 nuovi).
+- Work-tree pronto per commit. **Da pushare + verificare su Vercel**.
+
+### TODO post-push
+- [ ] Pushare il fix
+- [ ] Curl `/api/r2/repair-watermark` su evento `ee2cc954-...` per ri-applicare watermark alle 28 foto con il nuovo testo custom
+- [ ] Verificare galleria: foto devono mostrare "W gli Sposi! Agostino Spera & Danila Villa 30/07/2026 ❤️" in basso a sinistra, font Playfair Display (classico), logo Sposi.live top-right
+- [ ] Risolto anche il bug utente su eventuali altri eventi che avevano customText impostato ma nomi separati compilati (impossibile identificarli dal DB senza uno scan sistematico — applicare la fix al volo su ogni evento futuro tramite il processing)
+
+### File modificati in questa sotto-sessione
+```
+ apps/web/src/lib/process-queue.ts                                 | +35 righe (helper composeWatermarkLine1 esportato + sostituzione inline)
+ apps/web/src/lib/__tests__/process-queue-watermark-priority.test.ts | NEW (150 righe, 13 test)
+ PROJECT_STATUS.md                                                 | +60 righe (questa sezione)
+```
+
+---
+
 ## Sessione 29/07/2026 — FIX SHARP BUILD: dedup versione 0.34.5 (bug critico monorepo)
 
 ### Contesto

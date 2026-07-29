@@ -49,6 +49,44 @@ function escapeXml(s: string): string {
 }
 
 /**
+ * Composizione della riga principale del watermark (in basso a sinistra) a
+ * partire dai campi dell'evento. Esportata come helper puro per testabilità.
+ *
+ * Priorità (FIX 29/07/2026 dopo bug utente "watermark applicato, c'è logo e
+ * scritta ma non quella disposta nelle impostazioni"):
+ *   1. `watermark_text` custom se NON vuoto — è il testo scelto dagli sposi
+ *      (tipicamente include frase + data + cuore), ha la precedenza ASSOLUTA.
+ *   2. Nomi separati `groom1_* + groom2_*` (compilati dal settings 27/07/2026) →
+ *      formattati come "Nome1 Cognome1 ❤ Nome2 Cognome2".
+ *   3. Fallback `couple_name` (legacy pre-27/07).
+ *
+ * Se `watermark_names === false` → stringa vuota (i nomi sono disattivati).
+ *
+ * @param event Oggetto evento con i campi rilevanti (watermark_names,
+ *              watermark_text, groom1_first_name/last_name, groom2_*, couple_name)
+ * @returns stringa da passare come `branding.coupleNames` ad applyOverlay.
+ */
+export function composeWatermarkLine1(event: {
+  watermark_names?: boolean | null;
+  watermark_text?: string | null;
+  groom1_first_name?: string | null;
+  groom1_last_name?: string | null;
+  groom2_first_name?: string | null;
+  groom2_last_name?: string | null;
+  couple_name?: string | null;
+} | null | undefined): string {
+  if (!event) return '';
+  const namesEnabled = event.watermark_names !== false;
+  if (!namesEnabled) return '';
+  const customText = (event.watermark_text || '').trim();
+  if (customText) return customText;
+  const groom1 = [event.groom1_first_name, event.groom1_last_name].filter(Boolean).join(' ').trim();
+  const groom2 = [event.groom2_first_name, event.groom2_last_name].filter(Boolean).join(' ').trim();
+  if (groom1 && groom2) return `${groom1} ❤ ${groom2}`;
+  return (event.couple_name || '').trim();
+}
+
+/**
  * Watermark foto — proxy al modulo `@fotosposi/photo-overlay` (versione "MAX" del 25/07/2026).
  * Mantiene la firma legacy per non toccare i call-site; sotto traduce nei campi
  * `OverlayBranding` attesi dal nuovo modulo.
@@ -132,27 +170,15 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
 
   const coupleName = event?.couple_name || '';
   const eventDate = event?.date ? new Date(event.date).toLocaleDateString('it-IT') : '';
-  // Watermark (richiesto dall'utente 27/07/2026):
-  //   - SOLO i nomi separati da ❤ (es. "Marco ❤ Luca"), niente data, niente wordmark.
-  //   - Priorità: nomi separati groom1/groom2 (compilati dal settings 27/07) →
-  //     custom watermark_text → fallback couple_name (legacy).
-  //   - Se gli sposi hanno disattivato i nomi (`watermark_names = false`) → stringa vuota.
-  const namesEnabled = event?.watermark_names !== false;
-  const customText = (event?.watermark_text || '').trim();
-  const groom1 = [event?.groom1_first_name, event?.groom1_last_name].filter(Boolean).join(' ').trim();
-  const groom2 = [event?.groom2_first_name, event?.groom2_last_name].filter(Boolean).join(' ').trim();
-  // Se entrambi i campi groom sono compilati, usa quelli (con cuore). Altrimenti fallback
-  // a customText o couple_name.
-  let wmLine1 = '';
-  if (namesEnabled) {
-    if (groom1 && groom2) {
-      wmLine1 = `${groom1} ❤ ${groom2}`;
-    } else if (customText) {
-      wmLine1 = customText;
-    } else {
-      wmLine1 = coupleName;
-    }
-  }
+  // Watermark (richiesto dall'utente 29/07/2026):
+  //   - Priorità: `watermark_text` custom (scritto dagli sposi nelle settings)
+  //     HA SEMPRE la precedenza → nomi separati groom1+groom2 → couple_name.
+  //   - `watermark_names = false` → stringa vuota.
+  //   - Il cuore presente nel testo custom viene splittato da applyOverlay e
+  //     reso come path vettoriale rosso (vedi packages/photo-overlay/src/index.ts),
+  //     quindi non dipende da font Dingbats installati.
+  // Logica isolata nell'helper esportato `composeWatermarkLine1` per testabilità.
+  const wmLine1 = composeWatermarkLine1(event);
   const wmLine2 = ''; // rimossa la data (richiesta utente: solo nomi)
   const wmFont = watermarkFontFamily(event?.watermark_font);
   const brandLogo = loadBrandLogo(event?.brand);
@@ -479,18 +505,9 @@ export async function repairWatermarkForEvent(
     return { repaired: 0, skipped: 0, errors };
   }
 
-  // Composizione watermark (stessa logica di processQueueForEvent — duplicata
-  // per evitare refactoring espansivo: questa funzione è one-shot).
-  const namesEnabled = event?.watermark_names !== false;
-  const customText = (event?.watermark_text || '').trim();
-  const groom1 = [event?.groom1_first_name, event?.groom1_last_name].filter(Boolean).join(' ').trim();
-  const groom2 = [event?.groom2_first_name, event?.groom2_last_name].filter(Boolean).join(' ').trim();
-  let wmLine1 = '';
-  if (namesEnabled) {
-    if (groom1 && groom2) wmLine1 = `${groom1} ❤ ${groom2}`;
-    else if (customText) wmLine1 = customText;
-    else wmLine1 = event?.couple_name || '';
-  }
+  // Composizione watermark (stessa logica di processQueueForEvent, ora riusata
+  // tramite l'helper esportato — niente più duplicazione).
+  const wmLine1 = composeWatermarkLine1(event);
   const wmFont = watermarkFontFamily(event?.watermark_font);
   const brandLogo = loadBrandLogo(event?.brand);
   const wmFontBuffer = loadWatermarkFontBuffer(event?.watermark_font);
