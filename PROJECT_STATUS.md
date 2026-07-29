@@ -21,7 +21,7 @@
 
 **Cosa è cambiato** (`apps/web/src/lib/process-queue.ts`):
 1. **`processSingleItem(item, ctx)` estratto** dal `for` inline: ogni item processato da una funzione isolata che NON Propaga errori (outer catch → `return false`).
-2. **`Promise.allSettled` concorrenza 4** invece del for seriale: un item corrotto/lento (240MB video ffmpeg) NON blocca gli altri del batch né gli eventi successivi. Chunking inline `for (i=0; i<n; i+=CONCURRENCY)` → niente `pLimit`外伤新依赖.
+2. **`Promise.allSettled` concorrenza 4** invece del for seriale: un item corrotto/lento (240MB video ffmpeg) NON blocca gli altri del batch né gli eventi successivi. Chunking inline `for (i=0; i<n; i+=CONCURRENCY)` → niente `pLimit` né nuove dipendenze.
 3. **Backoff esponenziale puro** `computeProcessingBackoffMs(retry)` esportato: 1s→2s→4s→8s→16s→32s→60s (cap). Cumulativo 1..7 = 123s.
 4. **`moveToDeadLetter(supabase, item, failureClass, msg)`**: dopo `MAX_RETRY_COUNT=7` fallimenti, copia l'item in `upload_queue_dead_letter` e lo cancella da `upload_queue`. La coda principale resta snella anche con migliaia di matrimoni.
 5. **`logFailure(supabase, {eventId, fileName, failureClass, errorMessage, retryCount})`**: scrive una riga in `system_health_log` (tabella già esistente, migration 00029) per ogni fallimento. Best-effort: se la insert fallisce, log warning ma NON blocca.
@@ -29,7 +29,7 @@
 
 **Route NUOVA `apps/web/src/app/api/cron/dlq-retry/route.ts`** (auth Authorization Bearer CRON_SECRET):
 - Ogni 6 ore (vercel.json `0 */6 * * *`) legge DLQ items con `dlq_next_retry_at NULL o <= now` e `dlq_retry_count < 5`.
-- Per ognuno: re-inserisce un nuovo item in `upload_queue` (status pending, retry_count 0) e aggiorna la DLQ con `dlq_retry_count++` e `dlq_next_retry_at` calcolato con backoff più lento (1h→2h→4h→8h→24h max 5). Dopo 5 tentativi DLQ resta come storico impairATO non più ripescato.
+- Per ognuno: re-inserisce un nuovo item in `upload_queue` (status pending, retry_count 0) e aggiorna la DLQ con `dlq_retry_count++` e `dlq_next_retry_at` calcolato con backoff più lento (1h→2h→4h→8h→24h max 5). Dopo 5 tentativi DLQ resta come storico (non più ripescato).
 - Logga in `system_health_log` con `job='dlq-retry'`.
 
 **`apps/web/vercel.json` aggiornato**:
