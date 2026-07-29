@@ -14,44 +14,103 @@
 
 **Test**: 18/18 verdi per `packages/photo-overlay` (incluso integration test `hasHeart=true` su sharp reale, fixture `Agostino ❤ Danila`).
 
-### FIX 7 🟡 WIP (commit `8110a95` migration; CODICE PARALLELISMO NON SCRITTO)
+### FIX 7 ✅ PUSHATO (commit `78b13c3`, deploy READY)
 **Richiesta utente**: "i messaggi di errori in fase di caricamento aumentano, ricorda il sistema deve essere solido resistente, deve gradualmente gestire migliaia di matrimoni con centinaia di invitati se un solo invitato da problemi immagine in fase operativa".
 
-**Scelta implementativa approvata dall'utente**: Retry esponenziale con DLQ (più Isolamento per-batch + Telemetry come garanzie minime).
+**Scelta implementativa**: Retry esponenziale + DLQ + Isolamento per-batch + Telemetry.
 
-**Cosa è stato fatto**:
-- ✅ Migration `00041_upload_queue_dead_letter.sql` applicata su Supabase live. Tabella `upload_queue_dead_letter` con: `original_upload_queue_id`, `event_id`, `retry_count`, `dlq_retry_count`, `dlq_next_retry_at`, `last_failure_class`, `last_failure_message`. Indici su `event_id`, `dlq_next_retry_at` (partial WHERE NOT NULL), `last_failure_class`. RLS solo service_role.
-- ❌ Refactor `processQueueForEvent` in `apps/web/src/lib/process-queue.ts`: estrarre `processSingleItem(item, ctx)`, usare `Promise.allSettled` con concorrenza 4 (`pLimit`-style inline, niente dipendenze nuove).
-- ❌ Backoff esponenziale (1s → 2s → 4s → 8s → 16s → 32s → 64s, max 7 tentativi = ~127s cumulativi).
-- ❌ Spostamento in DLQ dopo max retry: copia item in `upload_queue_dead_letter`, cancella da `upload_queue`.
-- ❌ Telemetry strutturata in `system_health_log` (tabella già esistente dalla migration 00029): per ogni fallimento logga `kind='upload_processing_failure'`, `event_id`, `file_name`, `failure_class`, `error_message`, `retry_count`.
-- ❌ Route admin `/api/cron/dlq-retry` (auth X-Cron-Secret) che riprova gli item della DLQ con backoff più lento (1h → 24h, max 5).
-- ❌ Update `vercel.json` per schedulare `/api/cron/dlq-retry` ogni 6 ore.
+**Cosa è cambiato** (`apps/web/src/lib/process-queue.ts`):
+1. **`processSingleItem(item, ctx)` estratto** dal `for` inline: ogni item processato da una funzione isolata che NON Propaga errori (outer catch → `return false`).
+2. **`Promise.allSettled` concorrenza 4** invece del for seriale: un item corrotto/lento (240MB video ffmpeg) NON blocca gli altri del batch né gli eventi successivi. Chunking inline `for (i=0; i<n; i+=CONCURRENCY)` → niente `pLimit`外伤新依赖.
+3. **Backoff esponenziale puro** `computeProcessingBackoffMs(retry)` esportato: 1s→2s→4s→8s→16s→32s→60s (cap). Cumulativo 1..7 = 123s.
+4. **`moveToDeadLetter(supabase, item, failureClass, msg)`**: dopo `MAX_RETRY_COUNT=7` fallimenti, copia l'item in `upload_queue_dead_letter` e lo cancella da `upload_queue`. La coda principale resta snella anche con migliaia di matrimoni.
+5. **`logFailure(supabase, {eventId, fileName, failureClass, errorMessage, retryCount})`**: scrive una riga in `system_health_log` (tabella già esistente, migration 00029) per ogni fallimento. Best-effort: se la insert fallisce, log warning ma NON blocca.
+6. **`failure_class` enum-style**: `r2_download_failed | watermark_apply_failed | drive_sync_failed | detect_watermark_missing | invalid_image | other`. Dashboard admin può aggregare per categoria.
 
-**Test da scrivere**:
-- `processSingleItem` con mock R2/Drive/sharp: successo, watermark fallito (watermark_missing=true), Drive fallito (retry_count++), 7 retry → DLQ.
-- Backoff esponenziale: tentativo 1 = 1s, 2 = 2s, 3 = 4s, ..., 7 = 64s.
-- Concorrrenza 4: 10 item → tutti processati in 3 round (4+4+2).
-- Telemetry: ogni fallimento scrive 1 riga in system_health_log.
+**Route NUOVA `apps/web/src/app/api/cron/dlq-retry/route.ts`** (auth Authorization Bearer CRON_SECRET):
+- Ogni 6 ore (vercel.json `0 */6 * * *`) legge DLQ items con `dlq_next_retry_at NULL o <= now` e `dlq_retry_count < 5`.
+- Per ognuno: re-inserisce un nuovo item in `upload_queue` (status pending, retry_count 0) e aggiorna la DLQ con `dlq_retry_count++` e `dlq_next_retry_at` calcolato con backoff più lento (1h→2h→4h→8h→24h max 5). Dopo 5 tentativi DLQ resta come storico impairATO non più ripescato.
+- Logga in `system_health_log` con `job='dlq-retry'`.
 
-### Decisioni architetturali per FIX 7
-- **Niente dipendenze nuove**: `pLimit` non installato, implementato inline con `for await` chunking (più semplice, niente supply-chain risk).
-- **DLQ in tabella separata**, non colonna su `upload_queue`: cron sweep resta veloce (legge solo item pending/retry, non tutta la DLQ).
-- **`failure_class` enum-style**: `r2_download_failed | watermark_apply_failed | drive_sync_failed | detect_watermark_missing | invalid_image | other`. Permette dashboard admin per categoria.
+**`apps/web/vercel.json` aggiornato**:
+```json
+{ "crons": [
+  { "path": "/api/cron/backup", "schedule": "0 4 * * *" },
+  { "path": "/api/cron/maintenance", "schedule": "20 4 * * *" },
+  { "path": "/api/cron/dlq-retry", "schedule": "0 */6 * * *" }
+]}
+```
 
-### Stato riassuntivo
-- ✅ Commit pushati: `6172bb2` (FIX 6 cuore), `8110a95` (migration 00041 FIX 7).
-- 🟡 WIP: refactor `processQueueForEvent` per parallelismo + DLQ + telemetry (NON committato).
-- Vercel deploy `8110a95`: da verificare READY (vedi TODO sotto).
+**Test (`apps/web/src/lib/__tests__/process-queue-fix7.test.ts`)**: 13 nuovi test verdi:
+- `computeProcessingBackoffMs`: 0→retry_count<=0, 1→1s, 2→2s, ..., 6→32s, 7→60s (cap, non 64s), 8+→60s costante, negativi→0.
+- Sequence cumulativa 1..7 = 123000ms (1+2+4+8+16+32+60).
+- Determinismo: stesso input → stesso output (no jitter, importante per test ripetibili).
 
-### TODO per la prossima chat
-1. Verificare che il deploy `8110a95` sia READY su Vercel (token Vercel presente in `ECCOLO FOTOSPOSI.txt` riga "vercel fotosposi-web vcp_...").
-2. **FIX 7 codice**: estrarre `processSingleItem` da `processQueueForEvent`, parallelismo 4, backoff esponenziale, DLQ dopo 7 retry, telemetry in `system_health_log`.
-3. Aggiungere cron `/api/cron/dlq-retry` + aggiornare `vercel.json`.
-4. Test del nuovo flow + commit + push.
-5. **Foto vecchie `ee2cc954`**: l'utente vuole ricaricarle per evitare watermark sovrapposto (le foto pre-migration 00040 non hanno `original_r2_key`). Suggerimento operativo: scaricare le 28 foto da `https://sposi.live/events/ee2cc954-98d7-4e11-828b-668a52e738e2`, cancellare i record `media_uploads`, ricaricare. Il nuovo upload avrà automaticamente `original_r2_key` valorizzato.
-6. **Test badge "Backup temporaneo"**: caricare una nuova foto di test, verificare che appaia il badge amber sopra la foto finché Drive sync non completa.
-7. **Curl `/api/r2/orphans`**: contare gli orfani R2 (FIX 5 deployato). Auth: `X-Cron-Secret: <CRON_SECRET>`.
+**Verifica**:
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Test: **313/313 verdi** (era 300: +13 nuovi FIX 7, era 281 inizio sessione → +32 totali sessione).
+- Deploy Vercel `78b13c3` → **Ready** (build OK in 21s).
+- `.gitignore` aggiornato con `.playwright-mcp/` (artefatti MCP non committibili).
+
+### Architettura finale del processing upload (post-FIX 7)
+```
+upload_queue (pending/failed)
+        │
+        ▼
+processQueueForEvent (cron ogni 4:20 UTC + trigger upload page)
+        │
+        ├── LEGGE items (status in [pending,failed], retry_count < 7, limit 5)
+        │   NB: cron sweep ogni 4:20 su TUTTI gli eventi con pending;
+        │   trigger upload page solo per l'evento attivo in realtime.
+        │
+        ├── CHIAMA processSingleItem PER OGNI item
+        │   CONCORRENZA 4 (Promise.allSettled + chunking)
+        │   │
+        │   ├── 1. mark status='processing'
+        │   ├── 2. download R2 (presigned URL)
+        │   ├── 3. salva originale in originals/<r2_key>
+        │   ├── 4. applyWatermark (foto) / applyVideoOverlay (video)
+        │   ├── 5. upload watermarked su R2 (sovrascrive)
+        │   ├── 6. detectWatermark verify (self-healing)
+        │   ├── 7. createMediaRecord (con original_r2_key)
+        │   ├── 8. Drive sync (se OAuth collegato)
+        │   └── 9. update status='synced' o 'failed'
+        │
+        ├── SU SUCCESSO → status='synced' + retry_count=0
+        │
+        └── SU FALLIMENTO
+            ├── retry_count++ < 7 → status='failed' (cron retry con backoff atteso)
+            │                    + logFailure(system_health_log)
+            └── retry_count++ >= 7 → moveToDeadLetter
+                                     + logFailure(system_health_log)
+                                     + DELETE da upload_queue
+
+upload_queue_dead_letter (DLQ)
+        │
+        ▼
+/api/cron/dlq-retry (ogni 6h, auth CRON_SECRET)
+        │
+        ├── LEGGE DLQ items (dlq_next_retry_at NULL o <= now, dlq_retry_count < 5)
+        │
+        ├── PER OGNI item:
+        │   ├── RE-INSERT in upload_queue (status='pending', retry_count=0, nuovo id)
+        │   └── UPDATE DLQ (dlq_retry_count++, dlq_next_retry_at = now + 1h/2h/4h/8h/24h)
+        │
+        └── DOPO 5 tentativi DLQ → item resta in DLQ come storico (non più ripescato)
+
+system_health_log
+        │
+        ├── Ogni fallimento: kind='upload_processing_failure', event_id, file_name,
+        │   failure_class, error_message, retry_count
+        │
+        └── Ogni run cron: job='maintenance'/'dlq-retry'/'backup', status, details
+```
+
+### TODO post-FIX-7
+1. Test in produzione: caricare una foto corrotta MIME (es. .txt con estensione .jpg) e verificare che dopo 7 retry vada in DLQ e che `system_health_log` registri le 7 righe.
+2. Verificare `/api/cron/dlq-retry` risponde `{"status":"ok","retried":0,...}` con curl auth Bearer.
+3. Dashboard admin `/admin/system` per visualizzare `system_health_log` aggregato per failure_class, eventi top, ecc. (NON ancora implementato, prossimo passo).
+4. **Foto vecchie `ee2cc954`**: le 28 foto pre-migration 00040 non hanno `original_r2_key`. suggerimento: scaricarle dalla galleria, cancellare `media_uploads`, ricaricare così `original_r2_key` sarà popolato dal nuovo processing.
 
 ### File modificati in questa sotto-sessione
 ```
