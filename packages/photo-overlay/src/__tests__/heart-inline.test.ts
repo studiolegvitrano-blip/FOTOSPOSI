@@ -59,7 +59,7 @@ describe('applyOverlay — cuore ❤ con larghezza = singolo carattere del font 
     expect(svgText).toMatch(/M 10 6 C 10 2, 5 0, 2 3/);
   });
 
-  it('nessun gap extra intorno al cuore: il cursore avanza esattamente di HEART_WIDTH (=CHAR_WIDTH_ESTIMATE)', async () => {
+  it('gap intorno al cuore: SIDE_GAP + HEART_WIDTH + SIDE_GAP = 3 char-widths totali tra segmenti', async () => {
     await applyOverlay(Buffer.from('test'), {
       format: 'square',
       branding: {
@@ -73,18 +73,15 @@ describe('applyOverlay — cuore ❤ con larghezza = singolo carattere del font 
     const calls = sharpMock.composite.mock.calls;
     const compositeCall = calls[calls.length - 1]?.[0];
     const svgText = compositeCall[0].input.toString('utf8');
-    // Verifica: il primo segmento "AB" inizia a padLeft, dopo AB il cursore
-    // avanza di 2*CHAR_WIDTH_ESTIMATE, poi il cuore è al centro di HEART_WIDTH,
-    // poi "CD" inizia esattamente dopo HEART_WIDTH dal cuore.
-    // Estraiamo i tspan x values.
     const tspans = [...svgText.matchAll(/<tspan x="([0-9.]+)" y="[0-9]+">([^<]*)<\/tspan>/g)];
     expect(tspans.length).toBeGreaterThanOrEqual(2);
-    const firstEnd = parseFloat(tspans[0][1]) + tspans[0][2].length * 19.8; // CHAR_WIDTH = 36*0.55
+    const CHAR_WIDTH = 19.8; // 36 * 0.55
+    const HEART_WIDTH = CHAR_WIDTH;
+    const SIDE_GAP = CHAR_WIDTH;
+    const padLeft = 19; // 1080 * 0.018 ≈ 19
+    const expectedSecondX = padLeft + 2 * CHAR_WIDTH + HEART_WIDTH + SIDE_GAP;
     const secondStart = parseFloat(tspans[1][1]);
-    // La distanza firstEnd → secondStart deve essere ESATTAMENTE HEART_WIDTH
-    // (= CHAR_WIDTH_ESTIMATE), senza gap né spazio extra.
-    const distance = secondStart - firstEnd;
-    expect(distance).toBeCloseTo(19.8, 0); // CHAR_WIDTH_ESTIMATE = 36*0.55 = 19.8
+    expect(secondStart).toBeCloseTo(expectedSecondX, 0);
   });
 
   it('più cuori ❤ in una stringa → path multipli, tutti con larghezza = singolo carattere', async () => {

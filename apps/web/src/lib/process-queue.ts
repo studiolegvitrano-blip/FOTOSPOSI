@@ -403,6 +403,36 @@ async function processSingleItem(
       return false;
     }
 
+    // FIX 30/07/2026 (richiesta utente): auto-cleanup di item falliti il cui file
+    // risulta già in galleria ({media_uploads}) con drive_file_id presente.
+    // Causa tipica: il primo processing ha creato media_uploads +_uploaded su R2
+    // + caricato su Drive, ma un update finale (es. set status='synced') ha
+    // lanciato un errore spurio → item marcato 'failed' benché OK. Senza questo
+    // auto-cleanup, il cron ritenta charity e crea duplicati o amplifica l'errore.
+    // Strategia: se già esiste media_uploads.r2_key = item.r2_key AND event_id =
+    // eventId AND drive_file_id IS NOT NULL → l'item è già successo in toto,
+    // lo cancelliamo dalla coda (status finale: 'synced' per chiarezza).
+    // Best-effort: se la query fallisce (Supabase giù) si prosegue col processing
+    // normale (meglio un duplicato che un item perso).
+    try {
+      const { data: existingMedia } = await supabase
+        .from('media_uploads')
+        .select('id, drive_file_id')
+        .eq('event_id', eventId)
+        .eq('r2_key', r2Key)
+        .maybeSingle();
+      if (existingMedia && existingMedia.drive_file_id) {
+        console.log(`[process-queue] auto-cleanup item ${item.id} (event=${eventId}, file=${item.file_name}): già in media_uploads + Drive (media_id=${existingMedia.id})`);
+        await supabase.from('upload_queue').update({ status: 'synced', processed_at: new Date().toISOString(), drive_file_id: existingMedia.drive_file_id, error: null }).eq('id', item.id);
+        return true;
+      }
+    } catch (_autoCleanupErr) {
+      // Non blocca il processing: la query di introspezione può fallire per
+      // ragioni transienti (R2/Supabase), e in quel caso si prosegue col path
+      // normale → se proprio è già synced, il createMediaRecord fallback su
+      // INSERT + ON CONFLICT (migration 00037) gestisce la dup.
+    }
+
     const downloadUrl = await getPresignedDownloadUrl(r2Key, 3600);
     if (!downloadUrl) {
       const newRetry = (item.retry_count || 0) + 1;

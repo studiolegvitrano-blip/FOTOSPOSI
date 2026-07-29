@@ -109,15 +109,22 @@ export async function applyOverlay(
   // media di un carattere del font (CHAR_WIDTH_ESTIMATE), così il layout naturale
   // "vede" il cuore come un carattere qualsiasi del testo circostante.
   //
-  // Strategia finale (testata su sharp reale): <tspan> dentro <text> con path
-  // annidato NON è reso da librsvg in modo affidabile (rilascia 0 pixel rossi).
-  // Soluzione solida: due <text> separati alla stessa baseline — uno per i segmenti
-  // di testo, uno per il path cuore posizionato al centro della larghezza
-  // riservata. Il path cuore è traslato via SVG transform con scale + translate.
-  // Risultato: zero gap, zero spazi extra, il cuore occupa lo spazio di un
-  // singolo carattere alla baseline del testo circostante.
+  // Strategia solida (testata su sharp reale): due elementi separati alla stessa
+  // baseline — uno <text> con <tspan> per i segmenti di testo, uno <path> per
+  // ciascun cuore posizionato al centro della larghezza riservata. Il path cuore
+  // è traslato via SVG transform con scale + translate. Risultato: zero gap,
+  // zero spazi extra, il cuore occupa lo spazio di un singolo carattere alla
+  // baseline del testo circostante.
+  //
+  // FIX 30/07/2026 (continua): trim di ogni segmento per evitare che gli spazi
+  // intorno al ❤ vengano contati come caratteri (es. "Agostino ❤ Danila" →
+  // ["Agostino", "Danila"], NON ["Agostino ", " Danila"]). Tra i segmenti viene
+  // aggiunto UNO spazio tipografico esplicito (CHAR_WIDTH_ESTIMATE) prima e dopo
+  // il cuore — così non "attacchiamo" Agostino al cuore e il cuore non "attacca"
+  // Danila. Visivamente: "Agostino ❤ Danila" con 1 spazio x lato, come in chat.
   const RAW_HEART = '\u2764'; // ❤ — usato solo come separatore nella stringa
-  const segments = branding.coupleNames.split(RAW_HEART);
+  const rawSegments = branding.coupleNames.split(RAW_HEART);
+  const segments = rawSegments.map((s) => s.trim());
   const textPx = Math.min(
     Math.max(20, Math.round(imgHeight * 0.036)),
     format === 'story' ? 56 : 36,
@@ -128,48 +135,58 @@ export async function applyOverlay(
   const baselineY = imgHeight - padBottom;
 
   // Larghezza cuore = larghezza media di un carattere del font (CHAR_WIDTH_ESTIMATE).
-  // Il cursore avanza di HEART_WIDTH dopo ogni cuore, così il testo che segue
-  // parte subito dopo, senza gap.
+  // Il cursore avanza di HEART_WIDTH dopo ogni cuore + di 1 spazio (SIDE_GAP)
+  // prima e dopo il cuore, così il testo non "attacca" il cuore o viceversa.
   const CHAR_WIDTH_ESTIMATE = textPx * 0.55;
   const HEART_WIDTH = CHAR_WIDTH_ESTIMATE;
+  // Spazio esplicito prima e dopo il cuore (se i segmenti non sono vuoti).
+  // Evita l'effetto "Agostino❤Danila" attaccati ma anche l'enorme gap che si
+  // vedeva prima perché contavamo gli spazi del segmento come caratteri veri.
+  const SIDE_GAP = CHAR_WIDTH_ESTIMATE;
+
   let cursorX = padLeft;
   const tspanParts: string[] = [];
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i] || '';
     if (segment) {
+      // Se c'è un cuore PRIMA di questo segmento (i>0), aggiungiamo SIDE_GAP
+      // come margine sinistro esplicito.
+      if (i > 0) cursorX += SIDE_GAP;
       tspanParts.push(`<tspan x="${cursorX.toFixed(1)}" y="${baselineY}">${escapeXml(segment)}</tspan>`);
       cursorX += segment.length * CHAR_WIDTH_ESTIMATE;
     }
+    // Riserva spazio per il cuore tra un segmento e il successivo.
     if (i < segments.length - 1) {
-      // Riserviamo HEART_WIDTH per il cuore e avanziamo il cursore subito.
-      // Il path del cuore sarà renderizzato separatamente (vedi sotto) alla
-      // coordinata cursorX + HEART_WIDTH/2 (centro del carattere riservato).
       cursorX += HEART_WIDTH;
+      // L'SIDE_GAP destro del cuore sarà aggiunto nel segmento successivo (vedi sopra).
     }
   }
   const monoTextSvg = tspanParts.join('');
 
   // Cuore/i come <path> separati (rendering deterministico su librsvg).
   // heartSize = textPx → path alto quanto un carattere del font scelto.
-  // Larghezza visiva del path = textPx * 0.95 (leggermente più stretto del
-  // HEART_WIDTH riservato, così il successivo tspan inizia al pixel giusto).
+  // Per ogni cuore, il centro X = posizione del cuore nel cursore + HEART_WIDTH/2.
+  // Il path è su griglia 20×20 con top-left (0,0); lo trasliamo in modo che
+  // il bottom del cuore (y=20) coincida con la baseline, e lo scaliamo di
+  // heartSize/20 così il cuore è alto `heartSize` px = un carattere del font.
   const heartPaths: string[] = [];
-  let cx = padLeft;
-  for (let i = 0; i < segments.length; i++) {
-    const segment = segments[i] || '';
-    cx += segment.length * CHAR_WIDTH_ESTIMATE;
-    if (i < segments.length - 1) {
-      const heartCenterX = cx + HEART_WIDTH / 2;
-      // Il path è definito su griglia 20×20 con top-left (0,0). Lo trasliamo
-      // in modo che il bottom del cuore (y=20) coincida con la baseline.
-      // scale = heartSize/20 → cuore alto `heartSize` px.
-      const scale = heartSize / 20;
-      // topY = baselineY - heartSize (cuore che poggia sulla baseline)
-      const topY = baselineY - heartSize;
-      heartPaths.push(
-        `<path fill="#d9534f" transform="translate(${heartCenterX.toFixed(1)} ${(topY + heartSize).toFixed(1)}) scale(${scale.toFixed(3)})" d="${HEART_PATH_DATA.replace(/\s+/g, ' ').trim()}"/>`,
-      );
-      cx += HEART_WIDTH;
+  {
+    let cx = padLeft;
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i] || '';
+      if (segment) {
+        if (i > 0) cx += SIDE_GAP;
+        cx += segment.length * CHAR_WIDTH_ESTIMATE;
+      }
+      if (i < segments.length - 1) {
+        const heartCenterX = cx + HEART_WIDTH / 2;
+        const scale = heartSize / 20;
+        const topY = baselineY - heartSize;
+        heartPaths.push(
+          `<path fill="#d9534f" transform="translate(${heartCenterX.toFixed(1)} ${(topY + heartSize).toFixed(1)}) scale(${scale.toFixed(3)})" d="${HEART_PATH_DATA.replace(/\s+/g, ' ').trim()}"/>`,
+        );
+        cx += HEART_WIDTH;
+      }
     }
   }
   const monoHeartsSvg = heartPaths.join('');
