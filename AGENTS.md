@@ -42,6 +42,27 @@ Questo è un modular monolith Next.js + Supabase per una piattaforma di gestione
 6. Ad ogni feature completata: scrivi un test minimo, aggiorna PROJECT_STATUS.md, fai commit atomico.
 7. Non introdurre dipendenze a pagamento senza confermare con me prima.
 
+## Migrazioni DB
+
+`apply_migration` su Supabase MCP applica le DDL ma **NON refresha la cache PostgREST**. PostgREST tiene uno schema cache in memoria e NON si refresha automaticamente dopo `ALTER TABLE / ADD COLUMN`. Risultato: qualsiasi nuova colonna via migration MCP è invisibile al Data API (Supabase client incluso) finché non si esegue manualmente:
+
+```sql
+NOTIFY pgrst, 'reload schema';
+```
+
+Dopo aver applicato una migration che altera lo schema (es. `ALTER TABLE ADD COLUMN`), **esegui sempre** questo comando via `supabase_execute_sql`. Senza questo, il client Supabase rifiuta upsert/insert con `42703 column "X" does not exist in the schema cache`, anche se la colonna esiste nel DB (verificabile con `information_schema.columns`).
+
+Pattern completo sicuro:
+1. `apply_migration` o `execute_sql` con la DDL
+2. `execute_sql` con `NOTIFY pgrst, 'reload schema'`
+3. Verifica con una upsert di test che il client veda la nuova colonna
+
+## Sharp in monorepo: range identici obbligatori
+
+`sharp` ha dipendenze native (`@img/sharp-libvips-*`, `@img/sharp-*-*`) che **cambiano formato tra minor versions**. Se due package nello stesso monorepo dichiarano range sharp non sovrapposti (es. `^0.33.0` in `packages/photo-overlay` vs `^0.34.5` in `apps/web`), npm installa **due copie**: una hoisted root e una annidata in `packages/photo-overlay/node_modules/sharp`. webpack (Next.js `transpilePackages`) risolve `import('sharp')` dalla copia annidata locale → build fallisce con `Module not found '@img/sharp-libvips-dev/include'` perché la versione annidata ha un set di binding nativi diverso da quello che il bundler si aspetta.
+
+**Regola**: TUTTI i package che dipendono da `sharp` devono dichiarare lo **stesso range esatto** (`^0.34.5`). Verificare con `npm ls sharp` dopo ogni `npm install` — deve mostrare UNA SOLA copia `deduped`, MAI nested. Aggiungere `sharp` come `dependencies` (non `devDependencies`) in ogni package che lo importa per garantire che npm lo veda.
+
 ## Ordine di costruzione
 - **Fase 1** — Nucleo minimo vendibile: core → events → media
 - **Fase 2** — Engagement: games → social-sharing

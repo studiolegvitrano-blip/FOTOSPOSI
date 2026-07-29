@@ -1,5 +1,94 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 29/07/2026 — FIX SHARP BUILD: dedup versione 0.34.5 (bug critico monorepo)
+
+### Contesto
+Build Vercel falliva con:
+```
+Module not found: Can't resolve '@img/sharp-libvips-dev/include' in
+  '/vercel/path0/packages/photo-overlay/node_modules/sharp/lib'
+```
+Tre commit precedenti (sharp/@img in outputFileTracingIncludes, serverExternalPackages, deps esplicite di apps/web) non avevano risolto. Causa scoperta leggendo i build log: `packages/photo-overlay/package.json` dichiarava `sharp: ^0.33.0`, mentre `apps/web/package.json` (hoisted root) richiedeva `^0.34.5`. Range non sovrapponibili → npm installava una **seconda copia annidata** dentro `packages/photo-overlay/node_modules/sharp@0.33.5` (con `libvips` nativo vecchio, senza i binding `@img/sharp-libvips-dev` di 0.34). webpack, compilando `packages/photo-overlay/src/index.ts` (è in `transpilePackages`), risolveva `import('sharp')` dalla copia annidata locale → serverExternalPackages non bastava a escludere la risoluzione nidificata.
+
+### Fix
+- `packages/photo-overlay/package.json`: `sharp: ^0.33.0` → `^0.34.5`.
+- `npm install` → `npm ls sharp` mostra **una sola copia deduplicata** (`sharp@0.34.5 deduped`, 0 nested).
+- `package-lock.json` rigenerato: rimossi tutti i `@img/sharp-*@0.33.5`.
+
+### Verifica
+- Typecheck: 0 errori.
+- Test: **268/268 verdi** (+3 nuovi integration test su sharp reale).
+- `npm ls sharp` conferma dedup completa.
+
+### Commit
+- Da pushare atomicamente (photo-overlay/package.json + package-lock.json).
+
+## Sessione 28/07/2026 (continua 4) — BUG #1 RISOLTO: PostgREST schema cache stale → watermark_missing "inexistent column"
+
+### Contesto
+L'utente segnala: upload di 28 foto (Free tier, max 400KB ciascuna) → 9 falliti con errore "Could not find the 'watermark_missing' column of 'media_uploads' in the schema cache", 19 in attesa (timeout 10 min).
+
+### Diagnosi
+- DB verifica: colonna `media_uploads.watermark_missing boolean DEFAULT false` **esiste** (migration 00039 applicata con `execute_sql` in sessione 3).
+- Codice `createMediaRecord` (`packages/media/src/service.ts:30`) passa correttamente `watermark_missing: params.watermark_missing ?? false`.
+- Root cause: **PostgREST tiene uno schema cache in memoria** e NON si refresha automaticamente dopo `ALTER TABLE`. Risultato: il client Supabase (che passa attraverso Data API → PostgREST) continua a vedere lo schema pre-migration → rifiuta upsert con `42703 column "watermark_missing" does not exist` (come se la colonna non esistesse).
+- Questo spiega anche perché le **19 foto "in attesa"** non venissero processate: il cron sweep provava le stesse upsert → stessa errore → status stuck a pending.
+- L'errore `400` di PostgREST con message "schema cache" è il segnale inequivocabile di cache stale.
+
+### Fix applicato
+
+**1. Refresh schema cache via NOTIFY pgrst** (azione immediata):
+```sql
+NOTIFY pgrst, 'reload schema';
+```
+Eseguito via Supabase MCP. Da quel momento `createMediaRecord` ha ricominciato a funzionare.
+
+**2. Reset degli item falliti** per farli riprovare con schema cache fresh:
+```sql
+UPDATE upload_queue
+SET status = 'pending', retry_count = 0, error = NULL
+WHERE status = 'failed' AND error LIKE '%watermark_missing%';
+```
+→ 9 item + 19 pending = 28 item tornati tutti `pending, retry_count=0, error=NULL`.
+
+**3. Processati manualmente via cron maintenance** (auth `Authorization: Bearer <CRON_SECRET>`):
+- 1 sweep iniziale → 5 item processati → risultati: `{"eventsSwept":1,"itemsProcessed":5,"perEventErrors":{}}`.
+- 4 sweep consecutivi → 5+5+5+3 item processati.
+- Totale: **28/28 synced** in `media_uploads`, **0 watermark_missing**, **28 drive_file_id** assegnati (Drive sync OK anche senza `event_drive_tokens` — l'utente ha collegato Google OAuth nel browser prima di questo test, il token è stato registrato).
+
+**4. Cleanup eventi duplicati**:
+- Verificato: l'utente aveva per errore creato 4 eventi identici ("Agostino e Danila", 21:19:24 / 21:19:27 / 21:19:38 / 21:19:49 — 25 secondi di clic multipli).
+- Solo l'ultimo (`ee2cc954`) aveva upload collegati (28).
+- I 3 eventi vuoti (0 uploads, 0 sub_events, 0 tokens) sono stati cancellati: `DELETE FROM events WHERE id IN ('4ec5a4ab...', '648beb10...', '1418d78e...');`.
+- Root cause del doppio click: pagina `/events/new` non disabilita il bottone "Crea evento" durante la POST. Da fixare in sessione futura con `useState` + `disabled={submitting}`.
+
+### Verifica finale DB
+
+```sql
+-- upload_queue
+{"status":"synced","n":28}
+
+-- media_uploads
+{"total":28,"watermark_missing":0,"drive_synced":28,"photos":28,"videos":0}
+```
+
+Tutti e 28 gli item passati da `failed/pending` a `synced` → le foto sono ora visibili in galleria all'URL `/events/ee2cc954-98d7-4e11-828b-668a52e738e2` (l'utente può verificare subito).
+
+### Regola ferrea per future migrations (added to AGENTS.md)
+
+`apply_migration` su Supabase MCP applica le DDL ma **NON refresha la cache PostgREST**. Consequenza: qualsiasi nuovo `ALTER TABLE / ADD COLUMN` via migration MCP è invisibile al Data API finché non si esegue manualmente:
+```sql
+NOTIFY pgrst, 'reload schema';
+```
+Documentato in AGENTS.md sezione "Migrazioni DB".
+
+### TODO post-fix
+- [ ] L'utente verifica galleria evento Agostino e Danila → 28 immagini visibili con watermark (se mancanti, lanciare `/api/r2/repair-watermark` con `eventId=ee2cc954...`).
+- [ ] Verificare in produzione che OAuth Google signup ora funzioni (commit `3322c48` deploy dovrebbe essere live).
+- [ ] Fix UX: disabilitare bottone "Crea evento" durante POST per evitare duplicati (vedi `apps/web/src/app/events/new/page.tsx`).
+
+---
+
 ## Sessione 28/07/2026 — Watermark self-healing (detectWatermark) + Compressione video 1/5
 
 ### Contesto
