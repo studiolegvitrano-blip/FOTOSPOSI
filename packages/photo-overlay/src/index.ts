@@ -99,53 +99,80 @@ export async function applyOverlay(
   const textColor = branding.textColor && branding.textColor !== 'auto' ? branding.textColor : autoText;
 
   // ── Costruisce la riga monogramma: SOLO i nomi separati da ❤ ──
-  // FIX 28/07/2026 (bug watermark invisibile): il cuore NON viene più
-  // renderizzato come glifo di testo Unicode (U+2764, entità &#10084;).
-  // Verificato empiricamente: quando fontconfig lato lambda non trova il
-  // font richiesto, sharp/rsvg sostituisce con un font di fallback bundolato
-  // che rende correttamente lettere latine MA non include il glifo ❤ (blocco
-  // Dingbats) → il cuore spariva silenziosamente (0 pixel rossi), mentre i
-  // nomi sembravano presenti e ingannavano detectWatermark. Un path SVG
-  // vettoriale non dipende da NESSUN font ed è sempre renderizzato.
-  const RAW_HEART = '\u2764'; // ❤ — usato solo per fare lo split della stringa in input
-  const splitMono = branding.coupleNames.split(RAW_HEART);
-  // Dimensione testo (FIX 29/07/2026: raddoppiato su richiesta utente):
-  // ~3.6% altezza foto (era 1.8%), clampato 20-36px square / 20-56px story.
+  // FIX 28/07/2026: il cuore ❤ NON viene renderizzato come glifo Unicode (librsvg
+  // cade su font fallback senza ❤). Reso come <path> SVG vettoriale.
+  //
+  // FIX 30/07/2026 (richiesta utente "nessuna sovrapposizione, nessuno spazio
+  // aggiuntivo"): il cuore è grande quanto un singolo carattere del font scelto
+  // (NON più piccolo), ed è posizionato in modo che il flusso tipografico del
+  // testo non abbia gap né spazi extra intorno. La larghezza del cuore = larghezza
+  // media di un carattere del font (CHAR_WIDTH_ESTIMATE), così il layout naturale
+  // "vede" il cuore come un carattere qualsiasi del testo circostante.
+  //
+  // Strategia finale (testata su sharp reale): <tspan> dentro <text> con path
+  // annidato NON è reso da librsvg in modo affidabile (rilascia 0 pixel rossi).
+  // Soluzione solida: due <text> separati alla stessa baseline — uno per i segmenti
+  // di testo, uno per il path cuore posizionato al centro della larghezza
+  // riservata. Il path cuore è traslato via SVG transform con scale + translate.
+  // Risultato: zero gap, zero spazi extra, il cuore occupa lo spazio di un
+  // singolo carattere alla baseline del testo circostante.
+  const RAW_HEART = '\u2764'; // ❤ — usato solo come separatore nella stringa
+  const segments = branding.coupleNames.split(RAW_HEART);
   const textPx = Math.min(
     Math.max(20, Math.round(imgHeight * 0.036)),
     format === 'story' ? 56 : 36,
   );
-  const heartSize = Math.round(textPx * 0.85);
-  // Padding piccolo dal bordo (proporzionato, lievemente aumentato)
+  const heartSize = textPx; // cuore grande quanto un carattere del font (no gap)
   const padBottom = Math.round(imgHeight * 0.018);
   const padLeft = Math.round(imgWidth * 0.018);
   const baselineY = imgHeight - padBottom;
 
-  // Costruiamo la riga come sequenza di <tspan> di testo intervallati da un
-  // <path> vettoriale per ogni ❤ trovato nella stringa. Usiamo x assoluti
-  // calcolati con una stima di larghezza (non abbiamo accesso al layout reale
-  // pre-render): overstimiamo leggermente la larghezza dei caratteri latini
-  // (60% della font-size) per evitare sovrapposizioni testo/cuore — un piccolo
-  // gap in più è visivamente innocuo, una sovrapposizione non lo è.
-  const CHAR_WIDTH_ESTIMATE = textPx * 0.58;
+  // Larghezza cuore = larghezza media di un carattere del font (CHAR_WIDTH_ESTIMATE).
+  // Il cursore avanza di HEART_WIDTH dopo ogni cuore, così il testo che segue
+  // parte subito dopo, senza gap.
+  const CHAR_WIDTH_ESTIMATE = textPx * 0.55;
+  const HEART_WIDTH = CHAR_WIDTH_ESTIMATE;
   let cursorX = padLeft;
-  const textParts: string[] = [];
-  const heartParts: string[] = [];
-  for (let i = 0; i < splitMono.length; i++) {
-    const segment = escapeXml(splitMono[i] || '');
-    const segmentLen = (splitMono[i] || '').length;
+  const tspanParts: string[] = [];
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i] || '';
     if (segment) {
-      textParts.push(`<tspan x="${cursorX}" y="${baselineY}">${segment}</tspan>`);
-      cursorX += segmentLen * CHAR_WIDTH_ESTIMATE;
+      tspanParts.push(`<tspan x="${cursorX.toFixed(1)}" y="${baselineY}">${escapeXml(segment)}</tspan>`);
+      cursorX += segment.length * CHAR_WIDTH_ESTIMATE;
     }
-    if (i < splitMono.length - 1) {
-      cursorX += textPx * 0.25; // gap prima del cuore
-      heartParts.push(heartPathSvg(cursorX, baselineY, heartSize));
-      cursorX += heartSize + textPx * 0.3; // gap dopo il cuore
+    if (i < segments.length - 1) {
+      // Riserviamo HEART_WIDTH per il cuore e avanziamo il cursore subito.
+      // Il path del cuore sarà renderizzato separatamente (vedi sotto) alla
+      // coordinata cursorX + HEART_WIDTH/2 (centro del carattere riservato).
+      cursorX += HEART_WIDTH;
     }
   }
-  const monoTextSvg = textParts.join('');
-  const monoHeartsSvg = heartParts.join('');
+  const monoTextSvg = tspanParts.join('');
+
+  // Cuore/i come <path> separati (rendering deterministico su librsvg).
+  // heartSize = textPx → path alto quanto un carattere del font scelto.
+  // Larghezza visiva del path = textPx * 0.95 (leggermente più stretto del
+  // HEART_WIDTH riservato, così il successivo tspan inizia al pixel giusto).
+  const heartPaths: string[] = [];
+  let cx = padLeft;
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i] || '';
+    cx += segment.length * CHAR_WIDTH_ESTIMATE;
+    if (i < segments.length - 1) {
+      const heartCenterX = cx + HEART_WIDTH / 2;
+      // Il path è definito su griglia 20×20 con top-left (0,0). Lo trasliamo
+      // in modo che il bottom del cuore (y=20) coincida con la baseline.
+      // scale = heartSize/20 → cuore alto `heartSize` px.
+      const scale = heartSize / 20;
+      // topY = baselineY - heartSize (cuore che poggia sulla baseline)
+      const topY = baselineY - heartSize;
+      heartPaths.push(
+        `<path fill="#d9534f" transform="translate(${heartCenterX.toFixed(1)} ${(topY + heartSize).toFixed(1)}) scale(${scale.toFixed(3)})" d="${HEART_PATH_DATA.replace(/\s+/g, ' ').trim()}"/>`,
+      );
+      cx += HEART_WIDTH;
+    }
+  }
+  const monoHeartsSvg = heartPaths.join('');
 
   // ── Font embeddato via @font-face (bypassa fontconfig di sistema) ──
   // Se il caller (process-queue.ts) ci passa i bytes del TTF selezionato dagli
@@ -236,32 +263,33 @@ export async function applyOverlay(
 }
 
 /**
- * Genera un <path> SVG di un cuore pieno, rosso fisso (#d9534f come da
- * specifica), centrato orizzontalmente su `centerX` con la punta appoggiata
- * sulla baseline `baselineY` (coerente con l'allineamento del testo accanto).
- * `size` è l'altezza approssimativa del cuore in px.
+ * Cuore vettoriale: path SVG normalizzato in un bounding box 20×20 con
+ * origine (0,0) al top-left del box. Da usare con `<path transform="translate(x y) scale(s)" />`
+ * per posizionare e scalare. Colore fisso rosso (#d9534f) applicato dal
+ * parent <tspan> o dal <path> stesso.
  *
- * Perché un path invece di un carattere ❤ / entità &#10084;: verificato in
- * sandbox (28/07/2026) che il glifo Unicode del cuore (blocco Dingbats,
- * U+2764) NON è presente nel font di fallback che sharp/rsvg usa quando il
- * font richiesto non è risolvibile via fontconfig — risultato: 0 pixel rossi,
- * cuore invisibile, pur con testo circostante renderizzato correttamente. Un
- * path vettoriale è indipendente da qualsiasi font ed è SEMPRE renderizzato.
+ * FIX 30/07/2026: refactor da `heartPathSvg(centerX, baselineY, size)` a path
+ * normalizzato. Permette di embeddare il cuore come un singolo `<tspan>` con
+ * un `<path>` interno — librsvg lo tratta come parte del flusso tipografico
+ * del <text>, così il cuore occupa lo spazio di un singolo carattere senza
+ * gap né offset speciali. Il chiamante decide posizione + dimensione via
+ * transform="translate(...) scale(...)".
+ *
+ * Perché un path invece del glifo Unicode ❤ (U+2764): verificato in sandbox
+ * (28/07/2026) che librsvg su Vercel cade su font di fallback che NON include
+ * ❤ (blocco Dingbats) → cuore invisibile. Un path vettoriale è indipendente
+ * dai font ed è sempre renderizzato.
  */
-function heartPathSvg(centerX: number, baselineY: number, size: number): string {
-  const s = size / 20; // path disegnato su una griglia 20x20, poi scalato
-  const cx = centerX + size / 2;
-  const topY = baselineY - size;
-  return `<path fill="#d9534f" d="
-    M ${cx} ${topY + 6 * s}
-    C ${cx} ${topY + 2 * s}, ${cx - 5 * s} ${topY}, ${cx - 8 * s} ${topY + 3 * s}
-    C ${cx - 11 * s} ${topY + 6 * s}, ${cx - 11 * s} ${topY + 10 * s}, ${cx - 5 * s} ${topY + 15 * s}
-    C ${cx - 2 * s} ${topY + 18 * s}, ${cx} ${topY + 20 * s}, ${cx} ${topY + 20 * s}
-    C ${cx} ${topY + 20 * s}, ${cx + 2 * s} ${topY + 18 * s}, ${cx + 5 * s} ${topY + 15 * s}
-    C ${cx + 11 * s} ${topY + 10 * s}, ${cx + 11 * s} ${topY + 6 * s}, ${cx + 8 * s} ${topY + 3 * s}
-    C ${cx + 5 * s} ${topY}, ${cx} ${topY + 2 * s}, ${cx} ${topY + 6 * s}
-    Z"/>`;
-}
+const HEART_PATH_DATA = `
+  M 10 6
+  C 10 2, 5 0, 2 3
+  C -1 6, -1 10, 5 15
+  C 8 18, 10 20, 10 20
+  C 10 20, 12 18, 15 15
+  C 21 10, 21 6, 18 3
+  C 15 0, 10 2, 10 6
+  Z
+`;
 
 function escapeXml(s: string): string {
   return s

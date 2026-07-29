@@ -60,6 +60,7 @@ describe('applyOverlay + detectWatermark — pipeline reale (no mock sharp)', ()
     });
 
     const presence = await detectWatermark(watermarked);
+    console.log('DEBUG cuore piccolo:', presence);
     expect(presence.hasHeart).toBe(true);
     expect(presence.redPixelCount).toBeGreaterThan(15);
   });
