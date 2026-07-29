@@ -2,6 +2,6 @@
   "crons": [
     { "path": "/api/cron/backup", "schedule": "0 4 * * *" },
     { "path": "/api/cron/maintenance", "schedule": "20 4 * * *" },
-    { "path": "/api/cron/dlq-retry", "schedule": "0 */6 * * *" }
+    { "path": "/api/cron/dlq-retry", "schedule": "40 4 * * *" }
   ]
 }
