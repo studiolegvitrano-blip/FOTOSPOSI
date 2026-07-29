@@ -185,10 +185,10 @@ export async function applyOverlay(
   ];
 
   // ── Logo brand in alto a destra, A COLORI (no mix-blend, no opacità forzata) ──
-  // FIX 29/07/2026: raddoppiato su richiesta utente — da 15% a 30% larghezza foto,
-  // clamp 160-800px (era 80-400px). Visibilità premium anche su miniature piccole.
+  // FIX 29/07/2026 (terzo passaggio): dopo "raddoppia" l'utente ha chiesto "-15%".
+  // Dal 30% passiamo a 25.5% (= 30% × 0.85). Clamp 135-680px.
   if (branding.brandLogoBuffer) {
-    const targetLogoW = branding.brandLogoWidth ?? Math.min(800, Math.max(160, Math.round(imgWidth * 0.30)));
+    const targetLogoW = branding.brandLogoWidth ?? Math.min(680, Math.max(135, Math.round(imgWidth * 0.255)));
     try {
       const resizedLogo = await sharp(branding.brandLogoBuffer)
         .resize(targetLogoW, null, { fit: 'inside' })

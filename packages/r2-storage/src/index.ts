@@ -24,4 +24,5 @@ export {
   uploadFromBuffer,
   deleteObject,
   objectExists,
+  listObjectsByPrefix,
 } from './r2';

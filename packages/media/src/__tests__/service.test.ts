@@ -86,6 +86,43 @@ describe('createMediaRecord', () => {
     expect(conflictChain.upsert).toHaveBeenCalled();
     expect(insertChain.insert).toHaveBeenCalled();
   });
+
+  it('FIX 29/07/2026: passa original_r2_key al DB per re-watermark puliti (migration 00040)', async () => {
+    // Verifica che il campo original_r2_key venga correttamente persistito per
+    // consentire a repairWatermarkForEvent di scaricare l'originale NON
+    // watermarked invece di applicare il watermark sopra al watermarked.
+    const mockMedia = {
+      id: 'm4', event_id: 'evt1', uploaded_by: 'u1', type: 'photo', url: 'r2key1',
+      drive_sync_status: 'pending', created_at: new Date().toISOString(),
+      r2_key: 'events/2026_07_30_Agostino_Danila/photo1.jpg',
+      original_r2_key: 'originals/events/2026_07_30_Agostino_Danila/photo1.jpg',
+    };
+    const chain = buildChain(mockMedia);
+    mockFrom.mockReturnValue(chain);
+    const result = await createMediaRecord({
+      event_id: 'evt1', uploaded_by: 'u1', type: 'photo',
+      url: 'r2key1', r2_key: 'r2key1',
+      original_r2_key: 'originals/events/2026_07_30_Agostino_Danila/photo1.jpg',
+    });
+    expect(result.media?.original_r2_key).toBe('originals/events/2026_07_30_Agostino_Danila/photo1.jpg');
+    // Verifica che l'original_r2_key sia stato passato nell'upsert
+    const upsertCall = (chain.upsert as any).mock.calls[0][0];
+    expect(upsertCall.original_r2_key).toBe('originals/events/2026_07_30_Agostino_Danila/photo1.jpg');
+  });
+
+  it('original_r2_key opzionale: NULL accettato per record pre-migration', async () => {
+    const mockMedia = { id: 'm5', original_r2_key: null };
+    const chain = buildChain(mockMedia);
+    mockFrom.mockReturnValue(chain);
+    const result = await createMediaRecord({
+      event_id: 'evt1', uploaded_by: 'u1', type: 'photo',
+      url: 'r2key1', r2_key: 'r2key1',
+      original_r2_key: null,
+    });
+    expect(result.error).toBeUndefined();
+    const upsertCall = (chain.upsert as any).mock.calls[0][0];
+    expect(upsertCall.original_r2_key).toBeNull();
+  });
 });
 
 describe('getMediaByEvent', () => {

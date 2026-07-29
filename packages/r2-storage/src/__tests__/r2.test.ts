@@ -12,6 +12,7 @@ vi.mock('@aws-sdk/client-s3', () => {
     GetObjectCommand: vi.fn(),
     DeleteObjectCommand: vi.fn(),
     HeadObjectCommand: vi.fn(),
+    ListObjectsV2Command: vi.fn(),
   };
 });
 
@@ -33,7 +34,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-const { getPresignedUploadUrl, getPresignedDownloadUrl, uploadFromBuffer, deleteObject, objectExists } = await import('../r2');
+const { getPresignedUploadUrl, getPresignedDownloadUrl, uploadFromBuffer, deleteObject, objectExists, listObjectsByPrefix } = await import('../r2');
 
 describe('getPresignedUploadUrl', () => {
   it('genera presigned URL con successo', async () => {
@@ -132,5 +133,51 @@ describe('objectExists', () => {
     mockSend.mockRejectedValue(new Error('Not found'));
     const result = await objectExists('key1');
     expect(result).toBe(false);
+  });
+});
+
+describe('listObjectsByPrefix (FIX 29/07/2026 — script orfani R2)', () => {
+  it('lista tutti gli oggetti sotto un prefisso, gestendo paginazione', async () => {
+    mockSend
+      // Prima pagina: 3 oggetti, IsTruncated=true
+      .mockResolvedValueOnce({
+        Contents: [{ Key: 'events/p1.jpg' }, { Key: 'events/p2.jpg' }, { Key: 'events/p3.jpg' }],
+        IsTruncated: true,
+        NextContinuationToken: 'tok1',
+      })
+      // Seconda pagina: 2 oggetti, IsTruncated=false
+      .mockResolvedValueOnce({
+        Contents: [{ Key: 'events/p4.jpg' }, { Key: 'events/p5.jpg' }],
+        IsTruncated: false,
+      });
+    const result = await listObjectsByPrefix('events/');
+    expect(result.keys).toEqual(['events/p1.jpg', 'events/p2.jpg', 'events/p3.jpg', 'events/p4.jpg', 'events/p5.jpg']);
+    expect(result.truncated).toBe(false);
+    expect(mockSend).toHaveBeenCalledTimes(2);
+  });
+
+  it('rispetta maxKeys (sicurezza OOM per bucket enormi)', async () => {
+    mockSend.mockResolvedValueOnce({
+      Contents: [{ Key: 'a' }, { Key: 'b' }, { Key: 'c' }],
+      IsTruncated: true,
+      NextContinuationToken: 'tok1',
+    });
+    const result = await listObjectsByPrefix('', 3);
+    expect(result.keys).toHaveLength(3);
+    expect(result.truncated).toBe(true);
+  });
+
+  it('ritorna keys vuote se bucket non ha oggetti', async () => {
+    mockSend.mockResolvedValueOnce({ Contents: [], IsTruncated: false });
+    const result = await listObjectsByPrefix('vuoto/');
+    expect(result.keys).toEqual([]);
+    expect(result.truncated).toBe(false);
+  });
+
+  it('gestisce errore R2 con messaggio', async () => {
+    mockSend.mockRejectedValueOnce(new Error('R2 connection refused'));
+    const result = await listObjectsByPrefix('events/');
+    expect(result.error).toBe('R2 connection refused');
+    expect(result.keys).toEqual([]);
   });
 });

@@ -10,6 +10,13 @@ export async function createMediaRecord(params: {
   url: string;
   compressed?: boolean;
   r2_key?: string;
+  /**
+   * Path R2 dell'originale NON watermarked (prefisso originals/, vedi migration
+   * 00040_media_uploads_original_r2_key). Opzionale: se NULL, il record resta
+   * senza original_r2_key (legacy pre-migration 00040, oppure salvataggio
+   * originale fallito in processQueueForEvent).
+   */
+  original_r2_key?: string | null;
   watermark_missing?: boolean;
 }): Promise<{ media?: MediaUpload; error?: string }> {
   const supabase = createServiceClient();
@@ -27,6 +34,7 @@ export async function createMediaRecord(params: {
     drive_sync_status: 'pending' as const,
     compressed: params.compressed ?? false,
     r2_key: params.r2_key ?? null,
+    original_r2_key: params.original_r2_key ?? null,
     watermark_missing: params.watermark_missing ?? false,
   };
   const query = params.r2_key

@@ -196,6 +196,22 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
     folders = f.folders ?? null;
   }
 
+  // FIX 29/07/2026: inizializzo client S3 + PutObjectCommand UNA VOLTA fuori dal
+  // loop, così sono disponibili sia per il salvataggio dell'originale (prefisso
+  // originals/, vedi migration 00040) sia per il successivo upload del watermarked
+  // (stessa r2_key). Prima erano dichiarati inline dopo il watermark, quindi il
+  // salvataggio originale NON poteva accedervi → bug TypeScript "used before declaration".
+  const { PutObjectCommand, S3Client } = await import('@aws-sdk/client-s3');
+  const r2Client = new S3Client({
+    region: 'auto',
+    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+    },
+  });
+  const r2Bucket = process.env.R2_BUCKET || 'fotosposi-uploads';
+
   let processed = 0;
   for (const item of items) {
     try {
@@ -231,6 +247,33 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
 
       const isVideo = item.file_type?.startsWith('video/');
       let contentType = item.file_type || 'application/octet-stream';
+
+      // FIX 29/07/2026: persistenza dell'originale su R2 PRIMA del watermark.
+      // Senza questo, ogni re-processing (cambio testo/font/coupon) parte
+      // dall'immagine GIÀ watermarked → il nuovo watermark si sovrappone al
+      // vecchio (qualità degradata, "inquinamento" visibile).
+      // Salviamo l'originale in `originals/<r2_key>` (stesso basename della
+      // chiave visibile, prefisso originals/). Per le FOTO ha senso pieno:
+      // applyOverlay è deterministico sull'input. Per i VIDEO ffmpeg ri-codifica
+      // comunque in H.264/AAC MP4 — salvare l'originale permette di ri-applicare
+      // un watermark video pulito se cambiano le impostazioni.
+      // best-effort: se il salvataggio fallisce (R2 momentaneamente giù),
+      // logghiamo ma NON blocchiamo il processing — il record verrà creato con
+      // original_r2_key NULL e il re-processing futuro userà il fallback (vedi
+      // repairWatermarkForEvent). Funzionale ma degradato.
+      const originalKey = `originals/${r2Key}`;
+      try {
+        await r2Client.send(new PutObjectCommand({
+          Bucket: r2Bucket,
+          Key: originalKey,
+          Body: buffer,
+          ContentType: contentType,
+        }));
+        console.log(`[process-queue] originale salvato su R2: ${originalKey}`);
+      } catch (originalErr) {
+        console.error(`[process-queue] impossibile salvare originale ${originalKey} (event=${eventId}):`, originalErr);
+        // NON blocchiamo: il record verrà creato senza original_r2_key.
+      }
 
       // Watermark: SEMPRE applicato, su TUTTE le foto e TUTTI i video (il logo
       // Sposi.live/JustMarry.live è impresso a prescindere dalle scelte degli sposi);
@@ -280,19 +323,14 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
         }
       }
 
-      // Ricarica il file watermarked su R2 (sovrascrive l'originale)
-      const { PutObjectCommand } = await import('@aws-sdk/client-s3');
-      const { S3Client } = await import('@aws-sdk/client-s3');
-      const client = new S3Client({
-        region: 'auto',
-        endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-        credentials: {
-          accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
-          secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
-        },
-      });
-      await client.send(new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET || 'fotosposi-uploads',
+      // Ricarica il file watermarked su R2 (sovrascrive la versione visibile in
+      // galleria). NB: il file originale NON watermarked è già stato salvato
+      // separatamente sopra su `originals/<r2Key>` (vedi migration 00040), quindi
+      // un futuro re-watermark partirà dall'originale pulito.
+      // FIX 29/07/2026: client/command sono dichiarati fuori dal loop (vedi sopra)
+      // → riusati qui.
+      await r2Client.send(new PutObjectCommand({
+        Bucket: r2Bucket,
         Key: r2Key,
         Body: buffer,
         ContentType: contentType,
@@ -355,6 +393,7 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
         url: r2Key,
         compressed: item.compressed ?? false,
         r2_key: r2Key,
+        original_r2_key: originalKey, // FIX 29/07/2026: path R2 originals/ per re-processing pulito
         watermark_missing: watermarkMissing || undefined,
       });
 
@@ -492,8 +531,14 @@ export async function repairWatermarkForEvent(
   const [{ data: event }, { data: media }] = await Promise.all([
     supabase.from('events').select('couple_name, date, brand, watermark_names, watermark_text, watermark_font, groom1_first_name, groom1_last_name, groom2_first_name, groom2_last_name').eq('id', eventId).single(),
     supabase
+      // FIX 29/07/2026: selezioniamo anche `original_r2_key` per leggere l'originale
+      // NON watermarked (introdotto dalla migration 00040). Per i record pre-migration
+      // (original_r2_key NULL) si cade su r2_key come fallback degradato (il watermark
+      // verrà applicato sopra il watermarked precedente — qualità ridotta, ma
+      // funzionale per debug). Tutte le NUOVE upload hanno original_r2_key valorizzato
+      // → re-processing pulito senza sovrapposizioni.
       .from('media_uploads')
-      .select('id, r2_key, uploaded_by, type')
+      .select('id, r2_key, original_r2_key, uploaded_by, type')
       .eq('event_id', eventId)
       .eq('watermark_missing', true)
       .eq('type', 'photo')
@@ -522,8 +567,20 @@ export async function repairWatermarkForEvent(
       errors.push(`media ${m.id}: r2_key mancante`);
       continue;
     }
+    // FIX 29/07/2026: scarica l'originale NON watermarked se disponibile
+    // (processQueueForEvent lo ha salvato su `originals/<r2_key>` durante il primo
+    // processing — vedi migration 00040_media_uploads_original_r2_key). Per i
+    // record pre-migration, original_r2_key è NULL → fallback su r2_key (cioè
+    // sul file GIÀ watermarked: il watermark verrà applicato sopra, qualità
+    // degradata). Log esplicito quando il fallback si attiva, così l'utente sa
+    // che dovrà ricaricare le foto vecchie per avere un risultato pulito.
+    const sourceKey = m.original_r2_key ?? r2Key;
+    const usingFallback = !m.original_r2_key;
+    if (usingFallback) {
+      console.warn(`[repairWatermark] media ${m.id}: original_r2_key NULL, fallback su r2_key (watermark verrà applicato sopra al watermarked precedente — qualità degradata)`);
+    }
     try {
-      const downloadUrl = await getPresignedDownloadUrl(r2Key, 3600);
+      const downloadUrl = await getPresignedDownloadUrl(sourceKey, 3600);
       if (!downloadUrl) { skipped++; errors.push(`media ${m.id}: presigned fallito`); continue; }
       const resp = await fetch(downloadUrl);
       if (!resp.ok) { skipped++; errors.push(`media ${m.id}: download HTTP ${resp.status}`); continue; }
@@ -540,7 +597,11 @@ export async function repairWatermarkForEvent(
         continue;
       }
 
-      // Ricarica su R2 (stessa key = sovrascrive l'originale non watermarkato).
+      // Ricarica su R2 (stessa key = sovrascrive la versione watermarked corrente
+      // con il nuovo watermark applicato sull'originale pulito). Per funzionare
+      // correttamente serve `original_r2_key` valorizzato (vedi migration 00040):
+      // altrimenti il watermark viene applicato sopra il watermarked precedente
+      // → degradazione visiva progressiva a ogni re-processing.
       const { PutObjectCommand, S3Client } = await import('@aws-sdk/client-s3');
       const client = new S3Client({
         region: 'auto',

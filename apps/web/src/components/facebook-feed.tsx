@@ -16,6 +16,13 @@ export type FeedPost = {
   likes: number;
   comments: { author: string; text: string }[];
   reaction?: ReactionType;
+  /**
+   * FIX 29/07/2026: true se il media è stato caricato su R2 ma Drive sync
+   * NON è ancora andato a buon fine (status='pending' o 'failed'). Mostra
+   * un piccolo badge "Backup temporaneo" sotto la foto per trasparenza.
+   * Default false (Drive già sincronizzato, o non richiesto per il tier).
+   */
+  backupPending?: boolean;
 };
 
 type Props = {
@@ -242,25 +249,51 @@ export default function FacebookFeed({
 
             {/* Media (foto o video) */}
             {p.imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={p.imageUrl}
-                alt={p.caption || ''}
-                className="w-full object-cover bg-muted max-h-[680px] cursor-zoom-in"
-                loading="lazy"
-                onClick={() => onOpenImage?.(p)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onOpenImage?.(p);
-                  }
-                }}
-              />
+              <div className="relative">
+                {/* FIX 29/07/2026: badge "Backup temporaneo" per foto in attesa di
+                    Drive sync (status='pending'/'failed'). Visibilità onesta: la foto
+                    È già in galleria (sicura su R2), ma Drive non l'ha ancora
+                    ricevuta — il cron /api/cron/maintenance ritenta ogni 20 min. */}
+                {p.backupPending && (
+                  <div
+                    className="absolute top-2 left-2 z-10 bg-amber-500/90 text-white text-[10px] font-medium px-2 py-1 rounded-md shadow-sm flex items-center gap-1"
+                    title="Foto caricata su R2 ma Drive sync non ancora completato. Il sistema riprova automaticamente ogni 20 minuti."
+                  >
+                    <span className="inline-block w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                    Backup temporaneo
+                  </div>
+                )}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={p.imageUrl}
+                  alt={p.caption || ''}
+                  className="w-full object-cover bg-muted max-h-[680px] cursor-zoom-in"
+                  loading="lazy"
+                  onClick={() => onOpenImage?.(p)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onOpenImage?.(p);
+                    }
+                  }}
+                />
+              </div>
             )}
             {p.videoUrl && (
-              <video src={p.videoUrl} controls className="w-full object-cover bg-black max-h-[680px]" />
+              <div className="relative">
+                {p.backupPending && (
+                  <div
+                    className="absolute top-2 left-2 z-10 bg-amber-500/90 text-white text-[10px] font-medium px-2 py-1 rounded-md shadow-sm flex items-center gap-1"
+                    title="Video caricato su R2 ma Drive sync non ancora completato. Il sistema riprova automaticamente ogni 20 minuti."
+                  >
+                    <span className="inline-block w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                    Backup temporaneo
+                  </div>
+                )}
+                <video src={p.videoUrl} controls className="w-full object-cover bg-black max-h-[680px]" />
+              </div>
             )}
 
             {/* Contatore like + commenti */}

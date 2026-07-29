@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { defaultConfig } from './index';
 
@@ -102,6 +102,46 @@ export async function objectExists(key: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * FIX 29/07/2026 — Lista ricorsivamente tutti gli oggetti sotto un prefisso R2.
+ * Usato dallo script "orfani R2" per enumerare oggetti e confrontarli con i
+ * r2_key presenti in media_uploads.
+ *
+ * R2 (S3-compatible) ha un limite di 1000 oggetti per ListObjectsV2 call —
+ * gestiamo la paginazione automaticamente con `ContinuationToken`.
+ *
+ * @param prefix Prefisso R2 (es. "events/2026_07_30_Agostino_Danila/" o "originals/")
+ * @param maxKeys Limite di sicurezza per evitare OOM se il bucket ha milioni di oggetti
+ *                (default 100k). Restituisce `{truncated: true}` se fermato prima.
+ */
+export async function listObjectsByPrefix(
+  prefix: string,
+  maxKeys = 100000,
+): Promise<{ keys: string[]; truncated: boolean; error?: string }> {
+  const keys: string[] = [];
+  let token: string | undefined = undefined;
+  const cfg = defaultConfig();
+  try {
+    do {
+      const command: ListObjectsV2Command = new ListObjectsV2Command({
+        Bucket: cfg.bucket,
+        Prefix: prefix,
+        ContinuationToken: token,
+        MaxKeys: 1000,
+      });
+      const res = await getClient().send(command);
+      for (const obj of res.Contents ?? []) {
+        if (obj.Key) keys.push(obj.Key);
+        if (keys.length >= maxKeys) return { keys, truncated: true };
+      }
+      token = res.IsTruncated ? res.NextContinuationToken : undefined;
+    } while (token);
+    return { keys, truncated: false };
+  } catch (e) {
+    return { keys, truncated: false, error: e instanceof Error ? e.message : 'ListObjects failed' };
   }
 }
 

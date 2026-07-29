@@ -27,6 +27,13 @@ export default function EventTimelineFeed({ media, videos, event, eventId, onSha
   // Costruisce i post feed unendo foto e video, ordinati per created_at desc.
   const posts: FeedPost[] = useMemo(() => {
     const authorFallback = event.couple_name || c('brand_name');
+    // FIX 29/07/2026: propaga `backupPending` per mostrare il badge sotto la
+    // foto quando Drive sync non è ancora andato a buon fine. Un media è
+    // "in attesa di backup" quando drive_sync_status != 'synced' E esiste
+    // un r2_key (= la foto è su R2, sicura per l'utente, ma Drive deve ancora
+    // riceverla).
+    const isBackupPending = (m: MediaUpload) =>
+      !!m.r2_key && m.drive_sync_status !== 'synced';
     const photoPosts: FeedPost[] = media
       .filter((m) => (m.type || 'photo') === 'photo')
       .map((m) => ({
@@ -37,6 +44,7 @@ export default function EventTimelineFeed({ media, videos, event, eventId, onSha
         imageUrl: m.r2_key ? `/api/media/${m.id}/download` : m.url,
         likes: 0,
         comments: [],
+        backupPending: isBackupPending(m),
       }));
     const videoPosts: FeedPost[] = [...media.filter((m) => m.type === 'video'), ...videos].map((m) => {
       const id = m.id;
@@ -50,6 +58,7 @@ export default function EventTimelineFeed({ media, videos, event, eventId, onSha
         videoUrl: src,
         likes: 0,
         comments: [],
+        backupPending: isBackupPending(m as MediaUpload),
       };
     });
     return [...photoPosts, ...videoPosts].sort(

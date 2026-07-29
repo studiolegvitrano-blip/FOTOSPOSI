@@ -9,6 +9,12 @@ export interface MediaUpload {
   drive_sync_status: 'pending' | 'synced' | 'failed';
   compressed: boolean;
   r2_key: string | null;
+  /**
+   * FIX 29/07/2026: path R2 dell'originale NON watermarked (prefisso originals/),
+   * popolato da processQueueForEvent per consentire re-watermark puliti senza
+   * sovrapposizioni. NULL per record pre-migration 00040 (degradato).
+   */
+  original_r2_key?: string | null;
   watermark_missing?: boolean;
   created_at: string;
 }
@@ -80,4 +86,11 @@ export {
   getQueueStats,
   clearCompletedQueue,
 } from './queue';
+
+// FIX 29/07/2026 — Interfaccia provider backup + adapter Google Drive attivo + stub MEGA/Terabox.
+export type { BackupProvider, BackupUploadInput, BackupUploadResult, BackupProviderId } from './providers';
+export { ProviderNotConfiguredError, selectBackupProvider } from './providers';
+export { GoogleDriveProvider } from './google-drive-provider';
+export { MegaProvider } from './mega-provider';
+export { TeraboxProvider } from './terabox-provider';
 export type { QueueItem, QueueStatus } from './queue';
