@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
   // ENOENT ("spawn .../api/guestbook/messages/ffmpeg" — visto nei log Vercel).
   // Tenendolo esterno, require() risolve il vero node_modules/ffmpeg-static a runtime
   // (il binario arriva nella lambda grazie a outputFileTracingIncludes qui sotto).
-  serverExternalPackages: ['sharp', 'ffmpeg-static', '@fotosposi/photo-overlay', '@fotosposi/video-overlay', '@fotosposi/media'],
+  serverExternalPackages: ['sharp', 'ffmpeg-static'],
   transpilePackages: [
     '@fotosposi/core',
     '@fotosposi/events',
@@ -29,29 +29,22 @@ const nextConfig: NextConfig = {
   // Make sure Vercel's function tracer bundles the ffmpeg-static binary (it's invoked via
   // child_process.spawn, which the tracer can't follow like a normal `require`).
   outputFileTracingIncludes: {
-    // Oltre a ffmpeg, ogni route che imprime watermark ha bisogno dei font in
-    // assets/fonts: le lambda Vercel non hanno font di sistema e senza questi
-    // il testo del watermark viene rasterizzato come quadrati (tofu).
-    // sharp qui viene caricato via import() dinamico dentro photo-overlay/video-overlay:
-    // il tracer non lo segue e la lambda restava senza binario ("Could not load the
-    // sharp module using the linux-x64 runtime" nei log) → share sempre in 500.
-    'src/app/api/photos/[id]/share/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**', 'public/fonts/**', 'public/logo-*.png', '../../node_modules/sharp/**', '../../node_modules/@img/**'],
-    // Il watermark video ora viene bruciato anche durante il processing della coda
-    // (upload ospiti), nello sweep del cron e sui video guestbook: tutte queste
-    // route spawnano ffmpeg e usano sharp via import() dinamico.
-    // FIX 28/07/2026 (post-deploy): process-queue.ts falliva su Vercel con
-    // "Could not load the sharp module using the linux-x64 runtime" perché sharp
-    // è importato dinamicamente dentro @fotosposi/photo-overlay e il tracer di
-    // Next.js non segue import() dinamici. Aggiunto sharp/@img qui.
-    'src/app/api/r2/process-queue/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**', 'public/fonts/**', 'public/logo-*.png', '../../node_modules/sharp/**', '../../node_modules/@img/**'],
-    'src/app/api/cron/maintenance/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**', 'public/fonts/**', 'public/logo-*.png', '../../node_modules/sharp/**', '../../node_modules/@img/**'],
-    'src/app/api/guestbook/messages/route.ts': ['../../node_modules/ffmpeg-static/**', 'assets/fonts/**', 'public/fonts/**', 'public/logo-*.png', '../../node_modules/sharp/**', '../../node_modules/@img/**'],
-    // FIX 28/07/2026: mancava del tutto. repairWatermarkForEvent (chiamata da
-    // questa route) usa applyWatermark esattamente come process-queue.ts — senza
-    // questi asset bundlati, il repair dei 40 file dell'evento di test avrebbe
-    // riprodotto IDENTICO il bug che sta cercando di correggere.
-    // FIX post-deploy: aggiunto anche sharp/@img (vedi commento sopra per la causa).
-    'src/app/api/r2/repair-watermark/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png', '../../node_modules/sharp/**', '../../node_modules/@img/**'],
+    // Oltre a ffmpeg e sharp (dichiarate come deps esplicite di apps/web), ogni route
+    // che imprime watermark ha bisogno dei font e dei loghi:
+    //   - assets/fonts/** + public/fonts/** — i TTF reali (sharp usa un fallback
+    //     bundolato per le lettere latine ma senza font non ha glifo ❤ né i nomi
+    //     scritti). Senza questi, su lambda Vercel niente testo nel watermark.
+    //   - public/logo-*.png — i loghi brand da comporre top-right A COLORI.
+    // sharp e ffmpeg-static sono dichiarati come deps esplicite in apps/web/package.json
+    // (vedi FIX 29/07/2026), quindi Vercel li installa automaticamente e il tracer
+    // di Next.js li include nel bundle lambda. NON serve più tracciarli esplicitamente.
+    'src/app/api/photos/[id]/share/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png'],
+    'src/app/api/r2/process-queue/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png'],
+    'src/app/api/cron/maintenance/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png'],
+    'src/app/api/guestbook/messages/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png'],
+    // FIX 28/07/2026: route one-shot per riparare foto con watermark mancante
+    // (vedi PROJECT_STATUS.md sessione 28/07). Stessi asset delle altre route.
+    'src/app/api/r2/repair-watermark/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png'],
   },
 };
 
