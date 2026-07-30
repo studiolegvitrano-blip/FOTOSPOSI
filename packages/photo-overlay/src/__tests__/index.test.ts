@@ -94,9 +94,11 @@ describe('applyOverlay', () => {
     expect(chain.metadata).toHaveBeenCalled();
   });
 
-  it('cuore ❤ è renderizzato come path SVG vettoriale rossso (no entità XML glifo)', async () => {
-    // 28/07/2026: il glifo Unicode ❤ (U+2764) sparisce quando fontconfig di sistema
-    // non risolve il font richiesto → cuoricini (path vettoriali) invece di testo.
+  it('cuore ❤ reso come <path fill="#d9534f"> (FIX 30/07 v3)', async () => {
+    // FIX 30/07 v3: dopo test v2 (entity XML), librsvg non rende le entity
+    // `&#10084;` come cuore (hasHeart=false su sharp reale). Torno al path SVG
+    // ma con posizionamento ROBUSTO via cursorX (misure assolute) per evitare
+    // i bug di allineamento di v1.
     chain.toBuffer = vi.fn().mockResolvedValue(Buffer.from('emoji'));
     await applyOverlay(Buffer.from('test'), {
       format: 'square',
@@ -105,26 +107,24 @@ describe('applyOverlay', () => {
     expect(chain.composite).toHaveBeenCalled();
     const call = chain.composite.mock.calls[0][0] as Array<{ input: Buffer }>;
     const svgText = call[0].input.toString('utf8');
-    expect(svgText).toContain('fill="#d9534f"'); // cuore rosso
-    expect(svgText).toContain('<path'); // path vettoriale (non più entità &#10084;)
+    expect(svgText).toContain('fill="#d9534f"');
+    expect(svgText).toMatch(/<path[^>]*fill="#d9534f"[^>]*transform="translate/);
     expect(svgText).toContain('Guido');
     expect(svgText).toContain('Melissa');
   });
 
-  it('watermark SOLO nomi (28/07 fix): un solo path del cuore rosso, no data/wordmark', async () => {
+  it('watermark SOLO nomi (30/07 v3): un solo path cuore rosso', async () => {
     chain.toBuffer = vi.fn().mockResolvedValue(Buffer.from('only-names'));
     await applyOverlay(Buffer.from('test'), {
       format: 'square',
-      // Il caller passa già la stringa formattata "Nome1 ❤ Nome2"
       branding: { coupleNames: 'Marco ❤ Luca', primaryColor: '#1a1a2e', wordmark: 'Sposi.live' },
     });
     const call = chain.composite.mock.calls[0][0] as Array<{ input: Buffer }>;
     const svgText = call[0].input.toString('utf8');
     expect(svgText).toContain('Marco');
     expect(svgText).toContain('Luca');
-    expect(svgText).toContain('fill="#d9534f"'); // cuore rosso
-    expect(svgText).toContain('<path'); // path vettoriale
-    // Più di un path del cuore (es. data nel watermark) sarebbe un bug
+    expect(svgText).toContain('fill="#d9534f"');
+    // Più di un path cuore sarebbe un bug.
     const pathCount = (svgText.match(/<path[^>]*fill="#d9534f"/g) || []).length;
     expect(pathCount).toBe(1);
   });

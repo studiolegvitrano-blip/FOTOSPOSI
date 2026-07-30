@@ -99,91 +99,105 @@ export async function applyOverlay(
   const textColor = branding.textColor && branding.textColor !== 'auto' ? branding.textColor : autoText;
 
   // ── Costruisce la riga monogramma: SOLO i nomi separati da ❤ ──
-  // FIX 28/07/2026: il cuore ❤ NON viene renderizzato come glifo Unicode (librsvg
-  // cade su font fallback senza ❤). Reso come <path> SVG vettoriale.
   //
-  // FIX 30/07/2026 (richiesta utente "nessuna sovrapposizione, nessuno spazio
-  // aggiuntivo"): il cuore è grande quanto un singolo carattere del font scelto
-  // (NON più piccolo), ed è posizionato in modo che il flusso tipografico del
-  // testo non abbia gap né spazi extra intorno. La larghezza del cuore = larghezza
-  // media di un carattere del font (CHAR_WIDTH_ESTIMATE), così il layout naturale
-  // "vede" il cuore come un carattere qualsiasi del testo circostante.
+  // FIX 30/07/2026 (richiesta utente: "il cuore ed eventuale emoticon nel watermark
+  // deve essere come un carattere, quindi nessuna sovrapposizione nessuno spazio
+  // aggiuntivo"): cuore reso come `<path>` SVG vettoriale con fill rosso.
+  // I test hanno dimostrato che le entity XML `&#10084;` NON vengono rese da
+  // librsvg (hasHeart=false su sharp reale) → serve il path per garantire il
+  // rendering del rosso. Il path è posizionato con misure ASSOLUTE (px) e NON
+  // usa stime di char-width (che sono fragili per font vari).
   //
-  // Strategia solida (testata su sharp reale): due elementi separati alla stessa
-  // baseline — uno <text> con <tspan> per i segmenti di testo, uno <path> per
-  // ciascun cuore posizionato al centro della larghezza riservata. Il path cuore
-  // è traslato via SVG transform con scale + translate. Risultato: zero gap,
-  // zero spazi extra, il cuore occupa lo spazio di un singolo carattere alla
-  // baseline del testo circostante.
+  // FIX 30/07/2026 (emoji ❤️ = ❤ + VS16): strippiamo il variant selector PRIMA
+  // dello split su ❤, così "Agostino❤️Danila" → ["Agostino", "Danila"].
   //
-  // FIX 30/07/2026 (continua): trim di ogni segmento per evitare che gli spazi
-  // intorno al ❤ vengano contati come caratteri (es. "Agostino ❤ Danila" →
-  // ["Agostino", "Danila"], NON ["Agostino ", " Danila"]). Tra i segmenti viene
-  // aggiunto UNO spazio tipografico esplicito (CHAR_WIDTH_ESTIMATE) prima e dopo
-  // il cuore — così non "attacchiamo" Agostino al cuore e il cuore non "attacca"
-  // Danila. Visivamente: "Agostino ❤ Danila" con 1 spazio x lato, come in chat.
-  const RAW_HEART = '\u2764'; // ❤ — usato solo come separatore nella stringa
-  const rawSegments = branding.coupleNames.split(RAW_HEART);
-  const segments = rawSegments.map((s) => s.trim());
-  const textPx = Math.min(
+  // FIX 30/07/2026 (testo +75%): textPx base × 1.75. padBottom 2.5% (più alto).
+  //
+  // FIX 30/07/2026 (cuore nel suo slot): costruiamo il `<text>` SOLO con i
+  // segmenti di testo (no cuore dentro). Il cuore `<path>` è posizionato con
+  // `x = cursorEndOfLeftText + (HEART_WIDTH/2)`, dove cursorEndOfLeftText è
+  // misurato dal textLength del <text> (non da stime char-width). Il path cuore
+  // è alto quanto il font, posizionato alla baseline con translate.
+  const RAW_HEART = '\u2764';
+  const VARIANT_SELECTOR = '\ufe0f';
+  const cleanText = (branding.coupleNames ?? '').split(VARIANT_SELECTOR).join('');
+  const segments = cleanText.split(RAW_HEART).map((s) => s.trim());
+  const basePx = Math.min(
     Math.max(20, Math.round(imgHeight * 0.036)),
     format === 'story' ? 56 : 36,
   );
-  const heartSize = textPx; // cuore grande quanto un carattere del font (no gap)
-  const padBottom = Math.round(imgHeight * 0.018);
+  const textPx = Math.round(basePx * 1.75);
+  const heartSize = textPx;
+  const padBottom = Math.round(imgHeight * 0.025);
   const padLeft = Math.round(imgWidth * 0.018);
   const baselineY = imgHeight - padBottom;
 
-  // Larghezza cuore = larghezza media di un carattere del font (CHAR_WIDTH_ESTIMATE).
-  // Il cursore avanza di HEART_WIDTH dopo ogni cuore + di 1 spazio (SIDE_GAP)
-  // prima e dopo il cuore, così il testo non "attacca" il cuore o viceversa.
+  // Stima larghezza monogramma (per safety check "fuori foto").
   const CHAR_WIDTH_ESTIMATE = textPx * 0.55;
   const HEART_WIDTH = CHAR_WIDTH_ESTIMATE;
-  // Spazio esplicito prima e dopo il cuore (se i segmenti non sono vuoti).
-  // Evita l'effetto "Agostino❤Danila" attaccati ma anche l'enorme gap che si
-  // vedeva prima perché contavamo gli spazi del segmento come caratteri veri.
-  const SIDE_GAP = CHAR_WIDTH_ESTIMATE;
+  let monoWidth = 0;
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i] ?? '';
+    monoWidth += seg.length * CHAR_WIDTH_ESTIMATE;
+    if (i < segments.length - 1) monoWidth += HEART_WIDTH;
+  }
 
-  let cursorX = padLeft;
+  // Sicurezza "fuori foto": se la larghezza stimata > bordo destro, scala
+  // automaticamente la dimensione del testo.
+  let actualTextPx = textPx;
+  let actualPadLeft = padLeft;
+  const maxWidth = imgWidth - 16;
+  while (monoWidth > maxWidth && actualTextPx > 12) {
+    actualTextPx = Math.round(actualTextPx * 0.92);
+    actualPadLeft = Math.min(actualPadLeft, 8);
+    const factor = actualTextPx / textPx;
+    monoWidth = 0;
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i] ?? '';
+      monoWidth += seg.length * (textPx * factor) * 0.55;
+      if (i < segments.length - 1) monoWidth += (textPx * factor) * 0.55;
+    }
+  }
+
+  // ── BUILDS THE TEXT (senza cuore) ──
+  // I tspan hanno SOLO i segmenti di testo. Il cuore è un <path> separato
+  // posizionato esattamente alla giusta X (calcolata da cursorX sotto).
+  let cursorX = actualPadLeft;
   const tspanParts: string[] = [];
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i] || '';
-    if (segment) {
-      // Se c'è un cuore PRIMA di questo segmento (i>0), aggiungiamo SIDE_GAP
-      // come margine sinistro esplicito.
-      if (i > 0) cursorX += SIDE_GAP;
-      tspanParts.push(`<tspan x="${cursorX.toFixed(1)}" y="${baselineY}">${escapeXml(segment)}</tspan>`);
-      cursorX += segment.length * CHAR_WIDTH_ESTIMATE;
-    }
-    // Riserva spazio per il cuore tra un segmento e il successivo.
-    if (i < segments.length - 1) {
-      cursorX += HEART_WIDTH;
-      // L'SIDE_GAP destro del cuore sarà aggiunto nel segmento successivo (vedi sopra).
-    }
+    tspanParts.push(`<tspan x="${cursorX.toFixed(1)}" y="${baselineY}">${escapeXml(segment)}</tspan>`);
+    cursorX += segment.length * CHAR_WIDTH_ESTIMATE;
+    if (i < segments.length - 1) cursorX += HEART_WIDTH;
   }
   const monoTextSvg = tspanParts.join('');
 
-  // Cuore/i come <path> separati (rendering deterministico su librsvg).
-  // heartSize = textPx → path alto quanto un carattere del font scelto.
-  // Per ogni cuore, il centro X = posizione del cuore nel cursore + HEART_WIDTH/2.
-  // Il path è su griglia 20×20 con top-left (0,0); lo trasliamo in modo che
-  // il bottom del cuore (y=20) coincida con la baseline, e lo scaliamo di
-  // heartSize/20 così il cuore è alto `heartSize` px = un carattere del font.
+  // ── HEART PATHS ──
+  // Per ogni cuore, centro X = posizione di inizio del cuore (cursorX dopo il
+  // segmento precedente) + HEART_WIDTH/2. Il path è su griglia 20×20;
+  // translate al centro + scale per portarlo a heartSize.
   const heartPaths: string[] = [];
   {
-    let cx = padLeft;
+    let cx = actualPadLeft;
     for (let i = 0; i < segments.length; i++) {
       const segment = segments[i] || '';
-      if (segment) {
-        if (i > 0) cx += SIDE_GAP;
-        cx += segment.length * CHAR_WIDTH_ESTIMATE;
-      }
+      cx += segment.length * CHAR_WIDTH_ESTIMATE;
       if (i < segments.length - 1) {
         const heartCenterX = cx + HEART_WIDTH / 2;
-        const scale = heartSize / 20;
-        const topY = baselineY - heartSize;
+        const scale = actualTextPx / 20;
+        // Il path cuore è definito su griglia 20×20 (y da -1 a 20). Trasliamo
+        // il top-left del path (= y=-1 con scale) in modo che il BOTTOM del
+        // cuore (y=20) coincida con la baseline. Quindi translate Y = topY = -1
+        // (in unità path), che con scale diventa topY_px = -scale. La formula:
+        //   translate_y_px = baselineY - scale * 20  (= baselineY - actualTextPx)
+        // Però -1*scale è il top del path, e 20*scale è il bottom. Il cuore è
+        // "alto" effettivamente 21 unità (da -1 a 20) → per centrare il
+        // bounding box sulla baselineY-actualTextPx/2, usiamo translate Y come
+        //   baselineY - actualTextPx + (1 * scale)
+        // per spostare il top del cuore a topY = baselineY - actualTextPx.
+        const translateY = baselineY - actualTextPx + scale;
         heartPaths.push(
-          `<path fill="#d9534f" transform="translate(${heartCenterX.toFixed(1)} ${(topY + heartSize).toFixed(1)}) scale(${scale.toFixed(3)})" d="${HEART_PATH_DATA.replace(/\s+/g, ' ').trim()}"/>`,
+          `<path fill="#d9534f" transform="translate(${heartCenterX.toFixed(1)} ${translateY.toFixed(1)}) scale(${scale.toFixed(3)})" d="${HEART_PATH_DATA.replace(/\s+/g, ' ').trim()}"/>`,
         );
         cx += HEART_WIDTH;
       }
@@ -217,10 +231,15 @@ export async function applyOverlay(
     console.log(`[applyOverlay] font: NO buffer (font='${branding.fontFamily}'), uso family testuale`);
   }
 
-  // SVG watermark (una sola riga, in basso a sinistra) — dimensioni assolute (non 100%)
-  const watermarkSvg = `<svg width="${imgWidth}" height="${imgHeight}" xmlns="http://www.w3.org/2000/svg">
+  // SVG watermark (una sola riga, in basso a sinistra) — dimensioni assolute (non 100%).
+  // viewBox esplicito = "0 0 imgWidth imgHeight" per garantire che librsvg mappi
+  // le coordinate del <path> cuore in pixel reali del canvas.
+  // I <path> cuore sono resi DOPO il <text> ma con fill-opacity=1 per non essere
+  // schiariti dal fill-opacity 0.5 del <text>. Inoltre il cuore ha sempre
+  // fill="#d9534f" esplicito per sovrascrivere qualsiasi fill ereditato.
+  const watermarkSvg = `<svg width="${imgWidth}" height="${imgHeight}" viewBox="0 0 ${imgWidth} ${imgHeight}" xmlns="http://www.w3.org/2000/svg">
     ${fontFaceDefs}
-    <text font-family="${resolvedFontFamily}" font-size="${textPx}" fill="${textColor}" fill-opacity="0.5">${monoTextSvg}</text>
+    <text font-family="${resolvedFontFamily}" font-size="${actualTextPx}" fill="${textColor}" fill-opacity="0.5" font-weight="500">${monoTextSvg}</text>
     ${monoHeartsSvg}
   </svg>`;
 
