@@ -94,11 +94,13 @@ describe('applyOverlay', () => {
     expect(chain.metadata).toHaveBeenCalled();
   });
 
-  it('cuore ❤ reso come <path fill="#d9534f"> (FIX 30/07 v3)', async () => {
-    // FIX 30/07 v3: dopo test v2 (entity XML), librsvg non rende le entity
-    // `&#10084;` come cuore (hasHeart=false su sharp reale). Torno al path SVG
-    // ma con posizionamento ROBUSTO via cursorX (misure assolute) per evitare
-    // i bug di allineamento di v1.
+  it('cuore ❤ reso come <image href="data:image/png;base64,"> (FIX 30/07 v4)', async () => {
+    // FIX 30/07 v4: librsvg su Vercel NON renderizza <path transform=translate+scale>
+    // correttamente (cuore disallineato, troppo piccolo, gap eccessivo — segnalato
+    // utente). Sostituito con PNG inline base64 pre-generato a 200×200 px, rosso
+    // #d9534f, renderizzato via <image href="data:image/png;base64,..."> con
+    // preserveAspectRatio="none" per riempire esattamente lo slot quadrato.
+    // Verifichiamo presenza del <image> con data URI PNG + nomi仍是 nel <text>.
     chain.toBuffer = vi.fn().mockResolvedValue(Buffer.from('emoji'));
     await applyOverlay(Buffer.from('test'), {
       format: 'square',
@@ -107,13 +109,14 @@ describe('applyOverlay', () => {
     expect(chain.composite).toHaveBeenCalled();
     const call = chain.composite.mock.calls[0][0] as Array<{ input: Buffer }>;
     const svgText = call[0].input.toString('utf8');
-    expect(svgText).toContain('fill="#d9534f"');
-    expect(svgText).toMatch(/<path[^>]*fill="#d9534f"[^>]*transform="translate/);
+    // PNG inline base64 contiene i pixel #d9534f rosso del cuore
+    expect(svgText).toContain('href="data:image/png;base64,');
+    expect(svgText).toContain('preserveAspectRatio="none"');
     expect(svgText).toContain('Guido');
     expect(svgText).toContain('Melissa');
   });
 
-  it('watermark SOLO nomi (30/07 v3): un solo path cuore rosso', async () => {
+  it('watermark SOLO nomi (30/07 v4): un solo <image> cuore PNG', async () => {
     chain.toBuffer = vi.fn().mockResolvedValue(Buffer.from('only-names'));
     await applyOverlay(Buffer.from('test'), {
       format: 'square',
@@ -123,10 +126,10 @@ describe('applyOverlay', () => {
     const svgText = call[0].input.toString('utf8');
     expect(svgText).toContain('Marco');
     expect(svgText).toContain('Luca');
-    expect(svgText).toContain('fill="#d9534f"');
-    // Più di un path cuore sarebbe un bug.
-    const pathCount = (svgText.match(/<path[^>]*fill="#d9534f"/g) || []).length;
-    expect(pathCount).toBe(1);
+    expect(svgText).toContain('href="data:image/png;base64,');
+    // Più di un <image> cuore sarebbe un bug.
+    const imageCount = (svgText.match(/<image[^>]*href="data:image\/png;base64,/g) || []).length;
+    expect(imageCount).toBe(1);
   });
 });
 

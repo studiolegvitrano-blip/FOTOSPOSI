@@ -48,8 +48,8 @@ vi.mock('sharp', () => ({
 
 const { applyOverlay } = await import('../index');
 
-describe('applyOverlay — cuore come <path fill="#d9534f"> separato (FIX 30/07 v3)', () => {
-  it('cuore ❤ reso come <path fill="#d9534f"> con transform translate+scale', async () => {
+describe('applyOverlay — cuore come <image href="data:image/png;base64,..."> (FIX 30/07 v4)', () => {
+  it('cuore ❤ reso come <image href="data:image/png;base64,..."> inline', async () => {
     await applyOverlay(Buffer.from('test'), {
       format: 'square',
       branding: {
@@ -63,10 +63,10 @@ describe('applyOverlay — cuore come <path fill="#d9534f"> separato (FIX 30/07 
     const calls = sharpMock.composite.mock.calls;
     const compositeCall = calls[calls.length - 1]?.[0];
     const svgText = compositeCall[0].input.toString('utf8');
-    // Verifica: il cuore è un <path fill="#d9534f"> con transform translate+scale.
-    expect(svgText).toMatch(/<path[^>]*fill="#d9534f"[^>]*transform="translate\([^)]+\) scale\([^)]+\)"/);
-    // Inoltre il path cuore usa HEART_PATH_DATA (path normalizzato 20×20)
-    expect(svgText).toMatch(/M 10 6 C 10 2, 5 0, 2 3/);
+    // FIX 30/07 v4: cuore è ora un <image href="data:image/png;base64,..."> (PNG rosso inline)
+    // con preserveAspectRatio="none" per riempire lo slot quadrato.
+    expect(svgText).toMatch(/<image[^>]*href="data:image\/png;base64,[^"]+"/);
+    expect(svgText).toContain('preserveAspectRatio="none"');
   });
 
   it('<text> contiene SOLO i segmenti di testo, NON il cuore', async () => {
@@ -83,6 +83,7 @@ describe('applyOverlay — cuore come <path fill="#d9534f"> separato (FIX 30/07 
     const calls = sharpMock.composite.mock.calls;
     const compositeCall = calls[calls.length - 1]?.[0];
     const svgText = compositeCall[0].input.toString('utf8');
+    // FIX 30/07 v4: il cuore è un <image> PNG separato, non dentro <text>.
     // Nessuna entity XML cuore dentro il <text>.
     expect(svgText).not.toMatch(/&#10084;/);
     // Nessun tspan cuore (l'emoji composto non viene reso da librsvg).
@@ -103,12 +104,13 @@ describe('applyOverlay — cuore come <path fill="#d9534f"> separato (FIX 30/07 
     const calls = sharpMock.composite.mock.calls;
     const compositeCall = calls[calls.length - 1]?.[0];
     const svgText = compositeCall[0].input.toString('utf8');
-    // Il cuore deve essere splittato in 2 segmenti → 1 path cuore.
-    const matches = svgText.match(/<path[^>]*fill="#d9534f"/g) || [];
+    // FIX 30/07 v4: il cuore è ora un <image href="data:image/png;base64,...">.
+    // Deve esserci esattamente 1 <image> cuore (split corretto in 2 segmenti).
+    const matches = svgText.match(/<image[^>]*href="data:image\/png;base64,/g) || [];
     expect(matches.length).toBe(1);
-    // Agostino e Danila devono essere entrambi presenti nei tspan.
-    const tspans = [...svgText.matchAll(/<tspan[^>]*>([^<]*)<\/tspan>/g)];
-    const allText = tspans.map((m) => m[1]).join('|');
+    // Agostino e Danila devono essere entrambi presenti nei <text>.
+    const textEls = [...svgText.matchAll(/<text[^>]*>([^<]*)<\/text>/g)];
+    const allText = textEls.map((m) => m[1]).join('|');
     expect(allText).toContain('Agostino');
     expect(allText).toContain('Danila');
   });
@@ -185,7 +187,9 @@ describe('applyOverlay — cuore come <path fill="#d9534f"> separato (FIX 30/07 
     const calls = sharpMock.composite.mock.calls;
     const compositeCall = calls[calls.length - 1]?.[0];
     const svgText = compositeCall[0].input.toString('utf8');
-    const match = svgText.match(/<path[^>]*fill="#d9534f"/g) || [];
+    // FIX 30/07 v4: cuore è ora un <image href="data:image/png;base64,..."> (PNG rosso inline)
+    // invece di <path fill="#d9534f" transform=...>. Verifichiamo che ci siano 2 <image> cuore.
+    const match = svgText.match(/<image[^>]*href="data:image\/png;base64,/g) || [];
     expect(match.length).toBe(2);
   });
 });

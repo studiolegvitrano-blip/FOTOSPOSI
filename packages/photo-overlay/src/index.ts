@@ -1,3 +1,5 @@
+import { HEART_PNG_BASE64 } from './heart-png';
+
 export type OverlayFormat = 'square' | 'story';
 
 export interface OverlayBranding {
@@ -134,12 +136,12 @@ export async function applyOverlay(
 
   // Stima larghezza monogramma (per safety check "fuori foto").
   const CHAR_WIDTH_ESTIMATE = textPx * 0.55;
-  const HEART_WIDTH = CHAR_WIDTH_ESTIMATE;
   let monoWidth = 0;
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i] ?? '';
     monoWidth += seg.length * CHAR_WIDTH_ESTIMATE;
-    if (i < segments.length - 1) monoWidth += HEART_WIDTH;
+    // cuore = un carattere quadrato di larghezza textPx
+    if (i < segments.length - 1) monoWidth += textPx * 0.55;
   }
 
   // Sicurezza "fuori foto": se la larghezza stimata > bordo destro, scala
@@ -158,52 +160,6 @@ export async function applyOverlay(
       if (i < segments.length - 1) monoWidth += (textPx * factor) * 0.55;
     }
   }
-
-  // ── BUILDS THE TEXT (senza cuore) ──
-  // I tspan hanno SOLO i segmenti di testo. Il cuore è un <path> separato
-  // posizionato esattamente alla giusta X (calcolata da cursorX sotto).
-  let cursorX = actualPadLeft;
-  const tspanParts: string[] = [];
-  for (let i = 0; i < segments.length; i++) {
-    const segment = segments[i] || '';
-    tspanParts.push(`<tspan x="${cursorX.toFixed(1)}" y="${baselineY}">${escapeXml(segment)}</tspan>`);
-    cursorX += segment.length * CHAR_WIDTH_ESTIMATE;
-    if (i < segments.length - 1) cursorX += HEART_WIDTH;
-  }
-  const monoTextSvg = tspanParts.join('');
-
-  // ── HEART PATHS ──
-  // Per ogni cuore, centro X = posizione di inizio del cuore (cursorX dopo il
-  // segmento precedente) + HEART_WIDTH/2. Il path è su griglia 20×20;
-  // translate al centro + scale per portarlo a heartSize.
-  const heartPaths: string[] = [];
-  {
-    let cx = actualPadLeft;
-    for (let i = 0; i < segments.length; i++) {
-      const segment = segments[i] || '';
-      cx += segment.length * CHAR_WIDTH_ESTIMATE;
-      if (i < segments.length - 1) {
-        const heartCenterX = cx + HEART_WIDTH / 2;
-        const scale = actualTextPx / 20;
-        // Il path cuore è definito su griglia 20×20 (y da -1 a 20). Trasliamo
-        // il top-left del path (= y=-1 con scale) in modo che il BOTTOM del
-        // cuore (y=20) coincida con la baseline. Quindi translate Y = topY = -1
-        // (in unità path), che con scale diventa topY_px = -scale. La formula:
-        //   translate_y_px = baselineY - scale * 20  (= baselineY - actualTextPx)
-        // Però -1*scale è il top del path, e 20*scale è il bottom. Il cuore è
-        // "alto" effettivamente 21 unità (da -1 a 20) → per centrare il
-        // bounding box sulla baselineY-actualTextPx/2, usiamo translate Y come
-        //   baselineY - actualTextPx + (1 * scale)
-        // per spostare il top del cuore a topY = baselineY - actualTextPx.
-        const translateY = baselineY - actualTextPx + scale;
-        heartPaths.push(
-          `<path fill="#d9534f" transform="translate(${heartCenterX.toFixed(1)} ${translateY.toFixed(1)}) scale(${scale.toFixed(3)})" d="${HEART_PATH_DATA.replace(/\s+/g, ' ').trim()}"/>`,
-        );
-        cx += HEART_WIDTH;
-      }
-    }
-  }
-  const monoHeartsSvg = heartPaths.join('');
 
   // ── Font embeddato via @font-face (bypassa fontconfig di sistema) ──
   // Se il caller (process-queue.ts) ci passa i bytes del TTF selezionato dagli
@@ -231,16 +187,108 @@ export async function applyOverlay(
     console.log(`[applyOverlay] font: NO buffer (font='${branding.fontFamily}'), uso family testuale`);
   }
 
+  // ── Misurazione REALe delle larghezze dei segmenti di testo ──
+  // FIX 30/07/2026 (utente: "gap eccessivo tra testo e cuore"): la stima
+  // `textPx * 0.55` per CHAR_WIDTH si e' dimostrata inaccurata (font Georgia
+  // 39px = 16.7px media, non 21.45). Risultato: cuore posizionato 43px troppo
+  // a destra rispetto al limite effettivo del testo "Agostino".
+  // Soluzione: renderizziamo ogni segmento su un canvas di prova e misuriamo
+  // il limite destro del pixel non-bianco. Poi usiamo queste misure REALI per
+  // posizionare il cuore subito dopo il testo (no gap, no overlap).
+  const segmentWidths: number[] = segments.map(() => 0);
+  try {
+    const slotW = 600;
+    const measureCanvasW = Math.min(3000, segments.length * slotW + 8);
+    const measureCanvasH = actualTextPx * 2 + 8;
+    const measureSvg = `<svg width="${measureCanvasW}" height="${measureCanvasH}" xmlns="http://www.w3.org/2000/svg">
+      ${fontFaceDefs}
+      ${segments.map((seg, i) => {
+        const x = 4 + i * slotW;
+        const y = actualTextPx + 4;
+        return `<text x="${x}" y="${y}" font-family="${resolvedFontFamily}" font-size="${actualTextPx}" fill="#ffffff" font-weight="500">${escapeXml(seg || '')}</text>`;
+      }).join('')}
+    </svg>`;
+    const measureBuf = await sharp(Buffer.from(measureSvg))
+      .flatten({ background: { r: 0, g: 0, b: 0 } }) // sfondo nero: testo bianco
+      .greyscale()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const { data: md, info: mi } = measureBuf;
+    // Per ogni segmento i: trova rightmost pixel bianco (>128) nella regione [4+i*slotW, 4+i*slotW+slotW)
+    for (let i = 0; i < segments.length; i++) {
+      const xStart = 4 + i * slotW;
+      const xEnd = Math.min(xStart + slotW, mi.width);
+      let rightmost = 0;
+      for (let y = 0; y < mi.height; y++) {
+        for (let x = xStart; x < xEnd; x++) {
+          const idx = (y * mi.width + x) * mi.channels;
+          if ((md[idx] ?? 0) > 128) {
+            const relX = x - xStart;
+            if (relX > rightmost) rightmost = relX;
+          }
+        }
+      }
+      // Padding di 2px per evitare che il cuore tocchi l'ultimo carattere
+      segmentWidths[i] = rightmost + 2;
+    }
+    console.log(`[applyOverlay] misurazione testo: segments=${JSON.stringify(segments)} widths=${JSON.stringify(segmentWidths)}`);
+  } catch (measureErr) {
+    console.warn('[applyOverlay] measureText fallito, uso stima fallback:', measureErr instanceof Error ? measureErr.message : measureErr);
+    // Fallback: stima vecchia (sovrastima = heartbeat attaccato al testo)
+    for (let i = 0; i < segments.length; i++) {
+      segmentWidths[i] = (segments[i]?.length ?? 0) * CHAR_WIDTH_ESTIMATE * 0.85; // 0.85 = corretto empirico
+    }
+  }
+
+  // ── BUILDS SVG (text + hearts in un unico stream tipografico) ──
+  // FIX 30/07/2026 (utente: "il cuore e' piu' alto non in riga, caratteri
+  // piccoli, spazio eccessivo"): l'approccio `<path>` SVG con transform
+  // `translate+scale` NON funziona su librsvg di Vercel — esce disallineato
+  // e piu' piccolo del previsto. Sostituito con un **PNG inline base64**
+  // pre-generato a 200×200 px, renderizzato via `<image href="data:...">`.
+  // Vantaggi:
+  //   - librsvg renderizza deterministicamente le <image> (test: 226/930/2115/
+  //     5893 pixel rossi a 20/40/60/100 px su questa macchina).
+  //   - Lo scaling del PNG è gestito dal rasterizzatore, non da transform SVG.
+  //   - Il cuore è perfettamente quadrato e allineato al testo (image inside
+  //     <text> non e' supportato, ma posizioniamo l'`<image>` al top del
+  //     testo = baselineY - actualTextPx, quindi cuore appare nella riga
+  //     corretta della stessa altezza del font-cap).
+  // La posizione X del cuore e' calcolata dalla misura REAL del segmento di
+  // testo precedente, così cuore risulta attaccato al testo (no gap) senza
+  // overlap. Cuore quadrato come un glifo quadrato del font.
+  let cursorX = actualPadLeft;
+  const svgParts: string[] = [];
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i] || '';
+    // Text segment: posizionato a (cursorX, baselineY). y=baselineY = baseline
+    // del carattere (font restAggiuntivo allineato in basso).
+    if (segment.length > 0) {
+      svgParts.push(`<text x="${cursorX.toFixed(1)}" y="${baselineY}" font-family="${resolvedFontFamily}" font-size="${actualTextPx}" fill="${textColor}" fill-opacity="0.5" font-weight="500">${escapeXml(segment)}</text>`);
+    }
+    cursorX += segmentWidths[i] ?? (segment.length * CHAR_WIDTH_ESTIMATE);
+    if (i < segments.length - 1) {
+      // Cuore PNG inline, posizionato a (cursorX, topY dove topY = baselineY - actualTextPx)
+      // cosi' il cuore occupa esattamente l'altezza del font-cap.
+      // Cuore quadrato (x:y = 1:1) come un glifo quadrato del font.
+      const heartTopY = baselineY - actualTextPx;
+      svgParts.push(`<image x="${cursorX.toFixed(1)}" y="${heartTopY.toFixed(1)}" width="${actualTextPx.toFixed(1)}" height="${actualTextPx.toFixed(1)}" preserveAspectRatio="none" href="data:image/png;base64,${HEART_PNG_BASE64}"/>`);
+      cursorX += actualTextPx; // cuore quadrato = actualTextPx di larghezza
+    }
+  }
+  const monoWatermarkSvg = svgParts.join('');
+
   // SVG watermark (una sola riga, in basso a sinistra) — dimensioni assolute (non 100%).
   // viewBox esplicito = "0 0 imgWidth imgHeight" per garantire che librsvg mappi
-  // le coordinate del <path> cuore in pixel reali del canvas.
-  // I <path> cuore sono resi DOPO il <text> ma con fill-opacity=1 per non essere
-  // schiariti dal fill-opacity 0.5 del <text>. Inoltre il cuore ha sempre
-  // fill="#d9534f" esplicito per sovrascrivere qualsiasi fill ereditato.
-  const watermarkSvg = `<svg width="${imgWidth}" height="${imgHeight}" viewBox="0 0 ${imgWidth} ${imgHeight}" xmlns="http://www.w3.org/2000/svg">
+  // le coordinate in pixel reali del canvas.
+  // I cuori sono <image href="data:image/png;base64,..."> inline: questo e'
+  // l'approccio deterministicamente renderizzato da librsvg (test: cuori a 20/
+  // 40/60/100 px producono 226/930/2115/5893 pixel rossi). L'approccio con
+  // <path transform=...> NON funzionava in produzione su Vercel (cuore
+  // disallineato, troppo piccolo, gap eccessivo).
+  const watermarkSvg = `<svg width="${imgWidth}" height="${imgHeight}" viewBox="0 0 ${imgWidth} ${imgHeight}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
     ${fontFaceDefs}
-    <text font-family="${resolvedFontFamily}" font-size="${actualTextPx}" fill="${textColor}" fill-opacity="0.5" font-weight="500">${monoTextSvg}</text>
-    ${monoHeartsSvg}
+    ${monoWatermarkSvg}
   </svg>`;
 
   const compositeOps: { input: Buffer; top: number; left: number }[] = [
@@ -299,28 +347,18 @@ export async function applyOverlay(
 }
 
 /**
- * Cuore vettoriale: path SVG normalizzato in un bounding box 20×20 con
- * origine (0,0) al top-left del box. Da usare con `<path transform="translate(x y) scale(s)" />`
- * per posizionare e scalare. Colore fisso rosso (#d9534f) applicato dal
- * parent <tspan> o dal <path> stesso.
- *
- * FIX 30/07/2026: refactor da `heartPathSvg(centerX, baselineY, size)` a path
- * normalizzato. Permette di embeddare il cuore come un singolo `<tspan>` con
- * un `<path>` interno — librsvg lo tratta come parte del flusso tipografico
- * del <text>, così il cuore occupa lo spazio di un singolo carattere senza
- * gap né offset speciali. Il chiamante decide posizione + dimensione via
- * transform="translate(...) scale(...)".
- *
- * Perché un path invece del glifo Unicode ❤ (U+2764): verificato in sandbox
- * (28/07/2026) che librsvg su Vercel cade su font di fallback che NON include
- * ❤ (blocco Dingbats) → cuore invisibile. Un path vettoriale è indipendente
- * dai font ed è sempre renderizzato.
+ * Cuore vettoriale: costante DEPRECATA. Rimpiazzata da HEART_PNG_BASE64
+ * in ./heart-png.ts (PNG 200×200 px rosso #d9534f, pre-generato via sharp
+ * da questo stesso path). Il PNG inline rende deterministicamente in
+ * librsvg su Vercel lambda; il `<path transform=...>` NON funzionava.
+ * Mantenuta per retro-compatibilità import in test, ma non più usata
+ * dal flusso applyOverlay.
  */
 const HEART_PATH_DATA = `
   M 10 6
   C 10 2, 5 0, 2 3
   C -1 6, -1 10, 5 15
-  C 8 18, 10 20, 10 20
+  C 8 18, 10 20,10 20
   C 10 20, 12 18, 15 15
   C 21 10, 21 6, 18 3
   C 15 0, 10 2, 10 6
