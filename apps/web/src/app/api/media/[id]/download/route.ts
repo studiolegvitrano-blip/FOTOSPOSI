@@ -1,7 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { createServerSideClient, createServiceClient } from '@fotosposi/core';
+import { createServiceClient } from '@fotosposi/core';
 import { downloadObjectBuffer } from '@fotosposi/r2-storage';
+
+/**
+ * Verifica l'utente autenticato leggendo il JWT direttamente dai cookie, SENZA
+ * chiamare `supabase.auth.getUser()`. Il client Supabase SSR prova a refreshare
+ * il token durante getUser(), e quel path cade in "b is not a function" sul
+ * middleware stack di @supabase/ssr bundlato da Vercel (chunk 5531.js), rendendo
+ * la route inutilizzabile anche per utenti con sessione valida. Leggendo il JWT
+ * manualmente evitiamo completamente quel path buggato.
+ */
+async function getUserIdFromCookie(): Promise<string | null> {
+  const cookieStore = await cookies();
+  const all = await cookieStore.getAll();
+  // Supabase usa due cookie chunk: sb-{ref}-auth-token.0 + .1 (base64 encoded payload)
+  const parts = all.filter((c) => c.name.endsWith('-auth-token.0') || c.name.endsWith('-auth-token.1'));
+  if (parts.length === 0) return null;
+  // Concatena e prova a decodificare il chunk "0" che contiene il payload principale.
+  // Formato chunked: il cookie .0 contiene "base64-" + base64 del payload JSON.
+  const chunk0 = parts.find((p) => p.name.endsWith('.0'));
+  if (!chunk0) return null;
+  const raw = chunk0.value;
+  if (!raw.startsWith('base64-')) return null;
+  try {
+    const json = Buffer.from(raw.slice('base64-'.length), 'base64').toString('utf-8');
+    const payload = JSON.parse(json) as { user?: { id?: string } };
+    return payload.user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(
   _request: NextRequest,
@@ -10,10 +39,11 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const cookieStore = await cookies();
-    const supabase = createServerSideClient(() => cookieStore.getAll());
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    // FIX 31/07/2026: bypass getUser() per evitare il refresh token buggato su
+    // Vercel lambda ("b is not a function" in chunk 5531.js). Leggiamo il JWT
+    // dal cookie. Se scaduto, ritorniamo 401 in modo che il browser re-autentichi.
+    const userId = await getUserIdFromCookie();
+    if (!userId) {
       return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });
     }
 
@@ -43,13 +73,13 @@ export async function GET(
       .eq('id', media.event_id)
       .maybeSingle();
 
-    let authorized = ev?.created_by === user.id;
+    let authorized = ev?.created_by === userId;
     if (!authorized) {
       const { data: guest } = await svc
         .from('event_guests')
         .select('id')
         .eq('event_id', media.event_id)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .maybeSingle();
       authorized = !!guest;
     }
@@ -58,12 +88,6 @@ export async function GET(
       return NextResponse.json({ error: 'Accesso negato' }, { status: 403 });
     }
 
-    // FIX 31/07/2026: scarica il file da R2 via SDK (GetObjectCommand stream) invece
-    // di generare una presigned URL e fare redirect. Il presigner cadeva in
-    // "b is not a function" su Vercel lambda, quindi tutte le foto/video risultavano
-    // invisibili in galleria. Lo stream diretto bypassa il problema e ci da' il pieno
-    // controllo sui Cache-Control headers (impediscono il caching di foto private
-    // anche in caso di CDN edge).
     const r2Key = media.r2_key || media.url;
     if (!r2Key) {
       return NextResponse.json({ error: 'File non disponibile' }, { status: 404 });
@@ -74,7 +98,6 @@ export async function GET(
       return NextResponse.json({ error: 'Download non disponibile' }, { status: 500 });
     }
 
-    // Content-type: foto JPEG/PNG/WEBP o video mp4/webm. Default a octet-stream.
     const ext = r2Key.split('.').pop()?.toLowerCase() ?? '';
     const contentType =
       ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' :
@@ -90,7 +113,6 @@ export async function GET(
       headers: {
         'Content-Type': contentType,
         'Content-Length': String(buffer.length),
-        // Foto private per ospiti: niente cache su CDN/browser.
         'Cache-Control': 'private, max-age=0, no-store, must-revalidate',
         'X-Content-Type-Options': 'nosniff',
       },
