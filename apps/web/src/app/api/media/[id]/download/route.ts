@@ -4,28 +4,34 @@ import { createServiceClient } from '@fotosposi/core';
 import { downloadObjectBuffer } from '@fotosposi/r2-storage';
 
 /**
- * Verifica l'utente autenticato leggendo il JWT direttamente dai cookie, SENZA
- * chiamare `supabase.auth.getUser()`. Il client Supabase SSR prova a refreshare
- * il token durante getUser(), e quel path cade in "b is not a function" sul
- * middleware stack di @supabase/ssr bundlato da Vercel (chunk 5531.js), rendendo
- * la route inutilizzabile anche per utenti con sessione valida. Leggendo il JWT
- * manualmente evitiamo completamente quel path buggato.
+ * Verifica l'utente autenticato leggendo il JWT direttamente dai cookie Supabase,
+ * SENZA chiamare `supabase.auth.getUser()`. Il client Supabase SSR prova a
+ * refreshare il token durante getUser(), e quel path cade in "b is not a
+ * function" sul middleware stack di @supabase/ssr bundlato da Vercel (chunk
+ * 5531.js), rendendo la route inutilizzabile anche per utenti con sessione
+ * valida. Decodifica manuale del payload per ottenere user.id.
  */
 async function getUserIdFromCookie(): Promise<string | null> {
   const cookieStore = await cookies();
   const all = await cookieStore.getAll();
-  // Supabase usa due cookie chunk: sb-{ref}-auth-token.0 + .1 (base64 encoded payload)
-  const parts = all.filter((c) => c.name.endsWith('-auth-token.0') || c.name.endsWith('-auth-token.1'));
-  if (parts.length === 0) return null;
-  // Concatena e prova a decodificare il chunk "0" che contiene il payload principale.
-  // Formato chunked: il cookie .0 contiene "base64-" + base64 del payload JSON.
-  const chunk0 = parts.find((p) => p.name.endsWith('.0'));
+  // Supabase usa due cookie chunked: sb-{ref}-auth-token.0 + .1
+  // (chunked storage quando il cookie > 4KB). Usiamo le stesse funzioni
+  // della libreria @supabase/ssr per ricostruire il payload completo.
+  const { combineChunks, stringFromBase64URL } = await import('@supabase/ssr');
+  const chunk0 = all.find((c) => c.name.endsWith('-auth-token.0'));
   if (!chunk0) return null;
-  const raw = chunk0.value;
-  if (!raw.startsWith('base64-')) return null;
   try {
-    const json = Buffer.from(raw.slice('base64-'.length), 'base64').toString('utf-8');
-    const payload = JSON.parse(json) as { user?: { id?: string } };
+    const key = chunk0.name.replace(/\.0$/, '');
+    const combined = await combineChunks(key, async (chunkName: string) => {
+      const c = all.find((x) => x.name === chunkName);
+      return c?.value ?? null;
+    });
+    if (!combined) return null;
+    let decoded = combined;
+    if (decoded.startsWith('base64-')) {
+      decoded = stringFromBase64URL(decoded.substring('base64-'.length));
+    }
+    const payload = JSON.parse(decoded) as { user?: { id?: string } };
     return payload.user?.id ?? null;
   } catch {
     return null;
