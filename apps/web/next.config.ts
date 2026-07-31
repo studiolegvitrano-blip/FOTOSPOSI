@@ -13,7 +13,21 @@ const nextConfig: NextConfig = {
   // ENOENT ("spawn .../api/guestbook/messages/ffmpeg" — visto nei log Vercel).
   // Tenendolo esterno, require() risolve il vero node_modules/ffmpeg-static a runtime
   // (il binario arriva nella lambda grazie a outputFileTracingIncludes qui sotto).
-  serverExternalPackages: ['sharp', 'ffmpeg-static'],
+  serverExternalPackages: [
+    'sharp',
+    'ffmpeg-static',
+    // AWS SDK v3 + @smithy: lasciati esterni a webpack per evitare tree-shaking
+    // errato del middleware stack di @aws-sdk/s3-request-presigner, che su
+    // lambda Vercel falliva con "b is not a function" perché lo stack dei
+    // middleware veniva clonato con prototype mancante (sessione 31/07/2026,
+    // regression causa del 500 su /api/media/[id]/download e process-queue).
+    '@aws-sdk/client-s3',
+    '@aws-sdk/s3-request-presigner',
+    '@aws-sdk/signature-v4-multi-region',
+    '@smithy/core',
+    '@smithy/types',
+    '@aws-sdk/types',
+  ],
   transpilePackages: [
     '@fotosposi/core',
     '@fotosposi/events',
