@@ -218,5 +218,78 @@ export async function updateDriveSyncStatus(
   return {};
 }
 
+/**
+ * Cancella un media da `media_uploads` + i suoi file da R2 (originale + watermarked).
+ * Best-effort su R2: se uno dei due delete fallisce (R2 transient o key mancante per
+ * record pre-migration), logga warning ma NON blocca: meglio un record DB pulito che
+ * un DB con record GM ma R2 orphan (che terrebbe la foto visibile in galleria morta).
+ *
+ * NON cancella il file da Google Drive (il backup originale resta disponibile per
+ * lo sposo anche dopo che la foto è stata rimossa dalla galleria pubblica — same
+ * pattern di "cestino" dei social: la foto sparisce dal feed ma resta in archivio).
+ *
+ * @returns { ok: true } on success, { error } on DB failure
+ */
+export async function deleteMediaById(
+  mediaId: string,
+): Promise<{ ok?: true; error?: string }> {
+  const supabase = createServiceClient();
+  // Leggi il record prima di cancellare per ottenere r2_key e original_r2_key
+  const { data, error: fetchErr } = await supabase
+    .from('media_uploads')
+    .select('id, r2_key, original_r2_key')
+    .eq('id', mediaId)
+    .maybeSingle();
+
+  if (fetchErr) return { error: fetchErr.message };
+  if (!data) return { error: 'Media non trovato' };
+
+  // Best-effort cancellazione R2 (sia key watermarked che original)
+  const keysToDelete = [data.r2_key, data.original_r2_key].filter((k): k is string => !!k);
+  for (const key of keysToDelete) {
+    try {
+      await deleteObject(key);
+    } catch (err) {
+      console.warn(`[deleteMediaById] deleteObject(${key}) fallito (best-effort):`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  // Best-effort cancellazione da Drive se drive_file_id presente. NON bloccante:
+  // se Drive 401/404, il file resta orphan su Drive ma il record sparisce da DB
+  // → la foto non è più visibile in galleria (obiettivo primario raggiunto).
+  if (data.drive_file_id) {
+    try {
+      // Lookup del token Drive del evento per ottenere access_token
+      const { data: media_row } = await supabase
+        .from('media_uploads')
+        .select('event_id')
+        .eq('id', mediaId)
+        .maybeSingle();
+      if (media_row?.event_id) {
+        const { data: tokenRow } = await supabase
+          .from('event_drive_tokens')
+          .select('access_token')
+          .eq('event_id', media_row.event_id)
+          .maybeSingle();
+        if (tokenRow?.access_token) {
+          await fetch(`https://www.googleapis.com/drive/v3/files/${data.drive_file_id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${tokenRow.access_token}` },
+            signal: AbortSignal.timeout(10000),
+          });
+        }
+      }
+    } catch (driveErr) {
+      console.warn(`[deleteMediaById] Drive delete fallito (best-effort):`, driveErr instanceof Error ? driveErr.message : driveErr);
+    }
+  }
+
+  // Finally, DELETE da DB. Questo è l'unico passo NON best-effort: se fallisce, ritorniamo errore.
+  const { error: delErr } = await supabase.from('media_uploads').delete().eq('id', mediaId);
+  if (delErr) return { error: delErr.message };
+
+  return { ok: true };
+}
+
 export { saveDriveToken, getDriveToken, deleteDriveToken, refreshDriveAccessToken, getEventDriveFolders } from './tokens';
 export type { EventDriveToken } from './tokens';

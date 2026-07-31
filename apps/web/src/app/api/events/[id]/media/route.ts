@@ -39,6 +39,30 @@ export async function GET(
       .eq('event_id', eventId)
       .order('created_at', { ascending: false });
 
+    // FIX 31/07/2026: arricchisce ogni media con `uploader_name` e `uploader_role_at_event`
+    // per mostrare "Mario Rossi — Testimone" sotto ogni foto in galleria. Senza questo,
+    // l'utente che guarda la galleria non sa CHI ha caricato la foto — informazione utile
+    // per riconoscere i contributori e per il senso di community del matrimonio.
+    // Usiamo una singola query su core_users per gli uploader distinti, e mappiamo in memoria.
+    let uploaderInfoMap: Record<string, { name?: string; role_at_event?: string; first_name?: string; last_name?: string }> = {};
+    if (media && media.length > 0) {
+      const uploaderIds = Array.from(new Set(media.map((m: any) => m.uploaded_by).filter(Boolean)));
+      if (uploaderIds.length > 0) {
+        const { data: uploaders } = await svc
+          .from('core_users')
+          .select('id, first_name, last_name, name, role_at_event')
+          .in('id', uploaderIds);
+        uploaderInfoMap = Object.fromEntries(
+          (uploaders ?? []).map((u: any) => [u.id, u]),
+        );
+      }
+    }
+    const enrichedMedia = (media ?? []).map((m: any) => {
+      const u = uploaderInfoMap[m.uploaded_by];
+      const uploaderName = u ? (u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : u.name) : undefined;
+      return { ...m, uploader_name: uploaderName, uploader_role_at_event: u?.role_at_event ?? null };
+    });
+
     let videoMessages: unknown[] = [];
 
     // Video guestbook: solo per chi è autenticato come creator o guest registrato
@@ -56,7 +80,7 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({ media: media ?? [], videoMessages });
+    return NextResponse.json({ media: enrichedMedia, videoMessages });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Errore interno' }, { status: 500 });
   }

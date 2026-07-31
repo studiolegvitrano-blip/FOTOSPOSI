@@ -34,6 +34,7 @@ export default function EventDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showCountdown, setShowCountdown] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
+  const [canManage, setCanManage] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,6 +50,9 @@ export default function EventDetailPage() {
       if (d.event) {
         setEvent(d.event);
         setIsCreator(d.isCreator ?? false);
+        // canManage = sposo (creator) OR delegato (event_managers edit/admin).
+        // Restituito da /api/events/[id]/details a partire dal 31/07/2026.
+        setCanManage(d.canManage ?? d.isCreator ?? false);
       }
       if (d.subEvents) setSubEvents(d.subEvents);
       if (d.window) setEvtWindow(d.window);
@@ -151,6 +155,22 @@ export default function EventDetailPage() {
                       videos={videos}
                       event={event}
                       eventId={eventId}
+                      canManage={canManage}
+                      onDeleteMedia={async (postId: string) => {
+                        // Cancella foto via API DELETE /api/media/[id]. Solo sposo/delegato vede
+                        // il bottone (canManage=true), e solo lui arriva qui. La route autorizza
+                        // comunque via JWT + check su events.created_by / event_managers.
+                        const res = await fetch(`/api/media/${postId}`, { method: 'DELETE' });
+                        if (!res.ok) {
+                          const data = await res.json().catch(() => ({}));
+                          alert(data.error || 'Errore durante la cancellazione');
+                          return;
+                        }
+                        // Aggiorna la galleria rimuovendo la foto cancellata dallo state locale
+                        // (niente overhead di refetch — lo stato è già in memoria).
+                        setMedia((prev) => prev.filter((m) => m.id !== postId));
+                        setVideos((prev) => prev.filter((v) => v.id !== postId));
+                      }}
                       onShareMedia={(id, isVideo) => {
                         const brand = typeof window !== 'undefined' && window.location.hostname.includes('justmarry')
                           ? 'JustMarry.live'

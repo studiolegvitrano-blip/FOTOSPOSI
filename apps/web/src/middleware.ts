@@ -41,6 +41,11 @@ export async function middleware(request: NextRequest) {
           );
         },
       },
+      // FIX 31/07/2026: PKCE flow esplicito + auto-refresh. Senza questo il refresh token
+      // non veniva propagato ai cookie lato server → dopo la scadenza dell'access_token (1h)
+      // l'utente risulta non-authenticato finché non fa refresh manuale → sintomo "devo rifare
+      // login ogni tanto". getUser() invoca refresh autonomamente quando serve.
+      flowType: 'pkce',
     },
   );
 
@@ -53,18 +58,30 @@ export async function middleware(request: NextRequest) {
     });
   }
 
+  // /auth/callback è il redirect target di OAuth Google/Facebook/Apple: in quel momento i cookie
+  // auth NON sono ancora stati scritti (lo scambio code→session è client-side e avviene nel
+  // useEffect della pagina). Se il middleware includesse /auth/callback nel loop di getUser(),
+  // leggerebbe `user = null` al primo render e reindirizzerebbe a /login → loop morto. Lo
+  // escludiamo esplicitamente dal controllo.
+  if (request.nextUrl.pathname === '/auth/callback') return response;
+
   const protectedPaths = ['/dashboard', '/events/new', '/admin'];
   const isProtected = protectedPaths.some((p) => request.nextUrl.pathname.startsWith(p));
   if (!isProtected) return response;
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    // Passa `redirect` al login così un utente non-loggato che tenta di accedere a /dashboard
+    // puObject tornare a quella pagina dopo login (stesso pattern usato da invitati via QR).
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('redirect', request.nextUrl.pathname + request.nextUrl.search);
+    return NextResponse.redirect(loginUrl);
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/|_next/data|.*\\.(?:js|css|json|woff2?|png|jpg|svg|ico)$).*)'],
+  // Escludi /auth/callback dal matcher (vedi commento sopra), oltre agli asset statici e API.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/|_next/data|auth/callback|.*\\.(?:js|css|json|woff2?|png|jpg|svg|ico)$).*)'],
 };

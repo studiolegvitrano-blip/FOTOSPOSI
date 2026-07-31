@@ -567,6 +567,39 @@ async function processSingleItem(
       return false;
     }
 
+    // FIX 31/07/2026 (richiesta utente): su Drive viene caricato l'ORIGINALE SENZA WATERMARK,
+    // mentre su R2/galleria resta il watermarked. Lo sposo vuole backup puliti permanenti, ma
+    // la galleria pubblica mostra il branding. Strategia:
+    //   - `buffer` (watermarked) è già stato salvato su R2 con la stessa r2_key (riga 509).
+    //   - Per Drive carichiamo l'originale NON watermarked, salvato in precedenza su R2
+    //     `originals/${r2Key}` (riga 469). Lo scarichiamo con presigned GET per inviarlo a Drive.
+    //   - Se per qualche motivo l'originale non è disponibile (es. PutObject originale fallito),
+    //     fallback degradato: carica il watermarked — meglio un backup imperfetto che nessun backup.
+    let driveBuffer: Buffer = buffer;
+    if (hasDrive && folders) {
+      // Solo per foto: per i video il watermark è già insito nel buffer (video-overlay
+      // applica overlay ffmpeg in-place). Il video originale senza watermark non è salvato
+      // su R2 originals/ — quel fallback era stato rimosso per video >100MB per non duplicare
+      // storage. Per video, Drive riceve il watermarked (impraticabile da evitare senza VPS).
+      // Per FOTO invece: scarichiamo l'originale da R2 e lo mandiamo a Drive pulito.
+      if (!isVideo) {
+        try {
+          const originalGetUrl = await getPresignedDownloadUrl(originalKey, 600);
+          if (originalGetUrl) {
+            const origResp = await fetch(originalGetUrl);
+            if (origResp.ok) {
+              driveBuffer = Buffer.from(await origResp.arrayBuffer()) as Buffer;
+            }
+          }
+        } catch (origErr) {
+          // Fallback degradato: usa il buffer watermarked per Drive (meglio un backup
+          // imperfetto che niente). Logga il warning per observability ma non bloccare.
+          console.warn(`[process-queue] download originale ${originalKey} per Drive fallito (event=${eventId}):`, origErr instanceof Error ? origErr.message : origErr, '— fallback su watermarked per Drive');
+          driveBuffer = buffer;
+        }
+      }
+    }
+
     // Drive sync (se connesso per l'evento).
     if (hasDrive && folders) {
       try {
@@ -599,7 +632,7 @@ async function processSingleItem(
         const bodyBytes = Buffer.concat([
           Buffer.from(metaPart, 'utf8'),
           Buffer.from(fileHeader, 'utf8'),
-          buffer,
+          driveBuffer, // FIX 31/07/2026: originale NON watermarked per foto, watermarked per video.
           Buffer.from(closing, 'utf8'),
         ]);
 

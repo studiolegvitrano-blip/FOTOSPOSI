@@ -44,12 +44,28 @@ export async function GET(
     // (like guest email list) is NOT returned here.
     let isCreator = false;
     let isGuest = false;
+    let isManager = false;
+    let canManage = false;
     if (userId) {
       isCreator = event.created_by === userId;
       if (!isCreator) {
         const { data: guest } = await svc.from('event_guests').select('id').eq('event_id', eventId).eq('user_id', userId).maybeSingle();
         isGuest = !!guest;
+        // Verifica se l'utente è un delegato (event_managers con permission edit/admin)
+        const { data: managerRow } = await svc
+          .from('event_managers')
+          .select('permission')
+          .eq('event_id', eventId)
+          .eq('user_id', userId)
+          .in('permission', ['edit', 'admin'])
+          .maybeSingle();
+        isManager = !!managerRow;
       }
+      // canManage = può cancellare foto / modificare evento.
+      // Includiamo sposo (creator) + delegati manager con edit/admin.
+      // L'uploader di una foto propria può cancellarla anche se non è manager
+      // (gestito lato route DELETE /api/media/[id], non qui).
+      canManage = isCreator || (isManager ?? false);
     }
 
     return NextResponse.json({
@@ -58,6 +74,8 @@ export async function GET(
       window: evtWindow ?? null,
       isCreator,
       isGuest,
+      isManager,
+      canManage,
     });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Errore interno' }, { status: 500 });

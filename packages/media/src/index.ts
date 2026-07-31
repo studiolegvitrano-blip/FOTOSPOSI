@@ -17,6 +17,16 @@ export interface MediaUpload {
   original_r2_key?: string | null;
   watermark_missing?: boolean;
   created_at: string;
+  /**
+   * FIX 31/07/2026: arricchito lato /api/events/[id]/media — "Mario Rossi" (nome + cognome
+   * dell'uploader). Usato per mostrare l'autore del post accanto ad ogni foto in galleria.
+   */
+  uploader_name?: string;
+  /**
+   * FIX 31/07/2026: ruolo dell'uploader RELATIVO al matrimonio (Testimone/Parente/Amico/Altro).
+   * Es: "Mario Rossi — Testimone". NULL per uploader sposo o per record senza ruolo compilato.
+   */
+  uploader_role_at_event?: string | null;
 }
 
 export interface VideoMessage {
@@ -64,6 +74,7 @@ export {
   deleteFromStorage,
   uploadToR2,
   deleteFromR2,
+  deleteMediaById,
   createVideoMessage,
   getVideoMessages,
   updateDriveSyncStatus,

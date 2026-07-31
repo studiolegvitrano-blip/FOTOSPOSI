@@ -15,11 +15,18 @@ type Props = {
   eventId: string;
   onShareMedia: (id: string, isVideo: boolean) => void;
   onOpenImage?: (url: string) => void;
+  /**
+   * true se l'utente corrente è sposo (creator) o delegato con edit/admin.
+   * Passato al FacebookFeed per mostrare il bottone "Cancella" per ogni foto.
+   */
+  canManage?: boolean;
+  /** Callback per cancellare un media. La pagina padre la connette a DELETE /api/media/[id]. */
+  onDeleteMedia?: (postId: string) => Promise<void>;
 };
 
 const PAGE_SIZE = 4;
 
-export default function EventTimelineFeed({ media, videos, event, eventId, onShareMedia, onOpenImage }: Props) {
+export default function EventTimelineFeed({ media, videos, event, eventId, onShareMedia, onOpenImage, canManage, onDeleteMedia }: Props) {
   const t = useTranslations('feed');
   const c = useTranslations('common');
   const [page, setPage] = useState(1);
@@ -36,20 +43,35 @@ export default function EventTimelineFeed({ media, videos, event, eventId, onSha
       !!m.r2_key && m.drive_sync_status !== 'synced';
     const photoPosts: FeedPost[] = media
       .filter((m) => (m.type || 'photo') === 'photo')
-      .map((m) => ({
-        id: m.id,
-        author: authorFallback,
-        timestamp: m.created_at || new Date().toISOString(),
-        caption: undefined,
-        imageUrl: m.r2_key ? `/api/media/${m.id}/download` : m.url,
-        likes: 0,
-        comments: [],
-        backupPending: isBackupPending(m),
-      }));
+      .map((m) => {
+        // FIX 31/07/2026: usa uploader_name + role_at_event come "author" del post, così
+        // appare in fronte al post feed "Mario Rossi — Testimone". Se mancanti (pubblico non
+        // autenticato), fallback a authorFallback = couple_name. Senza nome reale dell'uploader,
+        // il post apparirebbe come caricato dagli sposi anche se è di un invitato.
+        const uploaderName = (m as any).uploader_name as string | undefined;
+        const role = (m as any).uploader_role_at_event as string | undefined;
+        const author = uploaderName
+          ? (role ? `${uploaderName} — ${role}` : uploaderName)
+          : authorFallback;
+        return {
+          id: m.id,
+          author,
+          timestamp: m.created_at || new Date().toISOString(),
+          caption: undefined,
+          imageUrl: m.r2_key ? `/api/media/${m.id}/download` : m.url,
+          likes: 0,
+          comments: [],
+          backupPending: isBackupPending(m),
+        };
+      });
     const videoPosts: FeedPost[] = [...media.filter((m) => m.type === 'video'), ...videos].map((m) => {
       const id = m.id;
       const src = m.r2_key ? `/api/media/${id}/download` : (m as unknown as { url?: string }).url;
-      const author = (m as unknown as { from_name?: string }).from_name || authorFallback;
+      const baseAuthor = (m as unknown as { from_name?: string }).from_name
+        || (m as any).uploader_name
+        || authorFallback;
+      const role = (m as any).uploader_role_at_event as string | undefined;
+      const author = role ? `${baseAuthor} — ${role}` : baseAuthor;
       return {
         id,
         author,
@@ -105,6 +127,8 @@ export default function EventTimelineFeed({ media, videos, event, eventId, onSha
         onShare={handleShare}
         onOpenImage={handleOpenImage}
         eventId={eventId}
+        canManage={canManage}
+        onDeleteMedia={onDeleteMedia}
       />
     </div>
   );

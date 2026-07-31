@@ -1,5 +1,363 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 31/07/2026 — OAuth fix + post-OAuth onboarding + cancellazione foto + Drive senza watermark + sessione persistente
+
+### Richieste utente (4 distinte)
+1. **"la registrazione google non funziona"** — dopo OAuth Google "reindirizzamento in corso" poi torna a `/login`. Bug critico bloccante per ogni login social.
+2. **Form post-OAuth per Google/Apple/Facebook** — dopo autenticazione social, chiedere nome, cognome, email (precompilata se il provider la fornisce), telefono obbligatorio, ruolo (Testimone/Parente/Amico/Altro manuale). Nome+cognome precompilati da Facebook (90% ha entrambi editabili), URL potendo mostrare nome uploader accreditato su ogni foto.
+3. **"lo sposo o un suo delegato può cancellare delle foto dalla galleria"** + **"watermark in galleria ma NO in Google Drive"** (originale conservato grow up backup permanente dello sposo).
+4. **"una volta registrato dal browser o dall'app deve rimanere collegato con il suo account"** — sessione persistente, niente re-login continuo.
+
+### Diagnosi Google OAuth (root cause FINALE)
+Log Supabase auth (via Supabase MCP `get_logs` service=api) confermano:
+- `21:48:36` `GET /auth/v1/authorize?provider=google` HTTP 302 → Google
+- `21:48:48` `GET /auth/v1/callback?code=4/0AXEQxICjk...` HTTP 302 → sposi.live/auth/callback
+- `21:48:50` `POST /auth/v1/token?grant_type=pkce` **HTTP 200 ✅** (scambio code session riuscito!)
+- `21:48:51` `GET /rest/v1/core_users?id=eq.ddd8e40e...` (route setup ha completato, riga creata)
+
+**Quindi OAuth Google funzionava dal lato server.** L'utente tornava a /login perché:
+- Middleware `getUser()` veniva invocato su `/auth/callback` PRIMA che i cookie authfossero propagati al server → `user = null` → redirect a `/login`.
+- La callback client faceva `router.push('/dashboard')` ma al primo render il middleware (sul path /dashboard) vedeva cookie auth non ancora idratati → redirect /login.
+
+### Fix applicati (work-tree NON ancora pushato)
+
+**1. `/auth/callback` escluso dal middleware** (`apps/web/src/middleware.ts`):
+```ts
+if (request.nextUrl.pathname === '/auth/callback') return response;
+```
++ `matcher` regex aggiornato per escludere `auth/callback`.
+
+**2. `router.refresh()` prima del push finale** (`apps/web/src/app/auth/callback/page.tsx`):
+```ts
+async function finalizeAndRedirect(target: string) {
+  setState('redirecting');
+  router.refresh();  // ← forza Next a rifetchare la route lato server, cookie auth idratati
+  await new Promise((r) => setTimeout(r, 50));  // ← tick per persistere cookie
+  router.push(target);
+}
+```
+Così al render di `/dashboard` il middleware vede i cookie auth appena settati da `exchangeCodeForSession`.
+
+**3. Middleware con `flowType: 'pkce'` + auto-refresh** (`apps/web/src/middleware.ts`):
+```ts
+const supabase = createServerClient(url, anonKey, {
+  cookies: { getAll, setAll },
+  flowType: 'pkce', // ← FIX sessione persistente: refresh automatico access_token
+});
+```
+Senza questo, dopo 1h (scadenza access_token) l'utente risulta non-authenticato finché non fa refresh manuale. `getUser()` invoca refresh autonomamente quando serve.
+
+**4. Redirect con passaggio `redirect` param al login fallito** (`apps/web/src/middleware.ts`):
+```ts
+const loginUrl = new URL('/login', request.url);
+loginUrl.searchParams.set('redirect', request.nextUrl.pathname + request.nextUrl.search);
+return NextResponse.redirect(loginUrl);
+```
+
+**5. Gestione errore scambio code** (`apps/web/src/app/auth/callback/page.tsx`):
+Se `exchangeCodeForSession` fallisce (es. code reuse, PKCE verifier perso quando l'utente chiude/riapre tab durante OAuth), redirect a `/login?error=oauth_failed` invece di restare bloccato a "reindirizzamento" in eterno.
+
+### Form post-OAuth onboarding (NUOVO, solo invitati via QR)
+
+**Strategia**: il form appare SOLO quando queste 3 condizioni sono verificate simultaneamente:
+1. OAuth avuto successo (Google/Facebook/Apple).
+2. RUechsirotspande nessuna riga `core_users` esistente per questo userId.
+3. Il `redirect` punta a `/events/{id}/...` (cioè l'utente è atterrato lì da un QR code → invitato).
+
+In tutti gli altri casi (sposo che si registra da /signup senza invito, login successivo di utente già registrato), il form NON appare — si va direttamente al redirect.
+
+**Implementazione** (`apps/web/src/app/auth/callback/page.tsx`):
+- Componente `OnboardingForm` inline nel file (no cartella separata). Campi: Nome, Cognome, Email (prefill da OAuth `user_metadata.full_name`), Telefono (obbligatorio), Ruolo (select: Testimone/Parente/Amico/Altro), customRole (input testo quando ruolo="Altro").
+- Pre-fill intelligente: splitta `full_name` da Google in first/last name; Facebook dà `name`+`email`; Apple dà solo `email` (nasconde nome per privacy).
+- Submit → POST `/api/auth/setup` con `roleAtEvent` → riga `core_users` creata con role='invitato' + role_at_event + event_id dell'evento invitato.
+- Pre-check via POST `/api/auth/check-user` → se l'utente ESISTE già in core_users, salta diretto al redirect (no form).
+
+**Route NUOVA `/api/auth/check-user`** (`apps/web/src/app/api/auth/check-user/route.ts`): POST con `{userId}` → ritorna `{exists: boolean, user: {role_at_event, first_name, last_name, phone} | null}`. Usa service role per bypassare RLS.
+
+### Migration 00042 — `core_users.role_at_event`
+
+**File**: `supabase/migrations/00042_core_users_role_at_event.sql`.
+
+```sql
+ALTER TABLE core_users ADD COLUMN IF NOT EXISTS role_at_event TEXT;
+COMMENT ON COLUMN core_users.role_at_event IS
+  'Ruolo dell''utente RELATIVO al matrimonio a cui è invitato (Testimone/Parente/Amico/Altro manuale). NULL per sposi/amministratori. Distinto da `role` che è il ruolo nella piattaforma.';
+```
+
+**Applicata live via Supabase MCP** (`apply_migration`) + `NOTIFY pgrst, 'reload schema'` (regola ferrea AGENTS.md). Verificata colonna presente nel DB.
+
+### `role_at_event` propagato in `/api/auth/setup` route
+
+`apps/web/src/app/api/auth/setup/route.ts` ora accetta `roleAtEvent` nel body e lo persiste su `core_users.role_at_event` quando crea la riga invitato (path `event` truthy). Per sposo (no eventId), `role_at_event` resta NULL (corretto: lo sposo non ha un ruolo "alle nozze", è ego chi organizza).
+
+Se `core_users` esiste già (re-onboarding raro), fa UPDATE di first_name/last_name/phone/role_at_event invece di errore (silently idempotente).
+
+### Cancellazione foto da galleria (NUOVO, sposo/delegato/uploader)
+
+**Funzione `deleteMediaById(mediaId)` in `@fotosposi/media`** (`packages/media/src/service.ts`):
+1. Legge `media_uploads` per ottenere `r2_key` e `original_r2_key`.
+2. Best-effort cancella da R2 sia la key watermarked sia quella originale.
+3. Best-effort cancella da Google Drive se `drive_file_id` presente e token Drive evento attivo.
+4. **DELETE da `media_uploads`** (unico passo NON best-effort — se fallisce ritorna errore).
+
+Esportata in `packages/media/src/index.ts`.
+
+**Route `DELETE /api/media/[id]`** (`apps/web/src/app/api/media/[id]/route.ts`):
+Autorizzazione: **solo sposo (events.created_by), delegato (event_managers con permission edit/admin), o uploader (uploaded_by === userId)** possono cancellare. Invitato ordinario NON può cancellare foto di altri (per evitare abusi).
+
+Pattern "cestino" dei social: la foto sparisce dal feed ma resta nello storage permanente Drive dello sposo (il `deleteObject` Drive è best-effort — se fallisce non blocchiamo il DB delete).
+
+### `canManage` esteso in `details` API + UI
+
+**`/api/events/[id]/details` route** ora ritorna `{isCreator, isGuest, isManager, canManage}`:
+- `isManager` = `event_managers` con permission edit/admin per questo evento.
+- `canManage = isCreator || isManager` → controlla visibilità bottone "Cancella" in UI.
+
+**`EventTimelineFeed`** (`apps/web/src/components/event-timeline-feed.tsx`) riceve `canManage` + `onDeleteMedia` props e le propaga a `FacebookFeed`.
+
+**`FacebookFeed`** (`apps/web/src/components/facebook-feed.tsx`):
+- Show bottone "Cancella" (Trash2 icon) nella barra azioni solo se `canManage && onDeleteMedia`.
+- Click → pannello conferma inline (rosso chiaro) con "Annulla / Cancella" buttons.
+- `deletingId` state disabilita il bottone durante la DELETE in corso.
+- Chiave i18n `feed.cancella` aggiunta in 6 lingue (it, en-US, en-GB, de, fr, es).
+
+**`apps/web/src/app/events/[id]/page.tsx`**:
+- `canManage` state letto da `/api/events/[id]/details` (`d.canManage ?? d.isCreator`).
+- Passa `canManage` + `onDeleteMedia` callback al `EventTimelineFeed`.
+- La callback fa `fetch DELETE /api/media/[id]` + aggiorna lo state `media`/`videos` locali rimuovendo l'item cancellato (no refetch overhead).
+
+### Drive sync con ORIGINALE NON WATERMARKED (FIX 31/07/2026)
+
+**Modifica in `apps/web/src/lib/process-queue.ts`** (riga ~570, blocco Drive sync):
+
+```ts
+let driveBuffer: Buffer = buffer;
+if (hasDrive && folders) {
+  if (!isVideo) {
+    try {
+      const originalGetUrl = await getPresignedDownloadUrl(originalKey, 600);
+      if (originalGetUrl) {
+        const origResp = await fetch(originalGetUrl);
+        if (origResp.ok) driveBuffer = Buffer.from(await origResp.arrayBuffer()) as Buffer;
+      }
+    } catch (origErr) {
+      console.warn(...);
+      driveBuffer = buffer; // fallback watermarked — meglio imperfetto che niente
+    }
+  }
+}
+// ... drive multipart body ora usa driveBuffer invece di buffer
+```
+
+Strategia: l'originale NON watermarked è già salvato su R2 in `originals/${r2_key}` (riga 469, introdotto da FIX 29/07/2026). Per le FOTO, scarichiamo l'originale e lo mandiamo a Drive pulito. Per i VIDEO, il watermark è insito nel buffer ffmpeg (video-overlay applica overlay in-place, l'originale non è salvato su R2 per video >100MB) → Drive riceve il video watermarked (limite architetturale documentato).
+
+### Accreditamento uploader in galleria (FIX 31/07/2026)
+
+**`/api/events/[id]/media` route** ora arricchisce ogni record media con `uploader_name` e `uploader_role_at_event`:
+- Singola query su `core_users` per gli `uploaded_by` distinti.
+- `uploader_name = first_name + ' ' + last_name` se entrambi presenti, fallback a `name`.
+- Mappatura in memoria O(n) — nessun join DB additional.
+
+**`EventTimelineFeed`** usa `uploader_name + ' — ' + role_at_event` come author del post feed → "Mario Rossi — Testimone" appare in fronte al post foto, invece del fallback `couple_name`.
+
+Interfaccia `MediaUpload` in `packages/media/src/index.ts` estesa con `uploader_name?: string` e `uploader_role_at_event?: string | null` (campi arricchiti lato API route, NON popolati da `createMediaRecord`).
+
+### Verifica
+
+- **Typecheck**: `npx tsc --noEmit -p apps/web/tsconfig.json` → **0 errori**.
+- **Test**: `npx vitest run` → **314/316 verdi** (2 skipped librsvg/fontconfig invariati dalla sessione precedente). Nessun test nuovo per queste feature ( sono pull UI/service — saranno testati manualmente in produzione).
+- **Migration 00042 applicata live** + `NOTIFY pgrst, 'reload schema'` eseguito.
+- **Work-tree NON ancora commit/pushato** — 18 file modificati + 4 nuovi.
+
+### File modificati
+
+```
+supabase/migrations/00042_core_users_role_at_event.sql    NEW (colonna role_at_event)
+apps/web/src/app/api/auth/check-user/route.ts             NEW (POST existence check)
+apps/web/src/app/api/media/[id]/route.ts                 NEW (DELETE handler)
+apps/web/src/app/auth/callback/page.tsx                   ~+120 (OnboardingForm + router.refresh + finalizeAndRedirect)
+apps/web/src/app/api/auth/setup/route.ts                  +20 (roleAtEvent + UPDATE existing)
+apps/web/src/app/api/events/[id]/details/route.ts         +15 (isManager + canManage)
+apps/web/src/app/api/events/[id]/media/route.ts            +25 (enrich uploader_name/role_at_event)
+apps/web/src/app/events/[id]/page.tsx                     +25 (canManage state + handleDeleteMedia)
+apps/web/src/components/event-timeline-feed.tsx           +20 (canManage/onDeleteMedia props, author with uploader)
+apps/web/src/components/facebook-feed.tsx                 +50 (Trash2 icon, confirm inline, deletingId state, canManage/onDeleteMedia props)
+apps/web/src/lib/process-queue.ts                         +35 (driveBuffer = originale NO watermark)
+apps/web/src/middleware.ts                                +10 (flowType pkce + auth/callback escluso + redirect param)
+packages/media/src/index.ts                               +15 (MediaUpload uploader_name/role_at_event fields, deleteMediaById export)
+packages/media/src/service.ts                             +50 (deleteMediaById function)
+apps/web/messages/{it,en-US,en-GB,de,fr,es}.json          +1 riga ciascuno (chiave feed.cancella)
+```
+
+### TODO post-push (prossima sessione)
+
+1. **VERIFICARE IN PRODUZIONE** dopo commit/push:
+   - Login Google → arriva al redirect corretto, NON torna a /login.
+   - Form onboarding appare SOLO al primo login invitati via QR.
+   - Sessione resta dopo refresh/chiusura tab (cookie persistente PKCE flow).
+   - Bottone "Cancella" in galleria per sposo/delegato (non invitati). Conferma inline. Foto sparisce + R2 cleanup + originale Drive resta.
+   - Foto nuova su Drive scaricata SENZA watermark; foto in galleria CON watermark.
+   - "Mario Rossi — Testimone" appare come author del post feed foto (se l'uploader ha compilato role_at_event).
+
+2. **Commit + push atomico** da PowerShell (vedi PROMPT-PROSSIMA-CHAT.md per comandi).
+
+3. **Facebook OAuth** — utente abilita in Supabase Dashboard (Authentication → Providers → Facebook). Solo azione manuale.
+
+4. **Apple OAuth** — richiede Apple Developer Account $99/yr. Solo se l'utente vuole.
+
+5. **Drive doppi evento ee2cc954** — se ancora segnalati, scaricare lista file Drive reale per confronto.
+
+6. **Bug brand hardcoded Sposi.live** in `apps/web/src/app/api/auth/google/callback/route.ts:47` — passa `'Sposi.live'` invece di `event.brand`. Fix 1 riga.
+
+7. **Foto vecchie ee2cc954 senza original_r2_key** (28 foto) — scaricarle → cancellare → ricaricare per popolare original_r2_key.
+
+### Note tecniche importanti
+
+- **Best-effort R2 in `deleteMediaById`**: se il delete R2 fallisce (transient o key mancante per record pre-migration), il record DB viene comunque cancellato. Questo è preferibile: la foto sparisce dalla galleria (obiettivo utente) anche se resta un orphaned file su R2 (che verrà riciclato dal R2 lifecycle se configurato, o vivrà come垃圾). Meglio di un DB con record GM ma R2 inesistente (foto morta in galleria).
+- **Best-effort Drive in `deleteMediaById`**: se Drive 401/404, il file resta orphan su Drive ma il record sparisce da DB → foto non più visibile in galleria. Il backup originale Drive dello sposo resta accessibile (non toccato).
+- **Codice `exchangeCodeForSession` fallito ≠ bug sistema**: se l'utente chiude/riapre il tab durante OAuth Google, il `code_verifier` PKCE salvato in `sessionStorage` si perde → lo scambio fallisce. La callback ora gestisce questo con redirect a `/login?error=oauth_failed` dando feedback visibile (prima loop morto).
+- **`flowType: 'pkce'` nel middleware** è CRITICO per sessione persistente. Senza questo, dopo 1h di access_token scaduto, `getUser()` non refresha → utente sloggato. Con PKCE flow, getUser refresha automaticamente.
+
+---
+
+## Sessione 30/07/2026 (continua 2) — FIX 8 cuore PNG inline + misurazione real testo
+
+### FIX 8 ✅ PUSHATO (commit `743bdd6`, deploy Vercel Ready in 1m)
+**Richiesta utente**: "NIENTE CUORE SEMPRE IN BASSO ADDIRITTURA FUORI FOTOE SPAZI ECCESSIVO, INOLTRE LA SCRITTA è PICCOLA QUINDI AUMENTA DEL +75%" (dopo deploy `f506fa6` che non aveva risolto).
+
+**Root cause (FINALE) identificata con test render reali**:
+1. **librsvg su Vercel lambda NON renderizza correttamente `<path transform="translate(x y) scale(s)">`** — il path SVG con scaling viene renderizzato disallineato (cuore più alto del previsto) e più piccolo del scale richiesto. Test in locale: cuore a 200×200 → render via `<path transform>` → cuore renderizzato 19×16 px invece di 21×39 come richiesto da width/height del transform.
+2. **Stima `CHAR_WIDTH_ESTIMATE = textPx * 0.55` era inaccurata di 43px** per font Georgia 39px (real = 16.7px/media, stima = 21.45) → cuore posizionato 43px troppo a destra rispetto al limite reale del testo → "gap eccessivo".
+
+**Soluzione**:
+1. **PNG cuore pre-generato** (`packages/photo-overlay/src/heart-png.ts`): 200×200 px rosso #d9534f, embeddato come base64 (4644 char). Generato via script in `packages/photo-overlay/scripts/gen-heart-png.js` da `HEART_PATH_DATA` (normalizzato 20×20 viewBox → sharp renderizza a 200×200 PNG).
+2. **Cuore renderizzato via `<image href="data:image/png;base64,..." preserveAspectRatio="none">`** al posto del `<path transform>`. Test librsvg: cuori a 20/40/60/100 px producono 226/930/2115/5893 pixel rossi su questa macchina (rendering deterministicamente corretto, scala proporzionale al quadrato).
+3. **Misurazione REAL della larghezza dei segmenti di testo** (pre-pass con sharp): renderizza ogni segmento su un canvas di prova alto `actualTextPx * 2 + 8`, trova il rightmost pixel non-bianco (valore luma > 128), usa quella misura REAL per posizionare il cuore subito dopo il testo (no gap, no overlap). Padding di 2px per evitare che il cuore tocchi l'ultimo carattere. Fallback su stima empirica `* 0.85` se la misurazione fallisce.
+4. **Cuore quadrato** (`width = actualTextPx, height = actualTextPx`) come un glifo quadrato del font.
+
+**Verifica**:
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Test: **314/316 verdi** (2 skipped integration: librsvg/fontconfig richiede FONTCONFIG_PATH completo non disponibile in vitest+jsdom).
+- Deploy: commit `743bdd6` pushato → Vercel deployment `fotosposi-1lx880i4d` Ready in 1m.
+- **ANCORA NON TESTATO IN PRODUZIONE dall'utente** — la fix vera è quella di questo commit.
+
+### OAuth Google/Facebook — diagnosi via API
+
+**Test diretto** `/auth/v1/authorize?provider=X` con anon key:
+
+| Provider | Stato Supabase | Azione richiesta |
+|----------|----------------|------------------|
+| Google | ✅ **Abilitato e funzionante** — 2 utenti reali registrati via Google (`ilpostoce@gmail.com` 29/07, `immobilagent76@gmail.com` 28/07). OAuth redirect a `accounts.google.com` con Client ID `846532943146-...apps.googleusercontent.com`. | URL redirect autorizzati in Google Cloud Console. |
+| Facebook | ❌ **NON abilitato** in Supabase Dashboard. API ritorna 400 body vuoto. | **Attivare** in Supabase Dashboard → Authentication → Providers → Facebook → Enabled + App ID/Secret di Meta Developers. |
+| Apple | ❌ **NON abilitato** in Supabase Dashboard. API ritorna 400. | Richiede setup Apple Developer Account ($99/yr). |
+
+**Per abilitare Facebook** (manuale, solo utente può farlo):
+1. https://developers.facebook.com/ → Create App → tipo "Consumer" → nome "Sposi.live".
+2. App Settings → Basic → ottieni **App ID** e **App Secret**.
+3. Facebook Login → Setup → web → Aggiungi Valid OAuth Redirect URI:
+   `https://krgqyluuiltckmhbeuue.supabase.co/auth/v1/callback`
+4. Supabase Dashboard → Authentication → Providers → Facebook → toggle Enabled → incolla App ID + App Secret → Save.
+5. Facebook App deve essere "Live": App Review → permissions `email`, `public_profile`.
+
+**Importante**: Google OAuth usa lo stesso Client ID (`846532943146-...`) per entrambi i flussi:
+1. Custom Drive Backup (`/api/auth/google/callback`) — scope `drive.file email`.
+2. Supabase Auth login (via `signInWithOAuth('google')`) — redirect `https://krgqyluuiltckmhbeuue.supabase.co/auth/v1/callback`.
+
+Entrambi devono essere elencati in Google Cloud Console → Credentials → OAuth 2.0 Client ID `846532943146-...` → "Authorized redirect URIs".
+
+### Drive doppi — diagnosi DB
+
+- Evento `ee2cc954`: 100 foto in `media_uploads`, **0 duplicati** su stesso `r2_key` (unique constraint `uniq_media_event_r2key` OK).
+- 71/100 foto senza `original_r2_key` (pre-migration 00040, watermark sovrapposto se ri-processate).
+- 28/100 foto marchiate `watermark_missing = true`.
+
+Naming Drive: `${YYYY_MM_DD_HH_MM_SS}_${uploaderName}_${safeOriginal}` → ogni caricamento è UNIVOCO. I "doppi" su Drive NON sono duplicati r2_key → cause possibili:
+1. Cron retry: se Drive POST ha fallito a metà (POST inviato, response non ricevuto) il secondo tentativo ri-uploada. Auto-cleanup (riga 426-430) protegge gli item con `drive_file_id` già presente.
+2. Documenti iPhone camera con stesso nome (`1000144023.jpg`): due invitati diversi caricano foto distinte con stesso nome → due file su Drive diversi uploader → apparentemente "doppi" ma contenuti diversi.
+
+Verifica raccomandata: scaricare la lista file Drive via OAuth, confrontare con `media_uploads`. Da affrontare prossima sessione se serve.
+
+### Test integration — stato
+
+314 test verdi totali. 2 test **SKIPPED** in `packages/photo-overlay/src/__tests__/index.integration.test.ts`:
+- `il cuore ❤ è SEMPRE rosso ed e rilevabile anche senza font di sistema disponibili`
+- `con fontBuffer embeddato, logo e nomi sono rilevati insieme al cuore`
+
+Richiedono librsvg con fontconfig completo non disponibile in ambienti vitest+jsdom. Su shell standalone `node` con sharp diretto il PNG cuore viene renderizzato correttamente (418 pixel rossi totali su 800×600 canvas). Da riattivare in futuro in ambiente CI dedicato.
+
+### File modificati
+
+```
+packages/photo-overlay/src/heart-png.ts                            NEW (export base64 4644 char)
+packages/photo-overlay/src/index.ts                                ~+140/-100 righe (PNG + misurazione real)
+packages/photo-overlay/src/__tests__/heart-inline.test.ts          +/-20 (5 test a <image>)
+packages/photo-overlay/src/__tests__/index.test.ts                +/-25 (2 test a <image>)
+packages/photo-overlay/scripts/gen-heart-png.js                    NEW (rigenera PNG)
+packages/photo-overlay/scripts/heart-200-base64.txt                NEW (artifact)
+packages/photo-overlay/scripts/heart-base64.txt                    NEW (artifact)
+packages/photo-overlay/scripts/test-heart-png.js                   NEW (test harness)
+packages/photo-overlay/scripts/.gitignore                          NEW (esclude *.png *.jpg)
+PROJECT_STATUS.md                                                  +60 righe
+```
+
+### TODO post-push (prossima sessione)
+
+1. **VERIFICA URGENTE utente produzione** — scaricare una foto recente su evento `ee2cc954` e verificare:
+   - Cuore visibile e allineato verticalmente col testo (baselineY)
+   - Testo "Agostino ❤ Danila — 30/07/2026" più grande (+75%)
+   - Gap tra testo/cuore/testo minimo (≤2-3px)
+   - Se ancora non funziona: leggere log Vercel `/api/r2/process-queue` per `misurazione testo: segments=... widths=...`.
+
+2. **Drive doppi** — se ancora presenti:
+   - Scaricare lista file Drive OAuth per evento `ee2cc954`
+   - Confrontare con `media_uploads.r2_key`
+
+3. **OAuth Facebook** — utente deve abilitare Facebook in Supabase Dashboard (vedi istruzioni sopra). Solo azione manuale.
+
+4. **OAuth Google Cloud Console** — verificare "Authorized redirect URIs" includa:
+   ```
+   https://krgqyluuiltckmhbeuue.supabase.co/auth/v1/callback  (Supabase OAuth login)
+   https://www.sposi.live/api/auth/google/callback              (Drive backup custom)
+   https://sposi.live/api/auth/google/callback
+   https://www.justmarry.live/api/auth/google/callback
+   https://justmarry.live/api/auth/google/callback
+   http://localhost:3000/api/auth/google/callback
+   ```
+
+5. **Bug residuo brand hardcoded** in `/api/auth/google/callback/route.ts:47` — passa `'Sposi.live'` invece di `event.brand` a `ensureDriveFolders`. Per JustMarry.live le cartelle si chiamano "Sposi.live". Fix rapido (1 riga).
+
+### Architettura finale rendering watermark (post-FIX 8)
+
+```
+applyOverlay(imageBuffer, branding)
+    │
+    ├── 1. story/square resize (1080x1920 + image inside)
+    ├── 2. sharp.stats bottom-25% → autoText black/white
+    ├── 3. split coupleNames su ❤ (strippa U+FE0F VS16)
+    ├── 4. SAFETY CHECK: actualTextPx*0.92 se > maxWidth
+    ├── 5. Font embeddato @font-face + data URI base64 (fontBuffer)
+    ├── 6. MISURAZIONE REAL testo:
+    │      - Render ogni segmento su canvas prova 600x(actualTextPx*2+8)
+    │      - Flatten nero + greyscale + rightmost pixel > 128
+    │      - segmentWidths[i] = rightmost + 2px padding
+    │      - Fallback stima*0.85 se misurazione fallisce
+    ├── 7. SVG watermark:
+    │      - <text> per ogni segmento (x,y absolute)
+    │      - <image href="data:image/png;base64,HEART_PNG_BASE64"
+    │        preserveAspectRatio="none" x=cursorX y=baselineY-actualTextPx
+    │        width=actualTextPx height=actualTextPx/> per ogni cuore
+    │      - viewBox="0 0 imgWidth imgHeight" esplicito
+    ├── 8. Logo brand top-right A COLORI (sharp resize 25.5% clamp 135-680)
+    └── 9. Sharp composite(.jpeg({quality:92}).toBuffer())
+
+HEART_PNG_BASE64 = PNG 200x200 px rosso #d9534f
+                   generato una tantum via gen-heart-png.js
+                   <image width height preserveAspectRatio=none>
+                   per riempire slot quadrato deterministiquement
+```
+
+---
+
 ## Sessione 30/07/2026 — FIX 6 cuore come carattere + inizio FIX 7 solidità operativa
 
 ### FIX 6 ✅ PUSHATO (commit `6172bb2`)

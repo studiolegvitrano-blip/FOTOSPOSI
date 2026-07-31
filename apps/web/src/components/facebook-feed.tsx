@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
-import { Share2, MessageCircle, ThumbsUp, X } from 'lucide-react';
+import { Share2, MessageCircle, ThumbsUp, X, Trash2 } from 'lucide-react';
 import ReactionsBar, { type ReactionType } from './reactions-bar';
 
 export type FeedPost = {
@@ -36,6 +36,13 @@ type Props = {
   containerClassName?: string;
   /** event_id per persistere reazioni/commenti nel DB (vedi /api/feed/{reactions,comments}). */
   eventId?: string;
+  /**
+   * true se l'utente corrente è sposo (creator) o delegato (event_managers edit/admin).
+   * Mostra il pulsante "Cancella" sotto ogni foto. Default false (invitato ordinario).
+   */
+  canManage?: boolean;
+  /** Callback per cancellare una foto. Chiamata solo se canManage === true. */
+  onDeleteMedia?: (postId: string) => void;
 };
 
 /* Avatar con iniziali se manca la foto profilo */
@@ -82,6 +89,8 @@ export default function FacebookFeed({
   onOpenImage,
   containerClassName = '',
   eventId,
+  canManage = false,
+  onDeleteMedia,
 }: Props & { eventId?: string }) {
   const t = useTranslations('feed');
   const [commentsOpen, setCommentsOpen] = useState<Set<string>>(new Set());
@@ -91,6 +100,8 @@ export default function FacebookFeed({
   const [commentDraft, setCommentDraft] = useState<Record<string, string>>({});
   const [extraComments, setExtraComments] = useState<Record<string, { id?: string; author: string; text: string; created_at?: string }[]>>({});
   const [commentsLoading, setCommentsLoading] = useState<Set<string>>(new Set());
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -352,7 +363,52 @@ export default function FacebookFeed({
                   <span>{t('condividi')}</span>
                 </button>
               )}
+              {canManage && onDeleteMedia && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteId(p.id)}
+                  disabled={deletingId === p.id}
+                  className="flex-1 w-full flex items-center justify-center gap-2 py-2 rounded-md hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                  title="Cancella questa foto dalla galleria"
+                >
+                  <Trash2 size={18} />
+                  <span>{deletingId === p.id ? '...' : t('cancella')}</span>
+                </button>
+              )}
             </div>
+
+            {/* Conferma cancellazione inline (solo per sposo/delegato) */}
+            {confirmDeleteId === p.id && (
+              <div className="px-4 py-3 border-t border-border bg-red-50/50">
+                <p className="text-sm text-text mb-2">Vuoi davvero cancellare questa foto dalla galleria? L'originale resta nel backup Drive dello sposo.</p>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteId(null)}
+                    disabled={deletingId === p.id}
+                    className="px-3 py-1.5 text-sm rounded-md border border-border bg-surface hover:bg-muted disabled:opacity-50"
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setDeletingId(p.id);
+                      try {
+                        if (onDeleteMedia) await onDeleteMedia(p.id);
+                      } finally {
+                        setDeletingId(null);
+                        setConfirmDeleteId(null);
+                      }
+                    }}
+                    disabled={deletingId === p.id}
+                    className="px-3 py-1.5 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {deletingId === p.id ? 'Cancello...' : 'Cancella'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Sezione commenti collassabile */}
             {commentsOpen.has(p.id) && (

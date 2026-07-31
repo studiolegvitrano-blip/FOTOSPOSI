@@ -44,7 +44,9 @@ export async function GET(req: NextRequest) {
     updated_at: new Date().toISOString(),
   }, { onConflict: 'event_id' });
 
-  const { folders } = await ensureDriveFolders(tokens.access_token, 'Sposi.live');
+  const { data: eventRow } = await supabase.from('events').select('brand').eq('id', eventId).maybeSingle();
+  const brand = eventRow?.brand === 'JustMarry.live' ? 'JustMarry.live' : 'Sposi.live';
+  const { folders } = await ensureDriveFolders(tokens.access_token, brand);
   if (folders) {
     for (const [name, folderId] of Object.entries(folders)) {
       if (folderId) {

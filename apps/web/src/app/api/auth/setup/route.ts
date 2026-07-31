@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
-  const { userId, email, name, firstName, lastName, phone, gdprConsent, marketingConsent, eventId } = await req.json();
+  const { userId, email, name, firstName, lastName, phone, gdprConsent, marketingConsent, eventId, roleAtEvent } = await req.json();
   if (!userId || !email || !name) {
     return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 });
   }
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   // Chi crea il proprio evento (sposi/amministratori) vs chi si registra da un invito/QR
   // (invitati, il cui compito è caricare foto/video) sono due percorsi diversi: prima venivano
   // trattati allo stesso modo (sempre role 'sposo', senza event_id), quindi un invitato che si
-  // registrava non risultava mai socio/membro dell'evento a cui era stato invitato — vedeva
+  // registrava non resultava mai socio/membro dell'evento a cui era stato invitato — vedeva
   // "nessun evento" in dashboard e le policy RLS su media_uploads/event_windows (che controllano
   // core_users.event_id) bloccavano anche il caricamento foto una volta tornato sulla pagina giusta.
   let event: { tenant_id: string } | null = null;
@@ -34,11 +34,20 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (existing) {
+    // Aggiorna i campi se l'utente sta rifacendo onboarding (raro). Non blocchiamo.
+    await supabase.from('core_users').update({
+      first_name: firstName ?? null,
+      last_name: lastName ?? null,
+      phone: phone ?? null,
+      role_at_event: roleAtEvent ?? null,
+    }).eq('id', userId);
     return NextResponse.json({ ok: true });
   }
 
   if (event) {
     // Invitato: nessun tenant proprio, appartiene al tenant dell'evento a cui è stato invitato.
+    // `role_at_event` descrive il ruolo RELATIVO al matrimonio (Testimone/Parente/Amico/Altro manuale)
+    // — distinto da `role` (sposo/invitato/manager/admin) che è il ruolo nella piattaforma.
     const { error: guestErr } = await supabase.from('core_users').insert({
       id: userId,
       email,
@@ -49,6 +58,7 @@ export async function POST(req: NextRequest) {
       gdpr_consent_at: new Date().toISOString(),
       marketing_consent: !!marketingConsent,
       role: 'invitato',
+      role_at_event: roleAtEvent ?? null,
       tenant_id: event.tenant_id,
       event_id: eventId,
     });
