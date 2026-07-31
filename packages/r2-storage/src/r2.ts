@@ -20,7 +20,6 @@ function getClient() {
   });
   return client;
 }
-
 export type UploadResult = { success: true; key: string; url: string } | { success: false; error: string };
 
 function safeKey(prefix: string, filename: string): string {
@@ -53,6 +52,27 @@ export async function getPresignedDownloadUrl(key: string, expiresIn = 3600): Pr
     const cfg = defaultConfig();
     const command = new GetObjectCommand({ Bucket: cfg.bucket, Key: key });
     return await getSignedUrl(getClient(), command, { expiresIn });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * FIX 31/07/2026: scarica un oggetto R2 direttamente via SDK (GetObjectCommand + stream)
+ * invece di generare una presigned URL. Su Vercel lambda il presigner di @aws-sdk/
+ * s3-request-presigner@3.1078.0 cadeva in "b is not a function" (webpack tree-shaking
+ * errato del middleware stack), quindi `getPresignedDownloadUrl` ritornava sempre null
+ * e la galleria non poteva più visualizzare nessuna foto/video. Questa funzione bypassa
+ * quel problema usando solo il client S3 base.
+ */
+export async function downloadObjectBuffer(key: string): Promise<Buffer | null> {
+  try {
+    const cfg = defaultConfig();
+    const obj = await getClient().send(new GetObjectCommand({ Bucket: cfg.bucket, Key: key }));
+    if (!obj.Body) return null;
+    const chunks: Buffer[] = [];
+    for await (const chunk of obj.Body as AsyncIterable<Buffer>) chunks.push(chunk);
+    return Buffer.concat(chunks);
   } catch {
     return null;
   }

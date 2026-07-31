@@ -21,6 +21,7 @@ export function getEndpoint(accountId: string): string {
 export {
   getPresignedUploadUrl,
   getPresignedDownloadUrl,
+  downloadObjectBuffer,
   uploadFromBuffer,
   deleteObject,
   objectExists,

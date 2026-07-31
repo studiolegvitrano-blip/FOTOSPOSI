@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createVideoMessage, getVideoMessages } from '@fotosposi/media';
 import { createServiceClient } from '@fotosposi/core';
-import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
 import { applyVideoOverlay } from '@fotosposi/video-overlay';
 import { watermarkFontFamily } from '@/lib/watermark-fonts';
 import { ensureWatermarkFonts, loadBrandLogo } from '@/lib/watermark-fonts.server';
@@ -51,11 +50,33 @@ async function watermarkGuestbookVideo(eventId: string, r2Key: string): Promise<
   const line1 = !namesEnabled ? '' : (customText || event?.couple_name || '');
   const line2 = !namesEnabled || customText ? '' : (event?.date ? new Date(event.date).toLocaleDateString('it-IT') : '');
 
-  const downloadUrl = await getPresignedDownloadUrl(r2Key, 3600);
-  if (!downloadUrl) return;
-  const resp = await fetch(downloadUrl);
-  if (!resp.ok) return;
-  const original = Buffer.from(await resp.arrayBuffer());
+  // FIX 31/07/2026: usa direttamente GetObjectCommand + PutObjectCommand invece di
+  // getPresignedDownloadUrl+fetch+redirect. Il presigner di @aws-sdk/s3-request-presigner
+  // 3.1078.0 cadeva in "b is not a function" su Vercel lambda (webpack bundling del
+  // middleware stack), e il catch silenzioso di getPresignedDownloadUrl ritornava null →
+  // `if (!downloadUrl) return` → video salvato senza watermark. Lo stream diretto
+  // evita quella dipendenza e fa una sola copia in memoria del buffer.
+  const { S3Client, GetObjectCommand, PutObjectCommand } = await import('@aws-sdk/client-s3');
+  const client = new S3Client({
+    region: 'auto',
+    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+    },
+  });
+
+  const bucket = process.env.R2_BUCKET || 'fotosposi-uploads';
+  let original: Buffer;
+  try {
+    const obj = await client.send(new GetObjectCommand({ Bucket: bucket, Key: r2Key }));
+    if (!obj.Body) return;
+    const chunks: Buffer[] = [];
+    for await (const chunk of obj.Body as AsyncIterable<Buffer>) chunks.push(chunk);
+    original = Buffer.concat(chunks);
+  } catch {
+    return;
+  }
 
   const branded = await applyVideoOverlay(original, {
     branding: {
@@ -70,17 +91,8 @@ async function watermarkGuestbookVideo(eventId: string, r2Key: string): Promise<
   });
   if (branded === original) return; // video troppo lungo: lasciato originale
 
-  const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
-  const client = new S3Client({
-    region: 'auto',
-    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
-    },
-  });
   await client.send(new PutObjectCommand({
-    Bucket: process.env.R2_BUCKET || 'fotosposi-uploads',
+    Bucket: bucket,
     Key: r2Key,
     Body: branded,
     ContentType: 'video/mp4', // l'overlay ri-codifica sempre in H.264/AAC MP4
