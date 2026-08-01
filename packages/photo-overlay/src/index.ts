@@ -120,12 +120,22 @@ export async function applyOverlay(
   // `x = cursorEndOfLeftText + (HEART_WIDTH/2)`, dove cursorEndOfLeftText è
   // misurato dal textLength del <text> (non da stime char-width). Il path cuore
   // è alto quanto il font, posizionato alla baseline con translate.
+  //
+  // FIX 31/07/2026 (richiesta utente: "spesso in base al carattere il watermark
+  // esce fuori dalla foto... la cosa importante che rientri interamente nella
+  // foto"): la dimensione del font ora è derivata dalla dimensione MINORE della
+  // foto (non dall'altezza), così per foto verticali il testo parte già proporzionato
+  // alla larghezza disponibile e non rischia di sforare.
   const RAW_HEART = '\u2764';
   const VARIANT_SELECTOR = '\ufe0f';
   const cleanText = (branding.coupleNames ?? '').split(VARIANT_SELECTOR).join('');
   const segments = cleanText.split(RAW_HEART).map((s) => s.trim());
+  // FIX 31/07/2026: base derivato dalla dimensione MINORE (no overflow verticale).
+  // Per foto verticali (portrait, es. 1080×1920 story) la dimensione limitante
+  // è la larghezza, non l'altezza — altrimenti testo gigante su foto strette.
+  const minDim = Math.min(imgWidth, imgHeight);
   const basePx = Math.min(
-    Math.max(20, Math.round(imgHeight * 0.036)),
+    Math.max(20, Math.round(minDim * 0.036)),
     format === 'story' ? 56 : 36,
   );
   const textPx = Math.round(basePx * 1.75);
@@ -148,10 +158,13 @@ export async function applyOverlay(
   // automaticamente la dimensione del testo.
   let actualTextPx = textPx;
   let actualPadLeft = padLeft;
-  const maxWidth = imgWidth - 16;
+  // FIX 31/07/2026: maxWidth ora considera ENTRAMBI i lati (sinistro + destro),
+  // non solo -16 dal destro. Per stringhe lunghe serve margine anche a sinistra.
+  const SIDE_PADDING = 12;
+  const maxWidth = imgWidth - 2 * SIDE_PADDING;
   while (monoWidth > maxWidth && actualTextPx > 12) {
     actualTextPx = Math.round(actualTextPx * 0.92);
-    actualPadLeft = Math.min(actualPadLeft, 8);
+    actualPadLeft = Math.min(actualPadLeft, SIDE_PADDING);
     const factor = actualTextPx / textPx;
     monoWidth = 0;
     for (let i = 0; i < segments.length; i++) {
@@ -238,6 +251,66 @@ export async function applyOverlay(
     for (let i = 0; i < segments.length; i++) {
       segmentWidths[i] = (segments[i]?.length ?? 0) * CHAR_WIDTH_ESTIMATE * 0.85; // 0.85 = corretto empirico
     }
+  }
+
+  // ── POST-SCALING CHECK basato su misura REAL ──
+  // FIX 31/07/2026 (utente: "il watermark esce fuori dalla foto"): dopo la
+  // misurazione REAL verifichiamo che la somma (segmenti + cuori quadrati)
+  // rientri effettivamente in maxWidth. Se no → riduci actualTextPx del 10%
+  // e rifai la misurazione REAL. Loop al massimo 6 volte (12px floor).
+  // NB: questo check usa i segmentWidths REALI, non la stima char-width.
+  {
+    const realTotalWidth =
+      segmentWidths.reduce((acc, w) => acc + w, 0) +
+      Math.max(0, segments.length - 1) * actualTextPx; // cuori quadrati
+    let iterations = 0;
+    while (realTotalWidth > maxWidth && actualTextPx > 12 && iterations < 6) {
+      actualTextPx = Math.round(actualTextPx * 0.9);
+      actualPadLeft = Math.min(actualPadLeft, SIDE_PADDING);
+      // Re-misura segmenti con la nuova actualTextPx (best-effort, può fallire)
+      try {
+        const slotW = 600;
+        const measureCanvasW = Math.min(3000, segments.length * slotW + 8);
+        const measureCanvasH = actualTextPx * 2 + 8;
+        const reSvg = `<svg width="${measureCanvasW}" height="${measureCanvasH}" xmlns="http://www.w3.org/2000/svg">
+          ${fontFaceDefs}
+          ${segments.map((seg, i) => `<text x="${4 + i * slotW}" y="${actualTextPx + 4}" font-family="${resolvedFontFamily}" font-size="${actualTextPx}" fill="#ffffff" font-weight="500">${escapeXml(seg || '')}</text>`).join('')}
+        </svg>`;
+        const reBuf = await sharp(Buffer.from(reSvg))
+          .flatten({ background: { r: 0, g: 0, b: 0 } })
+          .greyscale()
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        const { data: md2, info: mi2 } = reBuf;
+        for (let i = 0; i < segments.length; i++) {
+          const xStart = 4 + i * slotW;
+          const xEnd = Math.min(xStart + slotW, mi2.width);
+          let rightmost = 0;
+          for (let y = 0; y < mi2.height; y++) {
+            for (let x = xStart; x < xEnd; x++) {
+              const idx = (y * mi2.width + x) * mi2.channels;
+              if ((md2[idx] ?? 0) > 128) {
+                const relX = x - xStart;
+                if (relX > rightmost) rightmost = relX;
+              }
+            }
+          }
+          segmentWidths[i] = rightmost + 2;
+        }
+      } catch {
+        // Misurazione fallita: scala linearmente la stima precedente
+        const factor = actualTextPx / textPx;
+        for (let i = 0; i < segmentWidths.length; i++) {
+          const cur = segmentWidths[i] ?? 0;
+          segmentWidths[i] = Math.round(cur * factor);
+        }
+      }
+      iterations++;
+    }
+    const finalTotal =
+      segmentWidths.reduce((acc, w) => acc + w, 0) +
+      Math.max(0, segments.length - 1) * actualTextPx;
+    console.log(`[applyOverlay] post-scaling check: actualTextPx=${actualTextPx}px, realTotal=${finalTotal}px, maxWidth=${maxWidth}px, iterations=${iterations}`);
   }
 
   // ── BUILDS SVG (text + hearts in un unico stream tipografico) ──
