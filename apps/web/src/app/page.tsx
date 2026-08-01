@@ -329,10 +329,10 @@ export default async function Home() {
               </svg>
             </a>
             <a
-              href="https://x.com/sposilive"
+              href="https://x.com/SposiLive"
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="X (Twitter)"
+              aria-label="X (Twitter) @SposiLive"
               className="text-text-muted hover:text-brand transition-colors"
             >
               <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
