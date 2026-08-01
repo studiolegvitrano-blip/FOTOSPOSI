@@ -281,7 +281,19 @@
     "wow_walk": "Wow Walk",
     "privacy": "Gästedatenschutz",
     "notifications": "Benachrichtigungen",
-    "concierge": "AI Concierge"
+    "concierge": "AI Concierge",
+    "cd_countdown_intro": "Wir heiraten in",
+    "cd_days": "Tage",
+    "cd_hours": "Stunden",
+    "cd_minutes": "Minuten",
+    "cd_seconds": "Sekunden",
+    "cd_enter_app": "App öffnen",
+    "cd_ceremony_title": "Willkommen zur Trauung!",
+    "cd_ceremony_subtitle": "Wir sagen gleich Ja",
+    "cd_reception_title": "Willkommen zur Feier!",
+    "cd_reception_subtitle": "Die Party kann beginnen",
+    "cd_ended_title": "Danke an alle!",
+    "cd_ended_subtitle": "Es war ein unvergesslicher Tag"
   },
   "site_builder": {
     "title": "Hochzeitswebsite",
@@ -707,5 +719,36 @@
     "reaction_sigh": "Ach",
     "reaction_grrr": "Grrr",
     "persone_ammirano": "Leute bewundern die Erinnerungen"
+  },
+  "calendar_menu": {
+    "add_to_calendar": "Zum Kalender hinzufügen",
+    "google": "Google Kalender",
+    "outlook": "Outlook",
+    "apple": "Apple Kalender (.ics)"
+  },
+  "weather": {
+    "title": "Wetter",
+    "loading": "Wetter wird geladen...",
+    "unavailable": "Wetter nicht verfügbar",
+    "rain": "Regen",
+    "sunny": "Sonnig",
+    "mostly_sunny": "Überwiegend sonnig",
+    "partly_cloudy": "Teilweise bewölkt",
+    "cloudy": "Bewölkt",
+    "fog": "Nebel",
+    "drizzle": "Nieselregen",
+    "freezing_drizzle": "Eisiger Nieselregen",
+    "light_rain": "Leichter Regen",
+    "heavy_rain": "Starker Regen",
+    "freezing_rain": "Eisregen",
+    "light_snow": "Leichter Schneefall",
+    "snow": "Schnee",
+    "heavy_snow": "Starker Schneefall",
+    "snow_grains": "Schneegriesel",
+    "showers": "Regenschauer",
+    "snow_showers": "Schneeschauer",
+    "thunderstorm": "Gewitter",
+    "hail": "Hagel",
+    "unknown": "Gemischte Bedingungen"
   }
 }

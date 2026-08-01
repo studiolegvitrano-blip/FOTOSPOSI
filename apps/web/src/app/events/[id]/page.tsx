@@ -11,6 +11,8 @@ import { Share2, Church, Building2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { AddToCalendarMenu } from '@/components/add-to-calendar-menu';
+import WeatherWidget from '@/components/weather-widget';
 import type { WeddingEvent, SubEvent, EventWindow } from '@fotosposi/events';
 import type { MediaUpload } from '@fotosposi/media';
 import EventTimelineFeed from '@/components/event-timeline-feed';
@@ -35,6 +37,8 @@ export default function EventDetailPage() {
   const [showCountdown, setShowCountdown] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
   const [canManage, setCanManage] = useState(false);
+  const [ceremonyTime, setCeremonyTime] = useState<string | undefined>();
+  const [receptionTime, setReceptionTime] = useState<string | undefined>();
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,6 +58,10 @@ export default function EventDetailPage() {
         // Restituito da /api/events/[id]/details a partire dal 31/07/2026.
         setCanManage(d.canManage ?? d.isCreator ?? false);
       }
+      // Orari cerimonia/ricevimento dal SiteContent pubblicato (site-builder), passati
+      // dalla route details (01/08/2026). Se assenti → fallback 11:00/13:00 nel Countdown.
+      if (typeof d.ceremonyTime === 'string') setCeremonyTime(d.ceremonyTime);
+      if (typeof d.receptionTime === 'string') setReceptionTime(d.receptionTime);
       if (d.subEvents) setSubEvents(d.subEvents);
       if (d.window) setEvtWindow(d.window);
       if (m.media) setMedia(m.media);
@@ -68,14 +76,63 @@ export default function EventDetailPage() {
   const tier = (event.tier || 'free') as Tier;
   const showWidget = showCountdown && hasFeature(tier, 'countdown_widget');
 
+  // Orari cerimonia/ricevimento: arrivano dal SiteContent (site-builder) via
+  // /api/events/[id]/details. Fallback 11:00/13:00 solo se il draft non li ha
+  // (niente migration DB — decisione 31/07/2026). Rispettano eventi serali.
+  const ceremonyAddress = [event.church, event.church_address, event.church_city || event.location]
+    .filter(Boolean)
+    .join(', ');
+  const receptionAddress = [event.venue, event.venue_address, event.venue_city || event.location]
+    .filter(Boolean)
+    .join(', ');
+  const countdownLabels = {
+    countdown_intro: t('cd_countdown_intro'),
+    days: t('cd_days'),
+    hours: t('cd_hours'),
+    minutes: t('cd_minutes'),
+    seconds: t('cd_seconds'),
+    enter_app: t('cd_enter_app'),
+    ceremony_title: t('cd_ceremony_title'),
+    ceremony_subtitle: t('cd_ceremony_subtitle'),
+    reception_title: t('cd_reception_title'),
+    reception_subtitle: t('cd_reception_subtitle'),
+    ended_title: t('cd_ended_title'),
+    ended_subtitle: t('cd_ended_subtitle'),
+  };
+
+  // Città per il widget meteo: priorità alle città specifiche di cerimonia/ricevimento,
+  // fallback al comune generico dell'evento. Il widget usa Open-Meteo e appare solo
+  // da 3 giorni prima dell'evento — nessun input extra per gli sposi.
+  const weatherCity = event.venue_city || event.church_city || event.location;
+
   return (
     <>
       {showWidget && (
         <Countdown
           targetDate={event.date}
           coupleName={event.couple_name}
+          time={ceremonyTime || undefined}
+          ceremonyTime={ceremonyTime}
+          receptionTime={receptionTime}
+          ceremonyAddress={ceremonyAddress}
+          receptionAddress={receptionAddress}
+          labels={countdownLabels}
           onEnter={() => { setShowCountdown(false); contentRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
-        />
+        >
+          <AddToCalendarMenu
+            date={event.date}
+            time={ceremonyTime || '11:00'}
+            title={`Matrimonio ${event.couple_name}`}
+            address={ceremonyAddress || undefined}
+            note={`Cerimonia${receptionAddress ? ' - Ricevimento: ' + receptionAddress : ''}`}
+            durationMinutes={receptionTime ? 480 : 120}
+            size="sm"
+            variant="outline"
+          />
+          <div className="mt-3 flex flex-col items-center gap-2">
+            <WeatherWidget city={weatherCity} eventDate={event.date} />
+          </div>
+        </Countdown>
       )}
 
       {!showWidget && <div ref={contentRef}>

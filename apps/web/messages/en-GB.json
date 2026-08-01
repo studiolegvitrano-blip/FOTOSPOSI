@@ -281,7 +281,19 @@
     "wow_walk": "Wow Walk",
     "privacy": "Guest Privacy",
     "notifications": "Notifications",
-    "concierge": "AI Concierge"
+    "concierge": "AI Concierge",
+    "cd_countdown_intro": "We're getting married in",
+    "cd_days": "Days",
+    "cd_hours": "Hours",
+    "cd_minutes": "Minutes",
+    "cd_seconds": "Seconds",
+    "cd_enter_app": "Enter the app",
+    "cd_ceremony_title": "Welcome to the ceremony!",
+    "cd_ceremony_subtitle": "We're about to say I do",
+    "cd_reception_title": "Welcome to the reception!",
+    "cd_reception_subtitle": "Let the party begin",
+    "cd_ended_title": "Thank you all!",
+    "cd_ended_subtitle": "It was an unforgettable day"
   },
   "site_builder": {
     "title": "Wedding website",
@@ -707,5 +719,36 @@
     "reaction_sigh": "Sigh",
     "reaction_grrr": "Grrr",
     "persone_ammirano": "People are admiring the memories"
+  },
+  "calendar_menu": {
+    "add_to_calendar": "Add to calendar",
+    "google": "Google Calendar",
+    "outlook": "Outlook",
+    "apple": "Apple Calendar (.ics)"
+  },
+  "weather": {
+    "title": "Weather",
+    "loading": "Loading weather...",
+    "unavailable": "Weather unavailable",
+    "rain": "Rain",
+    "sunny": "Sunny",
+    "mostly_sunny": "Mostly sunny",
+    "partly_cloudy": "Partly cloudy",
+    "cloudy": "Cloudy",
+    "fog": "Fog",
+    "drizzle": "Drizzle",
+    "freezing_drizzle": "Freezing drizzle",
+    "light_rain": "Light rain",
+    "heavy_rain": "Heavy rain",
+    "freezing_rain": "Freezing rain",
+    "light_snow": "Light snow",
+    "snow": "Snow",
+    "heavy_snow": "Heavy snow",
+    "snow_grains": "Snow grains",
+    "showers": "Showers",
+    "snow_showers": "Snow showers",
+    "thunderstorm": "Thunderstorm",
+    "hail": "Hail",
+    "unknown": "Mixed conditions"
   }
 }

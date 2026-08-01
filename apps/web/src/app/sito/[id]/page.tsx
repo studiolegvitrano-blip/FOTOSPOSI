@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { generateIcsLink } from '@fotosposi/site-builder';
 import type { SiteDraft } from '@fotosposi/site-builder';
 import WeddingFeedDemo from '@/components/wedding-feed-demo';
+import WeatherWidget from '@/components/weather-widget';
 
 async function getDraft(draftId: string): Promise<{ draft: SiteDraft | null; template: any | null }> {
   const cookieStore = await cookies();
@@ -11,13 +12,16 @@ async function getDraft(draftId: string): Promise<{ draft: SiteDraft | null; tem
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } },
   );
-  const { data } = await supabase.from('site_drafts').select('*, events!inner(couple_name, date), site_templates!left(*)').eq('id', draftId).single();
+  const { data } = await supabase.from('site_drafts').select('*, events!inner(couple_name, date, location, venue_city, church_city), site_templates!left(*)').eq('id', draftId).single();
   if (!data) return { draft: null, template: null };
-  const event = data.events as { couple_name?: string; date?: string } | undefined;
+  const event = data.events as { couple_name?: string; date?: string; location?: string; venue_city?: string; church_city?: string } | undefined;
   const template = data.site_templates as any | null;
   const content = data.content as Record<string, any>;
   if (event?.couple_name && !content.coupleNames) content.coupleNames = event.couple_name;
   if (event?.date && !content.date) content.date = event.date;
+  if (event?.location && !content.eventCity) content.eventCity = event.location;
+  if (event?.venue_city) content.eventCity = event.venue_city;
+  if (event?.church_city) content.eventCity = event.church_city;
   delete (data as any).events;
   delete (data as any).site_templates;
   return { draft: { ...data, content }, template };
@@ -77,6 +81,11 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
               <a href={generateIcsLink(c.date, c.time, `Matrimonio ${c.coupleNames || ''}`, '', '')} download="matrimonio.ics" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 24px', borderRadius: 999, fontSize: 14, background: p0, color: p3, textDecoration: 'none' }}>
                 + Calendario
               </a>
+            )}
+            {c.date && c.eventCity && (
+              <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center' }}>
+                <WeatherWidget city={c.eventCity} eventDate={c.date} />
+              </div>
             )}
           </div>
 

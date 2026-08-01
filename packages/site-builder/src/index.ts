@@ -116,6 +116,155 @@ export function generateIcsLink(date: string, time: string, title: string, addre
   return `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
 }
 
+/**
+ * URL Google Calendar (form-based render). Apre il form Google con i campi
+ * precompilati. L'utente deve solo cliccare "Salva". Funziona anche senza login
+ * Google (porta a login se serve).
+ * Formato date/time richiesto: ISO `YYYY-MM-DD` + `HH:MM`. Durata in minuti.
+ */
+export function generateGoogleCalendarUrl(params: {
+  date: string;
+  time: string;
+  title: string;
+  address?: string;
+  note?: string;
+  durationMinutes?: number;
+}): string {
+  const [y, m, d] = params.date.split('-');
+  const [hh, mi] = (params.time || '12:00').split(':');
+  // Google Calendar vuole datetime locale SENZA timezone (form `YYYYMMDDTHHMM00`)
+  const start = `${y}${m}${d}T${hh}${mi}00`;
+  const search = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: params.title,
+    dates: `${start}/${start}`, // Google accetta anche solo start senza end
+    details: params.note ?? '',
+    location: params.address ?? '',
+  });
+  // Se durationMinutes specificata, calcola end
+  if (params.durationMinutes) {
+    const endDate = new Date(`${params.date}T${params.time}:00`);
+    endDate.setMinutes(endDate.getMinutes() + params.durationMinutes);
+    const ey = endDate.getFullYear();
+    const em = String(endDate.getMonth() + 1).padStart(2, '0');
+    const ed = String(endDate.getDate()).padStart(2, '0');
+    const eh = String(endDate.getHours()).padStart(2, '0');
+    const en = String(endDate.getMinutes()).padStart(2, '0');
+    search.set('dates', `${start}/${ey}${em}${ed}T${eh}${en}00`);
+  }
+  return `https://calendar.google.com/calendar/render?${search.toString()}`;
+}
+
+/**
+ * URL Outlook.com (Microsoft 365) Calendar deeplink. Apre il form di creazione
+ * evento precompilato su Outlook Web. Path `/calendar/0/deeplink/compose`.
+ */
+export function generateOutlookCalendarUrl(params: {
+  date: string;
+  time: string;
+  title: string;
+  address?: string;
+  note?: string;
+  durationMinutes?: number;
+}): string {
+  const start = new Date(`${params.date}T${params.time || '12:00'}:00`);
+  const end = new Date(start.getTime() + (params.durationMinutes ?? 120) * 60000);
+  const search = new URLSearchParams({
+    path: '/calendar/action/compose',
+    rru: 'addevent',
+    startdt: start.toISOString(),
+    enddt: end.toISOString(),
+    subject: params.title,
+    body: params.note ?? '',
+    location: params.address ?? '',
+  });
+  return `https://outlook.live.com/calendar/0/deeplink/compose?${search.toString()}`;
+}
+
+/**
+ * Phase detection: dato un evento con date + eventuali ceremonyTime/receptionTime,
+ * determina in quale delle 3 phase ci troviamo rispetto al "now".
+ *
+ * - `countdown`:  T > now + 1h          → manca ancora molto al matrimonio
+ * - `cerimony`:   |T - now| <= 2h       → cerimonia in corso (±1h finestra)
+ * - `reception`:  now > T + 2h          → cerimonia conclusa, in ricevimento
+ * - `ended`:      now > T + 24h         → tutto concluso (post-evento)
+ *
+ * Se ceremonyTime/receptionTime sono specificati nel SiteContent (o `time` legacy),
+ * usiamo quelli. Altrimenti fallback hardcoded:
+ *   - cerimonia default ore 11:00
+ *   - ricevimento default ore 13:00
+ * (decisione presa in sessione 31/07/2026: niente migration DB per orari default).
+ *
+ * La fase `reception` copre dalle +2h dopo inizio cerimonia fino a +24h (wedding day),
+ * poi scatta `ended`. Per eventi la cui cerimonia è la mattina tipica italiana
+ * (11:00) e ricevimento pomeriggio (13:00), l'overlap è: 13:00-23:59 wedding day
+ * è `reception`, 00:00+ è `ended`.
+ */
+export type EventPhase = 'countdown' | 'ceremony' | 'reception' | 'ended';
+
+const DEFAULT_CEREMONY_TIME = '11:00';
+const DEFAULT_RECEPTION_TIME = '13:00';
+const CEREMONY_WINDOW_HOURS = 2;
+
+export function getEventPhase(params: {
+  date: string;
+  ceremonyTime?: string;
+  receptionTime?: string;
+  time?: string;
+  now?: Date;
+}): EventPhase {
+  if (!params.date) return 'countdown';
+  const now = params.now ?? new Date();
+
+  const cTime = params.ceremonyTime || params.time || DEFAULT_CEREMONY_TIME;
+  const rTime = params.receptionTime || DEFAULT_RECEPTION_TIME;
+
+  const ceremonyStart = new Date(`${params.date}T${cTime}:00`);
+  if (Number.isNaN(ceremonyStart.getTime())) return 'countdown';
+
+  const receptionStart = new Date(`${params.date}T${rTime}:00`);
+  const ceremonyEnd = new Date(
+    ceremonyStart.getTime() + CEREMONY_WINDOW_HOURS * 3600000,
+  );
+  const dayAfter = new Date(ceremonyStart.getTime() + 24 * 3600000);
+
+  if (now < ceremonyStart) return 'countdown';
+  if (now >= ceremonyStart && now < ceremonyEnd && now < receptionStart) {
+    return 'ceremony';
+  }
+  if (now >= receptionStart && now < dayAfter) return 'reception';
+  if (now >= dayAfter) return 'ended';
+  // Gap teorico (ceremonyEnd <= now < receptionStart): cerimonia conclusa
+  // ma ricevimento non ancora iniziato → consideriamo ancora ceremony (benvenuto)
+  return 'ceremony';
+}
+
+/**
+ * Helper unificato: ritorna un oggetto con tutti i 3 URL provider
+ * per un dato evento. Usato dal componente AddToCalendarMenu.
+ */
+export function getCalendarLinks(params: {
+  date: string;
+  time: string;
+  title: string;
+  address?: string;
+  note?: string;
+  durationMinutes?: number;
+}): { google: string; outlook: string; ics: string } {
+  return {
+    google: generateGoogleCalendarUrl(params),
+    outlook: generateOutlookCalendarUrl(params),
+    ics: generateIcsLink(
+      params.date,
+      params.time,
+      params.title,
+      params.address ?? '',
+      params.note ?? '',
+    ),
+  };
+}
+
 export const SUGGESTED_PHRASES = {
   announcement: [
     'Vi annunciano il loro matrimonio',

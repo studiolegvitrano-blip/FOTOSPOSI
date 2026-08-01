@@ -283,7 +283,19 @@
     "notifications": "Notifiche",
     "concierge": "Concierge AI",
     "social_wall": "Social Wall",
-    "subtitle": "Sotto-eventi"
+    "subtitle": "Sotto-eventi",
+    "cd_countdown_intro": "Ci sposiamo tra",
+    "cd_days": "Giorni",
+    "cd_hours": "Ore",
+    "cd_minutes": "Minuti",
+    "cd_seconds": "Secondi",
+    "cd_enter_app": "Entra nell'app",
+    "cd_ceremony_title": "Benvenuti alla cerimonia!",
+    "cd_ceremony_subtitle": "Stiamo per dire il nostro Sì",
+    "cd_reception_title": "Benvenuti al ricevimento!",
+    "cd_reception_subtitle": "Che la festa abbia inizio",
+    "cd_ended_title": "Grazie a tutti!",
+    "cd_ended_subtitle": "È stato un giorno indimenticabile"
   },
   "site_builder": {
     "title": "Sito evento",
@@ -709,5 +721,36 @@
     "reaction_sigh": "Sigh",
     "reaction_grrr": "Grrr",
     "persone_ammirano": "Le persone ammirano i ricordi"
+  },
+  "calendar_menu": {
+    "add_to_calendar": "Aggiungi al calendario",
+    "google": "Google Calendar",
+    "outlook": "Outlook",
+    "apple": "Apple Calendar (.ics)"
+  },
+  "weather": {
+    "title": "Meteo",
+    "loading": "Caricamento meteo...",
+    "unavailable": "Meteo non disponibile",
+    "rain": "Pioggia",
+    "sunny": "Sereno",
+    "mostly_sunny": "Prevalentemente soleggiato",
+    "partly_cloudy": "Parzialmente nuvoloso",
+    "cloudy": "Nuvoloso",
+    "fog": "Nebbia",
+    "drizzle": "Pioviggine",
+    "freezing_drizzle": "Pioviggine gelata",
+    "light_rain": "Pioggia leggera",
+    "heavy_rain": "Pioggia intensa",
+    "freezing_rain": "Pioggia gelata",
+    "light_snow": "Neve leggera",
+    "snow": "Neve",
+    "heavy_snow": "Neve intensa",
+    "snow_grains": "Nevischio",
+    "showers": "Rovesci",
+    "snow_showers": "Rovesci di neve",
+    "thunderstorm": "Temporale",
+    "hail": "Grandine",
+    "unknown": "Condizioni miste"
   }
 }

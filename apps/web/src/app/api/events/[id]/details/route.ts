@@ -30,10 +30,11 @@ export async function GET(
       // public access ok
     }
 
-    const [{ data: event }, { data: subEvents }, { data: evtWindow }] = await Promise.all([
+    const [{ data: event }, { data: subEvents }, { data: evtWindow }, { data: draft }] = await Promise.all([
       svc.from('events').select('*').eq('id', eventId).maybeSingle(),
       svc.from('sub_events').select('*').eq('event_id', eventId).order('date', { ascending: true }),
       svc.from('event_windows').select('*').eq('event_id', eventId).maybeSingle(),
+      svc.from('site_drafts').select('content').eq('event_id', eventId).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
     ]);
 
     if (!event) {
@@ -68,6 +69,16 @@ export async function GET(
       canManage = isCreator || (isManager ?? false);
     }
 
+    // Orari cerimonia/ricevimento impostati dagli sposi nel site-builder (SiteContent).
+    // Il `content` JSONB del draft pubblicato contiene ceremonyTime/receptionTime.
+    // Fallback a undefined → il client usa 11:00/13:00 come default (decisione milestone
+    // countdown 3-phase, niente migration DB). Non esponiamo l'intero content: solo i
+    // campi che servono alla pagina (evitiamo di riversare dati RSVP/menu non necessari).
+    const content = (draft?.content ?? {}) as Record<string, unknown>;
+    const siteTimes: { ceremonyTime?: string; receptionTime?: string } = {};
+    if (typeof content.ceremonyTime === 'string') siteTimes.ceremonyTime = content.ceremonyTime;
+    if (typeof content.receptionTime === 'string') siteTimes.receptionTime = content.receptionTime;
+
     return NextResponse.json({
       event,
       subEvents: subEvents ?? [],
@@ -76,6 +87,7 @@ export async function GET(
       isGuest,
       isManager,
       canManage,
+      ...siteTimes,
     });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Errore interno' }, { status: 500 });

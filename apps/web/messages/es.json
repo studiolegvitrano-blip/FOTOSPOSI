@@ -281,7 +281,19 @@
     "wow_walk": "Wow Walk",
     "privacy": "Privacidad invitados",
     "notifications": "Notificaciones",
-    "concierge": "Conserjería IA"
+    "concierge": "Conserjería IA",
+    "cd_countdown_intro": "Nos casamos en",
+    "cd_days": "Días",
+    "cd_hours": "Horas",
+    "cd_minutes": "Minutos",
+    "cd_seconds": "Segundos",
+    "cd_enter_app": "Entrar en la app",
+    "cd_ceremony_title": "¡Bienvenidos a la ceremonia!",
+    "cd_ceremony_subtitle": "Estamos a punto de decir Sí",
+    "cd_reception_title": "¡Bienvenidos al banquete!",
+    "cd_reception_subtitle": "Que empiece la fiesta",
+    "cd_ended_title": "¡Gracias a todos!",
+    "cd_ended_subtitle": "Fue un día inolvidable"
   },
   "site_builder": {
     "title": "Web de boda",
@@ -707,5 +719,36 @@
     "reaction_sigh": "Ay",
     "reaction_grrr": "Grrr",
     "persone_ammirano": "La gente está admirando los recuerdos"
+  },
+  "calendar_menu": {
+    "add_to_calendar": "Añadir al calendario",
+    "google": "Google Calendar",
+    "outlook": "Outlook",
+    "apple": "Calendario de Apple (.ics)"
+  },
+  "weather": {
+    "title": "Meteo",
+    "loading": "Cargando el tiempo...",
+    "unavailable": "El tiempo no está disponible",
+    "rain": "Lluvia",
+    "sunny": "Despejado",
+    "mostly_sunny": "Mayormente soleado",
+    "partly_cloudy": "Parcialmente nublado",
+    "cloudy": "Nublado",
+    "fog": "Niebla",
+    "drizzle": "Llovizna",
+    "freezing_drizzle": "Llovizna helada",
+    "light_rain": "Lluvia ligera",
+    "heavy_rain": "Lluvia fuerte",
+    "freezing_rain": "Lluvia helada",
+    "light_snow": "Nieve ligera",
+    "snow": "Nieve",
+    "heavy_snow": "Nieve fuerte",
+    "snow_grains": "Cristales de nieve",
+    "showers": "Chubascos",
+    "snow_showers": "Chubascos de nieve",
+    "thunderstorm": "Tormenta",
+    "hail": "Granizo",
+    "unknown": "Condiciones mixtas"
   }
 }

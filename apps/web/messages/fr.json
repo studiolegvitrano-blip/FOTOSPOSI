@@ -281,7 +281,19 @@
     "wow_walk": "Wow Walk",
     "privacy": "Confidentialité invités",
     "notifications": "Notifications",
-    "concierge": "Conciergerie IA"
+    "concierge": "Conciergerie IA",
+    "cd_countdown_intro": "Nous nous marions dans",
+    "cd_days": "Jours",
+    "cd_hours": "Heures",
+    "cd_minutes": "Minutes",
+    "cd_seconds": "Secondes",
+    "cd_enter_app": "Entrer dans l'app",
+    "cd_ceremony_title": "Bienvenue à la cérémonie !",
+    "cd_ceremony_subtitle": "Nous allons dire Oui",
+    "cd_reception_title": "Bienvenue à la réception !",
+    "cd_reception_subtitle": "La fête peut commencer",
+    "cd_ended_title": "Merci à tous !",
+    "cd_ended_subtitle": "Une journée inoubliable"
   },
   "site_builder": {
     "title": "Site web du mariage",
@@ -707,5 +719,36 @@
     "reaction_sigh": "Ouh",
     "reaction_grrr": "Grrr",
     "persone_ammirano": "Les gens admirent les souvenirs"
+  },
+  "calendar_menu": {
+    "add_to_calendar": "Ajouter au calendrier",
+    "google": "Google Agenda",
+    "outlook": "Outlook",
+    "apple": "Calendrier Apple (.ics)"
+  },
+  "weather": {
+    "title": "Météo",
+    "loading": "Chargement de la météo...",
+    "unavailable": "Météo indisponible",
+    "rain": "Pluie",
+    "sunny": "Ensoleillé",
+    "mostly_sunny": "Plutôt ensoleillé",
+    "partly_cloudy": "Partiellement nuageux",
+    "cloudy": "Nuageux",
+    "fog": "Brouillard",
+    "drizzle": "Bruine",
+    "freezing_drizzle": "Bruine verglaçante",
+    "light_rain": "Pluie légère",
+    "heavy_rain": "Pluie forte",
+    "freezing_rain": "Pluie verglaçante",
+    "light_snow": "Neige légère",
+    "snow": "Neige",
+    "heavy_snow": "Neige abondante",
+    "snow_grains": "Neige en grains",
+    "showers": "Averses",
+    "snow_showers": "Averses de neige",
+    "thunderstorm": "Orage",
+    "hail": "Grêle",
+    "unknown": "Conditions mixtes"
   }
 }

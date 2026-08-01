@@ -1,11 +1,34 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getEventPhase, type EventPhase } from '@fotosposi/site-builder';
 
 interface CountdownProps {
   targetDate: string;
   coupleName: string;
   onEnter?: () => void;
+  ceremonyTime?: string;
+  receptionTime?: string;
+  time?: string;
+  ceremonyAddress?: string;
+  receptionAddress?: string;
+  /** Etichette i18n passate dal caller (per evitare dipendenze next-intl in packages/ui). */
+  labels?: {
+    countdown_intro: string;
+    days: string;
+    hours: string;
+    minutes: string;
+    seconds: string;
+    enter_app: string;
+    ceremony_title: string;
+    ceremony_subtitle: string;
+    reception_title: string;
+    reception_subtitle: string;
+    ended_title: string;
+    ended_subtitle: string;
+  };
+  /** Render custom sotto al countdown card per iniettare AddToCalendarMenu (app level). */
+  children?: React.ReactNode;
 }
 
 function calcDiff(target: Date): { days: number; hours: number; minutes: number; seconds: number } {
@@ -19,13 +42,47 @@ function calcDiff(target: Date): { days: number; hours: number; minutes: number;
   };
 }
 
-export function Countdown({ targetDate, coupleName, onEnter }: CountdownProps) {
+const DEFAULT_LABELS = {
+  countdown_intro: 'Ci sposiamo tra',
+  days: 'Giorni',
+  hours: 'Ore',
+  minutes: 'Minuti',
+  seconds: 'Secondi',
+  enter_app: 'Entra nell\'app',
+  ceremony_title: 'Benvenuti alla cerimonia!',
+  ceremony_subtitle: 'Stiamo per dire il nostro Sì',
+  reception_title: 'Benvenuti al ricevimento!',
+  reception_subtitle: 'Che la festa abbia inizio',
+  ended_title: 'Grazie a tutti!',
+  ended_subtitle: 'È stato un giorno indimenticabile',
+};
+
+export function Countdown({
+  targetDate,
+  coupleName,
+  onEnter,
+  ceremonyTime,
+  receptionTime,
+  time,
+  ceremonyAddress,
+  receptionAddress,
+  labels: userLabels,
+  children,
+}: CountdownProps) {
+  const labels = { ...DEFAULT_LABELS, ...userLabels };
+  const [phase, setPhase] = useState<EventPhase>(() =>
+    getEventPhase({ date: targetDate, ceremonyTime, receptionTime, time }),
+  );
   const [diff, setDiff] = useState(() => calcDiff(new Date(targetDate)));
 
   useEffect(() => {
-    const id = setInterval(() => setDiff(calcDiff(new Date(targetDate))), 1000);
+    const tick = () => {
+      setPhase(getEventPhase({ date: targetDate, ceremonyTime, receptionTime, time }));
+      setDiff(calcDiff(new Date(targetDate)));
+    };
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [targetDate]);
+  }, [targetDate, ceremonyTime, receptionTime, time]);
 
   const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -33,33 +90,86 @@ export function Countdown({ targetDate, coupleName, onEnter }: CountdownProps) {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-brand/5 to-background text-center px-4 relative overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-brand/10 via-transparent to-transparent pointer-events-none" />
 
-      <div className="relative z-10 space-y-8">
+      <div className="relative z-10 space-y-8 max-w-2xl mx-auto">
         <div className="space-y-2">
-          <p className="text-sm uppercase tracking-widest text-text-muted">Ci sposiamo tra</p>
           <h1 className="text-4xl sm:text-5xl font-bold">{coupleName}</h1>
         </div>
 
-        <div className="grid grid-cols-4 gap-4 max-w-sm mx-auto">
-          {[
-            { value: diff.days, label: 'Giorni' },
-            { value: diff.hours, label: 'Ore' },
-            { value: diff.minutes, label: 'Minuti' },
-            { value: diff.seconds, label: 'Secondi' },
-          ].map(({ value, label }) => (
-            <div key={label} className="flex flex-col items-center">
-              <span className="text-3xl sm:text-4xl font-bold tabular-nums text-brand">{pad(value)}</span>
-              <span className="text-xs text-text-muted uppercase tracking-wider mt-1">{label}</span>
+        {phase === 'countdown' && (
+          <>
+            <p className="text-sm uppercase tracking-widest text-text-muted">
+              {labels.countdown_intro}
+            </p>
+            <div className="grid grid-cols-4 gap-4 max-w-sm mx-auto">
+              {[
+                { value: diff.days, label: labels.days },
+                { value: diff.hours, label: labels.hours },
+                { value: diff.minutes, label: labels.minutes },
+                { value: diff.seconds, label: labels.seconds },
+              ].map(({ value, label }) => (
+                <div key={label} className="flex flex-col items-center">
+                  <span className="text-3xl sm:text-4xl font-bold tabular-nums text-brand">
+                    {pad(value)}
+                  </span>
+                  <span className="text-xs text-text-muted uppercase tracking-wider mt-1">
+                    {label}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
+
+        {phase === 'ceremony' && (
+          <div className="space-y-3">
+            <div className="text-5xl">💍</div>
+            <h2 className="text-2xl sm:text-3xl font-semibold text-brand">
+              {labels.ceremony_title}
+            </h2>
+            <p className="text-text-muted">{labels.ceremony_subtitle}</p>
+            {ceremonyAddress && (
+              <p className="text-sm text-text-muted italic">{ceremonyAddress}</p>
+            )}
+          </div>
+        )}
+
+        {phase === 'reception' && (
+          <div className="space-y-3">
+            <div className="text-5xl">🥂</div>
+            <h2 className="text-2xl sm:text-3xl font-semibold text-brand">
+              {labels.reception_title}
+            </h2>
+            <p className="text-text-muted">{labels.reception_subtitle}</p>
+            {receptionAddress && (
+              <p className="text-sm text-text-muted italic">{receptionAddress}</p>
+            )}
+          </div>
+        )}
+
+        {phase === 'ended' && (
+          <div className="space-y-3">
+            <div className="text-5xl">❤️</div>
+            <h2 className="text-2xl sm:text-3xl font-semibold">{labels.ended_title}</h2>
+            <p className="text-text-muted">{labels.ended_subtitle}</p>
+          </div>
+        )}
+
+        {children && <div className="pt-2">{children}</div>}
 
         {onEnter && (
           <button
             onClick={onEnter}
             className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-brand text-white font-medium hover:opacity-90 transition-opacity shadow-lg"
           >
-            Entra nell'app
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+            {labels.enter_app}
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 14l-7 7m0 0l-7-7m7 7V3"
+              />
+            </svg>
           </button>
         )}
       </div>

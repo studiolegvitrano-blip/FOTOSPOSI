@@ -1,6 +1,146 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
-## Sessione 31/07/2026 — OAuth fix + post-OAuth onboarding + cancellazione foto + Drive senza watermark + sessione persistente
+## Sessione 01/08/2026 (continua) — Widget meteo automatico Open-Meteo (giorno evento, 3 giorni prima)
+
+### Richiesta
+"il sistema deve lavorare automaticamente, gli sposi devono inserire meno cose possibili" + widget meteo che appare 3 giorni prima dell'evento (countdown widget + sito pubblico). Dopo analisi: 3B Meteo NON ha API pubblica (serve incollare codice embed generato dal wizard → passo manuale → viola il vincolo "meno cose possibili"). L'utente ha scelto **Open-Meteo** (gratis, senza API key, geocoding incluso).
+
+### Decisione architetturale (differente dal piano 3B)
+- **Niente campo nuovo nel site-builder**: la città si legge dai campi GIÀ inseriti nella creazione evento (`venue_city` / `church_city` / `location`) → zero input extra per gli sposi.
+- **Widget appare SOLO da 3 giorni prima dell'evento** (fino al giorno dopo — wake-up invitati). Prima di 3 giorni è inutile (forecast non affidabile) e la finestra garantisce che la data sia sempre entro i 16 giorni di forecast Open-Meteo.
+- Il meteo mostrato è quello del **giorno ESATTO della cerimonia** (start_date=end_date=eventDate), non "oggi" come farebbe il widget 3B.
+- **Provider**: Open-Meteo `https://api.open-meteo.com/v1/forecast` + `https://geocoding-api.open-meteo.com/v1/search`. Gratis, senza key, no rate-limit per uso moderato.
+
+### Cosa è stato fatto
+
+**1. NUOVO package `packages/weather`** (`@fotosposi/weather@0.1.0`):
+- `shouldShowWeather(eventDate, now?)` → true se oggi è in `[eventDate - 3gg, eventDate + 1gg]` (costanti `WEATHER_DAYS_BEFORE=3`, `WEATHER_DAYS_AFTER=1`). Date vuote/non valide → false.
+- `weatherCodeToInfo(code)` → WMO weather code → `{ labelKey, emoji }` (19 condizioni mappate, fallback unknown).
+- `buildOpenMeteoUrls(city, date)` → URL geocoding + closure forecast(lat, lon) con `start_date=end_date=date`.
+- `fetchWeatherForEvent(city, eventDate, fetchFn?)` → geocoding → forecast → `{ city, date, code, tMax, tMin, rainProb }`. `fetchFn` iniettabile per test. Errori chiari: città vuota / data non valida / città non trovata / HTTP error / dati incompleti.
+- **19 test** (`packages/weather/src/__tests__/index.test.ts`).
+
+**2. Route `apps/web/src/app/api/weather/route.ts`** (GET `?city=&date=`):
+- Valida param (city obbligatorio, date `YYYY-MM-DD`).
+- Gate `shouldShowWeather(date)` → 404 se fuori finestra (non chiama Open-Meteo inutilmente settimane prima).
+- `Cache-Control: public, s-maxage=3600` (il forecast non cambia ogni secondo).
+- Errori → 404 con messaggio pulito (no stack).
+
+**3. Componente client `apps/web/src/components/weather-widget.tsx`**:
+- Props: `city?`, `eventDate?`.
+- Gate client `shouldShowWeather(eventDate)` → render `null` se fuori finestra.
+- Fetch `/api/weather` → card compatta: emoji condizione + città + max/min °C + % pioggia (se >0).
+- Stati: loading (skeleton), unavailable (errore), data. i18n via `useTranslations('weather')`.
+
+**4. Integrazione `apps/web/src/app/events/[id]/page.tsx`** (countdown widget):
+- `weatherCity = event.venue_city || event.church_city || event.location` (priorità alle città specifiche di cerimonia/ricevimento).
+- `<WeatherWidget city={weatherCity} eventDate={event.date} />` iniettato come `children` del `Countdown`, sotto `AddToCalendarMenu`.
+
+**5. Integrazione `apps/web/src/app/sito/[id]/page.tsx`** (sito pubblico):
+- La query `getDraft` ora fa select anche su `events.location, venue_city, church_city`.
+- Imposta `content.eventCity` (priorità venue_city → church_city → location).
+- Se `c.date && c.eventCity` → `<WeatherWidget>` nella hero sotto il pulsante "+ Calendario".
+
+**6. i18n 6 lingue** (`apps/web/messages/{it,en-US,en-GB,de,fr,es}.json`): nuovo namespace `weather.*` con 23 chiavi (title, loading, unavailable, rain, sunny, mostly_sunny, partly_cloudy, cloudy, fog, drizzle, freezing_drizzle, light_rain, rain, heavy_rain, freezing_rain, light_snow, snow, heavy_snow, snow_grains, showers, snow_showers, thunderstorm, hail, unknown). Iniettate via script one-shot node (rimosso dopo l'esecuzione). Fix post-script: `rain_heavy` rinominata in `heavy_rain` (allineata a `weatherCodeToInfo`).
+
+### Verifica
+- Test: **361/361 verdi** (era 342 → +19 nuovi `packages/weather`). 29 file.
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori. `packages/weather` → OK.
+- Build: `npx next build` (apps/web) → OK, route `/api/weather` compilata.
+- Test reale Open-Meteo: `fetchWeatherForEvent('Palermo', +10gg)` → `{city:'Palermo', code:0, tMax:32, tMin:27.5, rainProb:15}`. Nota: data a +29gg → HTTP 400 (Open-Meteo copre max 16 giorni) — NON è un bug: il gate 3 giorni impedisce chiamate fuori finestra.
+- `npm install` eseguito (workspace `@fotosposi/weather` linkato + dep aggiunta in apps/web/package.json).
+
+### File modificati
+```
+packages/weather/package.json                        NEW (modulo @fotosposi/weather)
+packages/weather/tsconfig.json                       NEW
+packages/weather/src/index.ts                        NEW (shouldShowWeather + weatherCodeToInfo + buildOpenMeteoUrls + fetchWeatherForEvent)
+packages/weather/src/__tests__/index.test.ts         NEW (19 test)
+apps/web/src/app/api/weather/route.ts                NEW (GET meteo con gate finestra)
+apps/web/src/components/weather-widget.tsx           NEW (card meteo client, gate 3 giorni)
+apps/web/src/app/events/[id]/page.tsx                +8 (weatherCity + WeatherWidget in Countdown children)
+apps/web/src/app/sito/[id]/page.tsx                  +15 (select city + content.eventCity + WeatherWidget hero)
+apps/web/package.json                                +1 (dep @fotosposi/weather)
+apps/web/messages/{it,en-US,en-GB,de,fr,es}.json     +23 chiavi ciascuno (weather.*)
+package-lock.json                                    rigenerato
+PROJECT_STATUS.md                                    +80 righe (questa sezione)
+```
+
+### TODO post-push (prossima sessione)
+1. **Verifica in produzione**: aprire `/events/[id]` di un evento con countdown_widget attivo e città valorizzata quando mancano ≤3 giorni → appare la card meteo col meteo del giorno esatto; il sito pubblico `/sito/[id]` mostra la stessa card nella hero. Prima dei 3 giorni → nessun widget.
+2. **Commit + push atomico** (work-tree contiene anche sessione 31/07 + 01/08 countdown: 18+ file).
+3. Se un evento non ha `venue_city`/`church_city`/`location` → il widget non appare (comportamento voluto, niente città = niente meteo).
+4. Open-Meteo è gratuito ma con TOS da rispettare per volume — per l'uso "3 giorni prima" è abbondantemente sotto i limiti.
+
+---
+
+## Sessione 01/08/2026 — Countdown 3-phase + AddToCalendar (Google/Outlook/Apple iCal) milestone
+
+### Richiesta
+Completare il modulo countdown milestone iniziato nella sessione precedente:
+- Helper calendario (Google URL, Outlook URL, ICS) già in `packages/site-builder/src/index.ts` (9/9 test).
+- Da completare: componente `AddToCalendarMenu` + estensione `Countdown` con 3 phase (countdown → benvenuto cerimonia → ricevimento) + integrazione in `events/[id]/page.tsx` + i18n.
+- Decisione: orari default cerimonia `11:00` e ricevimento `13:00` per il phase detection **senza migration DB**.
+
+### Cosa è stato fatto
+
+**1. `getEventPhase()` in `packages/site-builder/src/index.ts`** (helper puro, testato):
+- 4 fasi: `countdown` (now < ceremonyStart) → `ceremony` (finestra ±2h dall'inizio cerimonia) → `reception` (da receptionStart fino a +24h wedding day) → `ended` (dopo +24h).
+- Fallback orari hardcoded: cerimonia `11:00`, ricevimento `13:00` (nessuna colonna DB nuova — decisione milestone).
+- Rispetta `SiteContent.ceremonyTime`/`receptionTime` e il `time` legacy come ceremonyTime.
+- Caso gap (cerimonia conclusa ma ricevimento non iniziato) → resta `ceremony` (benvenuto).
+
+**2. `packages/ui/src/countdown.tsx` esteso** (4 phase render, API retrocompatibile):
+- Nuove props opzionali: `ceremonyTime`, `receptionTime`, `time`, `ceremonyAddress`, `receptionAddress`, `labels` (i18n passate dal caller), `children` (slot per AddToCalendarMenu).
+- Phase `countdown` → countdown classico. Phase `ceremony` → card "💍 Benvenuti alla cerimonia!". Phase `reception` → card "🥂 Benvenuti al ricevimento!". Phase `ended` → card "❤️ Grazie a tutti!".
+- Default labels IT hardcoded (fallback se caller non passa `labels`), nessuna dipendenza next-intl nel package UI.
+- `packages/ui/package.json`: aggiunta dep `@fotosposi/site-builder@0.1.0` (dedup verificata con `npm ls`).
+
+**3. `apps/web/src/components/add-to-calendar-menu.tsx` (NUOVO)**:
+- Dropdown con 3 voci: Google Calendar (icona brand color), Outlook (icona brand), Apple Calendar `.ics` (download file).
+- Usa `getCalendarLinks()` da `@fotosposi/site-builder` → 3 link generati da un'unica chiamata.
+- Chiusura su click-esterno, varianti default/outline/ghost, size sm/default/lg. i18n via `useTranslations('calendar_menu')`.
+
+**4. Integrazione in `apps/web/src/app/events/[id]/page.tsx`**:
+- `Countdown` esteso con `time`/`ceremonyTime`/`receptionTime` + labels i18n + indirizzi cerimonia/ricevimento.
+- `AddToCalendarMenu` iniettato come `children` dentro la card countdown (visibile in tutte le phase): link `Matrimonio <coppia>` con address cerimonia + nota ricevimento.
+
+**4b. Orari reali dal SiteContent (FIX dopo review utente)**:
+- Inizialmente il phase detection usava solo il fallback 11:00/13:00 perché la route `details` non ritornava gli orari. L'utente ha fatto notare che gli orari li impostano gli sposi nel site-builder → `apps/web/src/app/api/events/[id]/details/route.ts` ora legge `site_drafts.content` (JSONB, ultimo draft) e ritorna `ceremonyTime`/`receptionTime` nel payload.
+- `events/[id]/page.tsx` legge quei campi dalla risposta details in `useState` (niente più cast locale `as WeddingEvent & {...}`).
+- Risultato: funziona anche per cerimonie serali (es. 18:00) e orari qualsiasi — il phase detection è agnostico rispetto all'ora. Fallback 11:00/13:00 scatta solo se il draft non ha gli orari.
+
+**5. i18n in 6 lingue** (`apps/web/messages/{it,en-US,en-GB,de,fr,es}.json`):
+- 13 chiavi `events.cd_*` (countdown 3-phase: intro, unità tempo, enter_app, ceremony/reception/ended title+subtitle).
+- Nuovo namespace `calendar_menu.*` (4 chiavi: add_to_calendar, google, outlook, apple).
+- Iniettate via script one-shot node (rimosso dopo l'esecuzione, non lasciato nel repo).
+
+### Verifica
+- Test: **342/342 verdi** (era 314/316 → +13 nuovi `event-phase` + 2 skipped integrazione invariati; 28 file).
+  - Nuovo `packages/site-builder/src/__tests__/event-phase.test.ts`: 13 test (countdown/ceremony/reception/ended, fallback orari, legacy time, gap ceremony, invalid date, Date.now fallback, eventi passati).
+  - Esistenti `calendar-links.test.ts`: 9/9 invariati.
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori. `packages/ui` typecheck OK.
+- `npm install` eseguito (lockfile aggiornato per dep ui→site-builder).
+
+### File modificati
+```
+packages/site-builder/src/index.ts                       +55 (getEventPhase + EventPhase type)
+packages/site-builder/src/__tests__/event-phase.test.ts  NEW (13 test)
+packages/ui/src/countdown.tsx                            riscritto (4 phase + labels + children + props orari)
+packages/ui/package.json                                 +1 (dep @fotosposi/site-builder)
+apps/web/src/components/add-to-calendar-menu.tsx         NEW (dropdown 3 provider calendario)
+apps/web/src/app/events/[id]/page.tsx                    +30 (Countdown esteso + AddToCalendarMenu children)
+apps/web/src/app/api/events/[id]/details/route.ts        +15 (ceremonyTime/receptionTime dal SiteContent)
+apps/web/messages/{it,en-US,en-GB,de,fr,es}.json         +17 chiavi ciascuno (events.cd_* + calendar_menu.*)
+package-lock.json                                        rigenerato
+PROJECT_STATUS.md                                        +60 (questa sezione)
+```
+
+### TODO post-push (prossima sessione)
+1. **Verifica in produzione** dopo commit/push: apertura `events/[id]` con countdown_widget attivo → countdown classico pre-evento; il giorno della cerimonia compare la card benvenuto cerimonia; dal ricevimento in poi card ricevimento; il dropdown AddToCalendar genera 3 link funzionanti (testare Google/Outlook/ICS su telefono).
+2. **Orari reali dal SiteContent**: ✅ RISOLTO — la route details ritorna `ceremonyTime`/`receptionTime` dal draft. Se il draft non li ha, fallback 11:00/13:00. Verificare con un evento che ha ceremonyTime impostato (es. 18:00 serale) che il phase detection rispetti l'orario.
+3. Commit + push atomico (work-tree contiene anche la sessione 31/07 non ancora pushato — 18+ file).
+
 
 ### Richieste utente (4 distinte)
 1. **"la registrazione google non funziona"** — dopo OAuth Google "reindirizzamento in corso" poi torna a `/login`. Bug critico bloccante per ogni login social.
