@@ -2,29 +2,43 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { hasFeature, type Tier } from '@fotosposi/core';
 import { getCurrentUser } from '@fotosposi/core';
 import { rememberLastEventCode } from '@/components/pwa-event-redirect';
+import { ShareButton, Countdown } from '@fotosposi/ui';
+import { shareWatermarkedMedia } from '@/lib/share-watermarked';
+import { Church, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { AddToCalendarMenu } from '@/components/add-to-calendar-menu';
+import WeatherWidget from '@/components/weather-widget';
 import type { WeddingEvent, SubEvent, EventWindow } from '@fotosposi/events';
 import type { MediaUpload } from '@fotosposi/media';
-
-function makeHashtag(name: string): string {
-  return '#' + name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() + 'sposi';
-}
+import EventTimelineFeed from '@/components/event-timeline-feed';
+import FullGalleryLightbox from '@/components/full-gallery-lightbox';
 
 export default function GuestEventPage() {
   const params = useParams();
   const code = params.code as string;
+  const t = useTranslations('events');
+  const c = useTranslations('common');
+  const j = useTranslations('jokes');
+
   const [event, setEvent] = useState<WeddingEvent | null>(null);
   const [subEvents, setSubEvents] = useState<SubEvent[]>([]);
   const [media, setMedia] = useState<MediaUpload[]>([]);
+  const [videos, setVideos] = useState<MediaUpload[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [window, setWindow] = useState<EventWindow | null>(null);
-  const [mode, setMode] = useState<'gallery' | 'live'>('gallery');
-  const [slideIdx, setSlideIdx] = useState(0);
-  const timerRef = useRef<NodeJS.Timeout>(undefined);
+  const [eventWindow, setEventWindow] = useState<EventWindow | null>(null);
+  const [showCountdown, setShowCountdown] = useState(true);
+  const [ceremonyTime, setCeremonyTime] = useState<string | undefined>();
+  const [receptionTime, setReceptionTime] = useState<string | undefined>();
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const loadData = async (guestUser?: { id: string; name: string; email?: string }) => {
     const res = await fetch('/api/guest/event', {
@@ -46,7 +60,11 @@ export default function GuestEventPage() {
     if (data.event) setEvent(data.event);
     setSubEvents(data.subEvents ?? []);
     setMedia(data.media ?? []);
-    setWindow(data.window ?? null);
+    setEventWindow(data.window ?? null);
+    // Orari cerimonia/ricevimento dal SiteContent (site-builder), come su /events/[id].
+    // Fallback 11:00/13:00 nel Countdown se assenti — fase countdown → cerimonia → ricevimento.
+    if (typeof data.ceremonyTime === 'string') setCeremonyTime(data.ceremonyTime);
+    if (typeof data.receptionTime === 'string') setReceptionTime(data.receptionTime);
     setLoading(false);
     // Se l'ospite installa l'app da qui ("Aggiungi a schermata Home"), la prossima apertura in
     // modalità standalone deve portare dritto a questo evento — vedi pwa-event-redirect.tsx.
@@ -70,147 +88,219 @@ export default function GuestEventPage() {
     return () => clearInterval(interval);
   }, [code]);
 
-  useEffect(() => {
-    if (mode === 'live' && media.length > 0) {
-      timerRef.current = setInterval(() => {
-        setSlideIdx(prev => (prev + 1) % media.length);
-      }, 5000);
-      return () => clearInterval(timerRef.current);
-    }
-  }, [mode, media.length]);
+  const handleShareMedia = useCallback(
+    (id: string, isVideo: boolean) => {
+      if (!event) return;
+      const brand = typeof window !== 'undefined' && window.location.hostname.includes('justmarry')
+        ? 'JustMarry.live'
+        : 'Sposi.live';
+      shareWatermarkedMedia(id, event.id, isVideo, `${event?.couple_name} — ${brand}`);
+    },
+    [event],
+  );
 
-  const [shareLoading, setShareLoading] = useState<string | null>(null);
-
-  const handleShare = useCallback(async (mediaId: string, coupleName: string, brand: string) => {
-    if (!event) return;
-    const hashtag = makeHashtag(coupleName);
-    const appTag = brand === 'fotosposi' ? '@sposilive' : '@justmarrylive';
-    const shareText = `${coupleName}\n\n${hashtag} ${appTag}`;
-
-    setShareLoading(mediaId);
-    try {
-      const resp = await fetch(`/api/photos/${mediaId}/share?eventId=${event.id}&format=story`);
-      if (!resp.ok) throw new Error('share failed');
-      const blob = await resp.blob();
-      const file = new File([blob], 'photo_story.jpg', { type: 'image/jpeg' });
-
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], text: shareText });
-      } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'photo_story.jpg'; a.click();
-        URL.revokeObjectURL(url);
-      }
-    } catch {
-      const url = `/api/photos/${mediaId}/share?eventId=${event.id}&format=story`;
-      const a = document.createElement('a');
-      a.href = url; a.download = 'photo_story.jpg'; a.click();
-    }
-    setShareLoading(null);
-  }, [event]);
-
-  function mediaUrl(m: { id: string; r2_key: string | null; url: string }): string {
-    return m.r2_key ? `/api/media/${m.id}/download` : m.url;
-  }
-
-  const photos = media.filter(m => m.type === 'photo');
-  const now = new Date();
-  const canUpload = !window || (now >= new Date(window.opens_at) && now <= new Date(window.closes_at));
-
-  if (loading) return <p className="text-center mt-8">Caricamento...</p>;
+  if (loading) return <p className="text-center mt-8">{c('loading')}</p>;
   if (error) return <main className="max-w-lg mx-auto mt-8 p-4 text-center"><h1 className="text-xl font-bold">{error}</h1></main>;
   if (!event) return null;
 
+  const tier = (event.tier || 'free') as Tier;
+  const showWidget = showCountdown && hasFeature(tier, 'countdown_widget');
+  const photos = media.filter(m => m.type === 'photo');
+  const now = new Date();
+  const canUpload = !eventWindow || (now >= new Date(eventWindow.opens_at) && now <= new Date(eventWindow.closes_at));
+
+  // Indirizzi cerimonia/ricevimento per il Countdown e per i link mappa (stesso calcolo
+  // della pagina sposi /events/[id]).
+  const ceremonyAddress = [event.church, event.church_address, event.church_city || event.location]
+    .filter(Boolean)
+    .join(', ');
+  const receptionAddress = [event.venue, event.venue_address, event.venue_city || event.location]
+    .filter(Boolean)
+    .join(', ');
+
+  // Titolo di benvenuto con nomi sposi (sposa prima, poi sposo) — stessa logica di /events/[id].
+  const brideName =
+    event.groom1_role === 'bride'
+      ? event.groom1_first_name
+      : event.groom2_role === 'bride'
+        ? event.groom2_first_name
+        : event.groom1_first_name;
+  const groomName =
+    event.groom1_role === 'groom'
+      ? event.groom1_first_name
+      : event.groom2_role === 'groom'
+        ? event.groom2_first_name
+        : event.groom2_first_name;
+  const welcomeTitle =
+    brideName && groomName
+      ? t('cd_welcome_prefix', { bride: brideName, groom: groomName })
+      : event.couple_name || undefined;
+
+  const weatherCity = event.venue_city || event.church_city || event.location;
+
+  const countdownLabels = {
+    countdown_intro: t('cd_countdown_intro'),
+    days: t('cd_days'),
+    hours: t('cd_hours'),
+    minutes: t('cd_minutes'),
+    seconds: t('cd_seconds'),
+    enter_app: t('cd_enter_app'),
+    ceremony_title: t('cd_ceremony_title'),
+    ceremony_subtitle: t('cd_ceremony_subtitle'),
+    reception_title: t('cd_reception_title'),
+    reception_subtitle: t('cd_reception_subtitle'),
+    ended_title: t('cd_ended_title'),
+    ended_subtitle: t('cd_ended_subtitle'),
+  };
+
   return (
-    <main className="max-w-4xl mx-auto">
-      {mode === 'live' && photos.length > 0 && (
-        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
-          <button onClick={() => setMode('gallery')} className="absolute top-4 right-4 text-white/60 hover:text-white z-10 text-sm bg-white/10 px-3 py-1 rounded-full">
-            Esci live
-          </button>
-          <div className="text-white/40 absolute bottom-4 text-sm">{slideIdx + 1} / {photos.length}</div>
-          {photos[slideIdx] && <img src={mediaUrl(photos[slideIdx])} alt="" className="max-w-full max-h-full object-contain" />}
-        </div>
+    <>
+      {showWidget && (
+        <Countdown
+          targetDate={event.date}
+          coupleName={event.couple_name}
+          welcomeTitle={welcomeTitle}
+          time={ceremonyTime || undefined}
+          ceremonyTime={ceremonyTime}
+          receptionTime={receptionTime}
+          ceremonyAddress={ceremonyAddress}
+          receptionAddress={receptionAddress}
+          labels={countdownLabels}
+          backgroundImageMobile="/countdown-bg-mobile.webp"
+          backgroundImageDesktop="/countdown-bg-desktop.webp"
+          onEnter={() => { setShowCountdown(false); contentRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
+        >
+          <AddToCalendarMenu
+            date={event.date}
+            time={ceremonyTime || '11:00'}
+            title={`Matrimonio ${event.couple_name}`}
+            address={ceremonyAddress || undefined}
+            note={`Cerimonia${receptionAddress ? ' - Ricevimento: ' + receptionAddress : ''}`}
+            durationMinutes={receptionTime ? 480 : 120}
+            size="sm"
+            variant="outline"
+          />
+          <div className="mt-3 flex flex-col items-center gap-2">
+            <WeatherWidget city={weatherCity} eventDate={event.date} />
+          </div>
+        </Countdown>
       )}
 
-      <div className="p-4 space-y-6">
-        <div className="text-center py-4">
-          <h1 className="text-3xl font-bold">{event.couple_name}</h1>
-          <p className="text-text-muted">{new Date(event.date).toLocaleDateString('it-IT')} — {event.location}</p>
-        </div>
-
-        <div className="flex gap-2 justify-center">
-          <Button variant={mode === 'gallery' ? 'default' : 'outline'} onClick={() => setMode('gallery')}>Galleria</Button>
-          {photos.length > 0 && (
-            <Button variant={mode === 'live' ? 'default' : 'outline'} onClick={() => { setMode('live'); setSlideIdx(0); }}>
-              Live ({photos.length})
-            </Button>
-          )}
-          {event.allow_guest_media === false
-            ? null
-            : canUpload
-              ? <Button variant="outline" asChild><a href={`/events/${event.id}/upload`}>Carica</a></Button>
-              : <Button variant="outline" disabled>Carica (finestra chiusa)</Button>}
-          <Button variant="outline" asChild><a href={`/events/${event.id}/games/jokes`}>Scherzi</a></Button>
-          <Button variant="outline" asChild><a href={`/events/${event.id}/guestbook`}>Video</a></Button>
-          {/* Capsula del Tempo: la pagina pubblica esisteva già (/e/[id]/capsule) ma
-              nessun link la rendeva raggiungibile dagli invitati. */}
-          <Button variant="outline" asChild><a href={`/e/${event.id}/capsule`}>Capsula del Tempo</a></Button>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-          {media.map((m) => (
-            <Card key={m.id} className="overflow-hidden group relative">
-              <CardContent className="p-1">
-                {m.type === 'photo'
-                  ? <img src={mediaUrl(m)} alt="" className="w-full h-36 object-cover rounded" />
-                  : <video src={mediaUrl(m)} className="w-full h-36 object-cover rounded" controls />}
-              </CardContent>
-              {m.type === 'photo' && (
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                  <button
-                    onClick={() => handleShare(m.id, event.couple_name, event.brand)}
-                    disabled={shareLoading === m.id}
-                    className="bg-white/90 text-sm px-2 py-1.5 rounded hover:bg-white flex items-center gap-1 disabled:opacity-50"
-                    title="Condividi su Instagram, Facebook, WhatsApp"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                    <span className="text-xs">{shareLoading === m.id ? '...' : 'Condividi'}</span>
-                  </button>
+      {!showWidget && <div ref={contentRef}>
+        <main className="max-w-7xl mx-auto p-4 space-y-4">
+          {/* Intestazione evento: nomi sposi + data/luogo + link mappa cerimonia/ricevimento */}
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">{event.couple_name}</h1>
+              <p className="text-text-muted">
+                {new Date(event.date).toLocaleDateString()} — {event.location}
+              </p>
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-text-muted mt-1">
+                {event.church && (
                   <a
-                    href={`/api/photos/${m.id}/share?eventId=${event.id}&format=square`}
-                    download
-                    className="bg-white/90 text-sm px-2 py-1.5 rounded hover:bg-white"
-                    title="Scarica foto"
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([event.church, event.church_address, event.church_city || event.location].filter(Boolean).join(', '))}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 hover:text-brand transition-colors no-underline text-text-muted"
+                    title="Apri nel navigatore"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <Church className="w-4 h-4" /> {event.church}{event.church_address ? ` — ${event.church_address}` : ''}
                   </a>
-                </div>
-              )}
-            </Card>
-          ))}
-          {media.length === 0 && (
-            <p className="col-span-full text-center text-text-muted py-8">Ancora nessuna foto. Carica la prima!</p>
-          )}
-        </div>
+                )}
+                {event.venue && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([event.venue, event.venue_address, event.venue_city || event.location].filter(Boolean).join(', '))}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 hover:text-brand transition-colors no-underline text-text-muted"
+                    title="Apri nel navigatore"
+                  >
+                    <Building2 className="w-4 h-4" /> {event.venue}{event.venue_address ? ` — ${event.venue_address}` : ''}
+                  </a>
+                )}
+              </div>
+              <Badge variant={event.tier === 'premium' ? 'default' : 'secondary'}>{event.tier}</Badge>
+            </div>
+          </div>
 
-        {subEvents.length > 0 && (
-          <div className="space-y-2">
-            <h2 className="text-lg font-semibold">Programma</h2>
-            {subEvents.map((s) => (
-              <Card key={s.id}>
-                <CardContent className="py-3 flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{s.title}</p>
-                    <p className="text-sm text-text-muted">{new Date(s.date).toLocaleDateString('it-IT')}{s.location ? ` — ${s.location}` : ''}</p>
-                  </div>
+          {/* ─── LAYOUT: sidebar azioni sx | feed centrale stile Facebook ─── */}
+          <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-4">
+            {/* Sidebar SINISTRA — azioni per gli invitati */}
+            <aside className="space-y-2 order-2 lg:order-1">
+              <p className="text-xs uppercase tracking-wide text-text-muted px-1">{c('upload')}</p>
+              {event.allow_guest_media === false
+                ? null
+                : canUpload
+                  ? <Button variant="default" className="w-full justify-center" asChild><a href={`/events/${event.id}/upload`}>{c('upload')}</a></Button>
+                  : <Button variant="default" className="w-full justify-center" disabled>{c('upload')} (finestra chiusa)</Button>}
+              <Button variant="secondary" className="w-full justify-center" asChild><a href={`/events/${event.id}/games`}>{t('games')}</a></Button>
+              <Button variant="outline" className="w-full justify-center" asChild><a href={`/events/${event.id}/games/jokes`}>{j('title')}</a></Button>
+              <Button variant="outline" className="w-full justify-center" asChild><a href={`/events/${event.id}/guestbook`}>{t('guestbook')}</a></Button>
+              <Button variant="outline" className="w-full justify-center" asChild><a href={`/e/${event.id}/capsule`}>Capsula del Tempo</a></Button>
+            </aside>
+
+            {/* COLONNA CENTRALE — feed timeline stile Facebook */}
+            <section className="order-1 lg:order-2">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
+                  <CardTitle>{c('gallery')} ({media.length + videos.length})</CardTitle>
+                  {event.allow_guest_media === false ? null : (
+                    <Button variant="default" size="sm" asChild>
+                      <a href={`/events/${event.id}/upload`}>{c('upload')}</a>
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {media.length === 0 && videos.length === 0 ? (
+                    <p className="text-text-muted">{c('no_results')}</p>
+                  ) : (
+                    <EventTimelineFeed
+                      media={media}
+                      videos={videos}
+                      event={event}
+                      eventId={event.id}
+                      onShareMedia={handleShareMedia}
+                      onOpenImage={(url) => setLightbox(url)}
+                    />
+                  )}
                 </CardContent>
               </Card>
-            ))}
+
+              {/* Sub-eventi (programma) */}
+              {subEvents.length > 0 && (
+                <Card className="mt-4">
+                  <CardHeader><CardTitle>{t('subtitle')}</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {subEvents.map((s) => (
+                        <div key={s.id} className="flex items-center justify-between p-2 rounded-md border border-border">
+                          <div>
+                            <p className="font-medium">{s.title}</p>
+                            <p className="text-sm text-text-muted">{new Date(s.date).toLocaleDateString()}{s.location ? ` — ${s.location}` : ''}</p>
+                          </div>
+                          <Badge variant="outline">{s.type}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="flex items-center gap-4 mt-4">
+                <ShareButton
+                  eventUrl={typeof globalThis !== 'undefined' ? globalThis.location?.href ?? '' : ''}
+                  title={event.couple_name}
+                />
+              </div>
+            </section>
           </div>
-        )}
-      </div>
-    </main>
+        </main>
+      </div>}
+      <FullGalleryLightbox
+        media={media}
+        initialUrl={lightbox}
+        onClose={() => setLightbox(null)}
+      />
+    </>
   );
 }

@@ -1,5 +1,43 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 02/08/2026 (continua 6) — Pagina ospite `/event/[code]` allineata alla pagina sposi
+
+### Richiesta utente
+L'utente si è registrato come ospite all'evento `ddde9e03-8454-4cf7-ac24-a5d920fe788f` e segnala che la schermata `/event/[code]` è "niente" rispetto alla pagina sposi `/events/[id]`: nessuna attribuzione del caricatore, nessun navigatore (mappe), niente meteo, niente stile Facebook, niente countdown.
+
+### Cosa è stato fatto
+
+**1. `apps/web/src/app/api/guest/event/route.ts`** (+30):
+- Arricchimento media con `uploader_name`/`uploader_role_at_event` (query `core_users` su `uploaded_by` distinti, stesso pattern di `/api/events/[id]/media`) → il feed mostra "Mancuso Francesca" sotto ogni foto invece del fallback couple_name.
+- Fetch di `site_drafts.content` (ultimo draft) e ritorno di `ceremonyTime`/`receptionTime` nel payload → il Countdown ospite fa il phase detection con gli orari reali del site-builder (fallback 11:00/13:00 nel componente).
+
+**2. `apps/web/src/app/event/[code]/page.tsx`** (riscritto, ~306 righe): mirror completo della pagina sposi:
+- **Countdown 3-phase** con `welcomeTitle` ("Benvenuti al Matrimonio di Danila e Agostino"), sfondo immagine (mobile/desktop), orari cerimonia/ricevimento dal SiteContent, indirizzi, `AddToCalendarMenu` e `WeatherWidget` come children.
+- **Header evento**: nomi sposi + data/luogo + **link mappe navigatore** per Chiesa (lucide `Church`) e Ricevimento (lucide `Building2`) + badge tier.
+- **Layout 3 colonne** (sidebar azioni sx | feed centrale): sidebar con Carica (rispetta `allow_guest_media`/finestra upload), Giochi, Angolo Scherzi, Video Guestbook, Capsula del Tempo; colonna centrale con `EventTimelineFeed` (stile Facebook: reazioni, commenti, attribuzione uploader) + sub-eventi (programma) + `ShareButton`.
+- `FullGalleryLightbox` per foto a schermo intero.
+- Mantenute modalità: auto-refresh 15s, `rememberLastEventCode` (PWA standalone), poller con `getCurrentUser`.
+
+### Verifica
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Test: **389/389 verdi** (nessun test rotto).
+- Browser su :3100 (`/event/ddde9e03-8454-4cf7-ac24-a5d920fe788f`): countdown "Grazie a tutti!" (evento 30/07 passato) → "Entra nell'app" → header con nomi/data/Valledolmo + link mappe (Chiesa Immacolata, Fontana Murata) + badge deluxe + sidebar azioni + feed Facebook "Galleria (147)" con attribuzione **"Mancuso Francesca"** reale.
+- Unico console error: CSP del vecchio script Vercel Analytics (dev-only, non bloccante). I 401 su `/api/media/*/download` sono attesi da anonimo in dev (route auth-gated: solo sposo o ospite registrato in `event_guests`).
+
+### File modificati
+```
+apps/web/src/app/api/guest/event/route.ts          +30 (enrichment uploader + siteTimes)
+apps/web/src/app/event/[code]/page.tsx             riscritto (~306 righe, mirror pagina sposi)
+PROJECT_STATUS.md                                  +45 righe (questa sezione)
+```
+
+### TODO post-push
+1. Commit + push atomico.
+2. Verificare in produzione `https://www.sposi.live/event/ddde9e03-8454-4cf7-ac24-a5d920fe788f` da un account ospite registrato: countdown, meteo (entro 3gg dall'evento), navigatore mappe, feed stile Facebook con nomi caricatori, upload.
+3. L'attribuzione uploader funziona solo se l'uploader ha compilato nome/cognome nel form post-OAuth — gli upload anonimi restano con fallback couple_name (comportamento atteso).
+
+---
+
 ## Sessione 02/08/2026 (continua 5) — Console CEO `/ceo`: dashboard gestionale fuori dall'evento
 
 ### Richiesta utente
