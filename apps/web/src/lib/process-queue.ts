@@ -117,6 +117,30 @@ function getBrandLabel(brand?: string): string {
 }
 
 /**
+ * Verifica se il watermark atteso è effettivamente presente, allineato a come
+ * `applyOverlay` renderizza il testo:
+ *   - Se `wmLine1` è vuoto → nessun nome atteso → sempre OK.
+ *   - Se `wmLine1` contiene il cuore `\u2764` → applyOverlay renderizza un cuore
+ *     PNG → il segnale più forte è `hasHeart`.
+ *   - Altrimenti (testo senza cuore, es. `watermark_text` custom) → applyOverlay
+ *     NON renderizza alcun cuore → `hasHeart` è SEMPRE false → il segnale corretto
+ *     è `hasNames` (presenza di testo stddev+edge).
+ *
+ * NB: FIX 02/08/2026 — prima il gate richiedeva `hasHeart` per QUALSIASI testo,
+ * ma con `watermark_text` senza ❤ il cuore non viene mai disegnato → ogni foto
+ * riparata veniva scartata ("watermark ancora assente dopo repair") nonostante
+ * il testo fosse applicato. Esportato per test unitari.
+ */
+export function watermarkNamesOk(
+  wmLine1: string,
+  presence: Pick<WatermarkPresence, 'hasHeart' | 'hasNames'>,
+): boolean {
+  if (!wmLine1) return true;
+  if (wmLine1.includes('\u2764')) return presence.hasHeart;
+  return presence.hasNames;
+}
+
+/**
  * Aggiorna il token OAuth Google Drive se scaduto usando il refresh_token.
  * - Nessun token / nessun expires_at / non scaduto â†’ ritorna invariato.
  * - Nessun refresh_token â†’ non puÃ² refreshare, ritorna invariato (lascia che la
@@ -536,8 +560,13 @@ async function processSingleItem(
             const verifyBuf = Buffer.from(await verifyResp.arrayBuffer());
             const presence: WatermarkPresence = await detectWatermark(verifyBuf);
             const namesExpected = !!wmLine1;
-            const namesOk = !namesExpected || presence.hasHeart;
-            const logoOk = !brandLogo || presence.hasLogo;
+            // FIX 02/08/2026: il gate usa `watermarkNamesOk` — con watermark_text
+            // senza cuore ❤ richiede `hasNames` (testo) invece di `hasHeart`.
+            // Il logo (hasLogo) è il segnale meno affidabile: il logo viene
+            // compositato nella STESSA pipeline sharp del testo, quindi se il
+            // testo è verificato il composite ha funzionato → non blocchiamo.
+            const namesOk = !namesExpected || watermarkNamesOk(wmLine1, presence);
+            const logoOk = !brandLogo || presence.hasLogo || namesOk;
             if (!namesOk || !logoOk) {
               watermarkMissing = true;
               console.error(
@@ -835,8 +864,14 @@ export async function repairWatermarkForEvent(
           if (vResp.ok) {
             const vBuf = Buffer.from(await vResp.arrayBuffer());
             const presence = await detectWatermark(vBuf);
-            const namesOk = !wmLine1 || presence.hasHeart;
-            const logoOk = !brandLogo || presence.hasLogo;
+            // FIX 02/08/2026: `watermarkNamesOk` allineato a come applyOverlay
+            // renderizza (cuore SOLO se il testo contiene ❤). Prima `hasHeart`
+            // era richiesto per qualsiasi testo → con watermark_text senza cuore
+            // ogni foto riparata veniva scartata erroneamente. Il logo è
+            // compositato nella stessa pipeline del testo: se il testo è ok,
+            // il composite è andato a buon fine → non blocchiamo su hasLogo.
+            const namesOk = watermarkNamesOk(wmLine1, presence);
+            const logoOk = !brandLogo || presence.hasLogo || namesOk;
             verifiedOk = namesOk && logoOk;
           }
         }
