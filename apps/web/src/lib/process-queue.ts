@@ -56,6 +56,8 @@ async function logFailure(
 ): Promise<void> {
   try {
     await supabase.from('system_health_log').insert({
+      job: 'upload_processing_failure',
+      status: 'error',
       kind: 'upload_processing_failure',
       event_id: params.eventId,
       file_name: params.fileName ?? null,

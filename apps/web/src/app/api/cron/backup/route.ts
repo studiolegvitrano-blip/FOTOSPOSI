@@ -15,7 +15,8 @@ const BACKUP_TABLES = [
   'site_drafts',
   'orders',
   'event_branding',
-  'event_tiers',
+  'event_features',
+  'tier_features',
   'marketplace_suppliers',
 ] as const;
 

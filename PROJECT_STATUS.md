@@ -1,5 +1,47 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 02/08/2026 (continua 2) — Dashboard admin /admin/system + fix telemetry FIX 7 (era morta)
+
+### Bug critico trovato: la telemetry di FIX 7 NON ha MAI funzionato
+Durante la verifica preliminare della dashboard è emerso che **tutte le insert di telemetry fallivano silenziosamente**:
+- `logFailure` in `apps/web/src/lib/process-queue.ts` scriveva colonne inesistenti (`kind`, `event_id`, `file_name`, `failure_class`, `error_message`, `retry_count`) e NON passava `job`/`status` (entrambi NOT NULL) → la insert falliva sempre (best-effort con `console.warn`, nessun errore visibile).
+- `/api/cron/dlq-retry` scriveva `job: 'dlq-retry'` che violava il CHECK originario `job IN ('backup','maintenance')` → insert falliva.
+- `system_health_log` conteneva quindi SOLO righe di cron backup/maintenance (21 totali), zero telemetry di processing.
+- **Bug separato**: il cron backup falliva ogni notte (`status='error'`, 4 errori 29/07→01/08) perché `BACKUP_TABLES` includeva `'event_tiers'` — tabella INESISTENTE (quelle reali sono `event_features` + `tier_features`) → "Could not find the table 'public.event_tiers' in the schema cache".
+
+### Fix applicati
+**1. Migration `00043_system_health_log_telemetry.sql`** (applicata live + `NOTIFY pgrst, 'reload schema'`):
+- CHECK su `job` rilassato: `('backup','maintenance','dlq-retry','upload_processing_failure')`.
+- Nuove colonne: `kind TEXT`, `event_id UUID`, `file_name TEXT`, `failure_class TEXT`, `error_message TEXT`, `retry_count INT`.
+- Indici: `(kind, created_at DESC)`, `(event_id)`, `(failure_class)`.
+- Verificata colonne visibili al Data API post-reload.
+
+**2. `logFailure` corretto** (`apps/web/src/lib/process-queue.ts`): ora passa `job: 'upload_processing_failure'` + `status: 'error'` oltre a `kind` e alle colonne telemetry → la insert funziona.
+
+**3. Cron backup corretto** (`apps/web/src/app/api/cron/backup/route.ts`): `event_tiers` → `event_features` + `tier_features`.
+
+### Nuova dashboard admin `/admin/system`
+- **Route `GET /api/admin/system`** (service role, auth sessione utente): ritorna in un colpo:
+  - `queue`: conteggio upload_queue per status (pending/processing/failed/synced).
+  - `deadLetter`: totale + per `last_failure_class` + 20 item recenti (id, file_name, classe, dlq_retry_count, moved_to_dlq_at).
+  - `watermarkMissing`: conteggio foto con watermark_missing=true.
+  - `failures`: totale + per classe + per evento + per file + top 10 eventi (con `couple_name`) + 30 più recenti (ultimi 7 giorni).
+  - `lastJobs`: ultima esecuzione backup / maintenance / dlq-retry con status + details.
+- **Pagina `apps/web/src/app/admin/system/page.tsx`** (client, stesso pattern delle altre admin): 6 card KPI (in coda / in elaborazione / falliti / completati / dead letter / foto no watermark), tabella ultimi cron con badge ok/warning/error + avvisi espliciti se backup/maintenance in errore, tabella fallimenti per classe, tabella eventi top con link all'evento, DLQ con badge per classe, dettaglio fallimenti recenti.
+- Link "Sistema" aggiunto nel menu `/admin`.
+
+### Verifica
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Test: **361/361 verdi** (nessun test toccato: la telemetry era già best-effort, non testata).
+- Build: `npx next build` → `/admin/system` (3.63kB) e `/api/admin/system` (228B) compilate, unico warning preesistente (workspace root tracing).
+
+### TODO post-push
+1. **Verificare in produzione**: login admin → `/admin/system` mostra le 6 card, i cron (backup è in errore fino al prossimo run corretto), e la telemetry `upload_processing_failure` compare la prima volta che un item fallisce (dopo il fix, se un upload fallisce ora la riga viene scritta).
+2. **Riprogrammare backup**: il prossimo run notturno (04:00 UTC) deve risultare `ok` (verificare il 03/08 che `lastJobs.backup.status` sia `ok`).
+3. Le 3 foto `upload_queue` attualmente `failed` verranno riprovate dal prossimo cron maintenance → se falliscono di nuovo compariranno in `/admin/system` con classe errore reale (finalmente visibile).
+
+---
+
 ## Sessione 02/08/2026 — Sfondo immagine countdown + titolo di benvenuto con nomi sposi
 
 ### Sfondo immagine countdown (mobile + desktop)
