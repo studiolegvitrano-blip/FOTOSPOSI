@@ -399,9 +399,17 @@ async function processSingleItem(
 
     const r2Key = item.r2_key;
     if (!r2Key) {
-      const newRetry = 99;
-      await logFailure(supabase, { eventId, fileName: item.file_name, failureClass: FAILURE_CLASS_INVALID, errorMessage: 'r2_key mancante', retryCount: newRetry });
-      await supabase.from('upload_queue').update({ status: 'failed', error: 'r2_key mancante', retry_count: newRetry }).eq('id', item.id);
+      // FIX 02/08/2026: prima l'item veniva marcato 'failed' con retry_count=99,
+      // che lo escludeva per sempre dal retry (filtro `< 7`) SENZA però spostarlo
+      // in DLQ → item irrecuperabili (il file non è MAI arrivato su R2, non c'è
+      // nulla da riprocessare) restavano appesi in upload_queue all'infinito,
+      // falsando la dashboard ("Falliti in retry" che non ritentano mai).
+      // Ora si usa moveToDeadLetter: l'item esce dalla coda attiva, è tracciato
+      // con failure_class='invalid_image' (visibile in /admin/system) e la coda
+      // principale resta snella. dlq-retry può ancora ripescarlo (r2_key NULL →
+      // tornerà qui → DLQ), senza lasciare spazzatura nella coda principale.
+      await moveToDeadLetter(supabase, item, FAILURE_CLASS_INVALID, 'r2_key mancante');
+      await logFailure(supabase, { eventId, fileName: item.file_name, failureClass: FAILURE_CLASS_INVALID, errorMessage: 'r2_key mancante', retryCount: MAX_RETRY_COUNT });
       return false;
     }
 

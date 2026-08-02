@@ -1,5 +1,50 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 02/08/2026 (continua 3) — r2_key mancante → DLQ (niente più spazzatura in coda) + fix file_name DLQ dashboard + verifica meteo
+
+### Nuovo bug trovato: item senza `r2_key` restavano appesi in coda per sempre
+Durante la verifica della dashboard `/admin/system` è emerso che 3 item `upload_queue` con `status='failed'` erano irrecuperabili:
+- Il path `r2_key mancante` in `apps/web/src/lib/process-queue.ts` marcava l'item con `status='failed'` + **`retry_count=99`**.
+- Il filtro di `processQueueForEvent` è `.lt('retry_count', MAX_RETRY_COUNT)` (7) → **un item con retry_count=99 non veniva MAI più ritentato**, ma restava in `upload_queue` → spazzatura permanente che falsava la dashboard ("Falliti (in retry)" che in realtà non ritentano mai).
+- Peggio: per questi item il file **non è mai arrivato su R2** (r2_key NULL) → non c'è nulla da riprocessare, stavano in coda senza scopo.
+
+### Fix applicato
+**`apps/web/src/lib/process-queue.ts` (path `r2_key mancante`)**: ora usa `moveToDeadLetter(supabase, item, FAILURE_CLASS_INVALID, 'r2_key mancante')` + `logFailure` (retryCount = MAX_RETRY_COUNT) invece dell'update `status='failed'/retry_count=99`.
+- L'item esce dalla coda attiva (insert in `upload_queue_dead_letter` + delete da `upload_queue`).
+- È tracciato con `failure_class='invalid_image'` → visibile nella dashboard `/admin/system`.
+- La coda principale resta snella. `dlq-retry` può ancora ripescarlo (r2_key NULL → tornerà qui → DLQ) ma senza lasciare spazzatura nella coda principale.
+
+**Pulizia dei 3 item bloccati in produzione** (1000126935.jpg, 1000144023.jpg, 1000160172.jpg — tutti `invalid_image`/r2_key mancante): spostati manualmente in `upload_queue_dead_letter` via SQL (insert + delete). La dashboard ora mostra **0 falliti (in retry)** e **3 in DLQ**.
+
+**Fix dashboard**: `apps/web/src/app/api/admin/system/route.ts` — la select su `upload_queue_dead_letter` NON includeva `file_name` → la colonna "File" mostrava sempre "—". Aggiunto `file_name` alla select. Verificato in browser: ora mostra i nomi reali dei file.
+
+### Test
+**NUOVO `apps/web/src/lib/__tests__/process-queue-dlq-r2key.test.ts`** (2 test, mock-based come process-queue-fix7):
+- item senza r2_key → insert in `upload_queue_dead_letter` (con `last_failure_class='invalid_image'`) + delete da `upload_queue` + `system_health_log` con `job='upload_processing_failure'`.
+- NON marca più l'item `failed` con `retry_count=99` (regressione del bug originale).
+
+### Verifica
+- Test: **363/363 verdi** (era 361 → +2 nuovi).
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Dashboard in browser (dev :3100, login admin): 6 card KPI corrette (0 in coda / 0 in elaborazione / 0 falliti / 140 completati / 3 DLQ / 42 foto no watermark), tabella cron (backup error atteso fino al prossimo run 03/08 04:00 UTC, maintenance ok, DLQ retry mai eseguito), DLQ con nomi file reali.
+- **Widget meteo verificato end-to-end** (feature sessione 01/08): `/api/weather?city=Palermo&date=2026-07-30` (fuori finestra) → **404** (nessuna chiamata Open-Meteo sprecata); `date=2026-08-04` (entro 3gg) → **200** con forecast reale `{city:'Palermo', code:1, tMax:32.5, tMin:25.9, rainProb:3}`. La pagina evento `ee2cc954` (data 30/07, fuori finestra) NON mostra il widget → gate client+server funzionante. Unico console error: CSP del vecchio script Vercel Analytics (dev-only, non bloccante).
+
+### File modificati
+```
+apps/web/src/lib/process-queue.ts                                  | +8/-7 (r2_key mancante → moveToDeadLetter, commento esplicativo)
+apps/web/src/app/api/admin/system/route.ts                         | +1 (select file_name in DLQ)
+apps/web/src/lib/__tests__/process-queue-dlq-r2key.test.ts         | NEW (154 righe, 2 test)
+apps/web/.gitignore                                                | NEW (.vercel — pre-esistente, ora tracciato)
+PROJECT_STATUS.md                                                  | +55 righe (questa sezione)
+```
+
+### TODO post-push
+1. **Verifica in produzione** dopo commit/push: `/admin/system` deve mostrare 0 falliti + 3 DLQ con nomi file; il cron backup delle 04:00 UTC del 03/08 deve risultare `ok` (fix `event_tiers`→`event_features`/`tier_features` già in 99e9190).
+2. Il prossimo run `dlq-retry` (ogni 6h) ripescherà i 3 item DLQ → torneranno in upload_queue → r2_key NULL → DLQ di nuovo. **Risultato atteso**: nessuna spazzatura in coda, nessun errore, solo un ciclo DLQ→retry→DLQ innocuo. (Se si vuole fermare il ciclo: DELETE dei 3 record DLQ via SQL.)
+3. Le 42 foto `watermark_missing` restano da riparare (`/api/r2/repair-watermark` su evento ee2cc954) — non toccato in questa sessione.
+
+---
+
 ## Sessione 02/08/2026 (continua 2) — Dashboard admin /admin/system + fix telemetry FIX 7 (era morta)
 
 ### Bug critico trovato: la telemetry di FIX 7 NON ha MAI funzionato

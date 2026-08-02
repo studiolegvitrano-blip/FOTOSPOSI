@@ -30,7 +30,7 @@ export async function GET(_req: NextRequest) {
     // 1) Stato code di processing
     const [{ data: queueRows }, { data: dlqRows }, { data: watermarkMissing }] = await Promise.all([
       svc.from('upload_queue').select('status'),
-      svc.from('upload_queue_dead_letter').select('id, event_id, last_failure_class, dlq_retry_count, moved_to_dlq_at'),
+      svc.from('upload_queue_dead_letter').select('id, event_id, file_name, last_failure_class, dlq_retry_count, moved_to_dlq_at'),
       svc.from('media_uploads').select('id').eq('watermark_missing', true).limit(1000),
     ]);
 
