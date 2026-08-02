@@ -28,7 +28,7 @@ Convertite in WebP (85% quality) e installate in `apps/web/public/`:
 ### Titolo di benvenuto con nomi sposi
 **Richiesta utente**: "devi scrivere Benvenuti al Matrimonio di <nome sposa> e <nome sposo> esempio Elena e Mario, e il countdown 'Ci sposiamo tra' ... invece di 'Ci sposiamo tra Agostino Spera & Danila Villa'".
 
-**Implementazione** (IN WORK-TREE, NON ancora commit/push):
+**Implementazione** (✅ COMMIT `396a88a` PUSHATO):
 - `packages/ui/src/countdown.tsx`: nuova prop opzionale `welcomeTitle` → se presente, l'h1 mostra `welcomeTitle` invece di `coupleName`.
 - `apps/web/src/app/events/[id]/page.tsx`: calcola `welcomeTitle` dai campi `groom1/groom2_*`:
   - `brideName` = first_name del partner con `role==='bride'` (groom1 o groom2), fallback groom1.
@@ -42,7 +42,9 @@ Convertite in WebP (85% quality) e installate in `apps/web/public/`:
   - fr: "Bienvenue au Mariage de {bride} et {groom}"
   - es: "Bienvenidos a la Boda de {bride} y {groom}"
 
-**Stato verifica titolo**: typecheck 0 errori (web+ui), JSON 6 lingue validi. La verifica browser NON era conclusa quando la chat si è interrotta (dev server riavviato, Playwright non più disponibile) — da confermare visivamente con la prossima chat.
+**Stato verifica titolo**: typecheck 0 errori (web+ui), JSON 6 lingue validi, **361/361 test verdi**, commit `396a88a` pushato → deploy Vercel automatico.
+
+**Nota push (sessione chiusa)**: il primo push di `13afafc` è stato rifiutato da GitHub Push Protection perché il commit includeva `PROMPT-PROSSIMA-CHAT.md` con il Vercel token in chiaro (riga 46). Risolto: sanitizzato il file (token → placeholder `"<da ECCOLO FOTOSPOSI.txt>"`), commit riscritto senza quel file (`396a88a`). Il file `PROMPT-PROSSIMA-CHAT.md` resta sul disco (untracked, NON committato) e va tenuto fuori da ogni commit futuro.
 
 ### File modificati sessione 02/08
 ```

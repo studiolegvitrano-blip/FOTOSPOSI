@@ -17,3 +17,7 @@ stress-test-agenti/.tmp-fixtures/
 
 .playwright-mcp/
 
+# prompt di ripristino sessione — contiene riferimenti a token/secret, non committare mai
+PROMPT-PROSSIMA-CHAT.md
+
+
