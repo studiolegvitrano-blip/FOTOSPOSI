@@ -165,6 +165,41 @@ export async function listObjectsByPrefix(
   }
 }
 
+/**
+ * CEO dashboard — Lista ricorsivamente gli oggetti sotto un prefisso R2 con la
+ * loro dimensione in byte (per calcolare la memoria occupata per evento/folder).
+ *
+ * `ListObjectsV2` ritorna `Size` per ogni oggetto; `listObjectsByPrefix` li
+ * scarta. Questa variante li conserva. Stessa paginazione automatica (1000/chunk).
+ */
+export async function listObjectsWithSizes(
+  prefix: string,
+  maxKeys = 100000,
+): Promise<{ objects: Array<{ key: string; size: number }>; truncated: boolean; error?: string }> {
+  const objects: Array<{ key: string; size: number }> = [];
+  let token: string | undefined = undefined;
+  const cfg = defaultConfig();
+  try {
+    do {
+      const command: ListObjectsV2Command = new ListObjectsV2Command({
+        Bucket: cfg.bucket,
+        Prefix: prefix,
+        ContinuationToken: token,
+        MaxKeys: 1000,
+      });
+      const res = await getClient().send(command);
+      for (const obj of res.Contents ?? []) {
+        if (obj.Key) objects.push({ key: obj.Key, size: obj.Size ?? 0 });
+        if (objects.length >= maxKeys) return { objects, truncated: true };
+      }
+      token = res.IsTruncated ? res.NextContinuationToken : undefined;
+    } while (token);
+    return { objects, truncated: false };
+  } catch (e) {
+    return { objects, truncated: false, error: e instanceof Error ? e.message : 'ListObjects failed' };
+  }
+}
+
 function getPublicBase(cfg: ReturnType<typeof defaultConfig>): string {
   return cfg.publicUrl || `https://${cfg.bucket}.${cfg.accountId}.r2.cloudflarestorage.com`;
 }

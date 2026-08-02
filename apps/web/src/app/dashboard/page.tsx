@@ -51,6 +51,7 @@ export default function DashboardPage() {
           <LanguageSwitcher />
           <Button variant="outline" asChild><Link href="/marketplace">{n('marketplace')}</Link></Button>
           <Button variant="outline" asChild><Link href="/admin">{n('admin')}</Link></Button>
+          <Button variant="ghost" asChild><Link href="/ceo">CEO</Link></Button>
           <Button variant="ghost" onClick={handleLogout}>{n('logout')}</Button>
         </div>
       </div>

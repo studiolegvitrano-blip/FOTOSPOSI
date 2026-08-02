@@ -26,4 +26,5 @@ export {
   deleteObject,
   objectExists,
   listObjectsByPrefix,
+  listObjectsWithSizes,
 } from './r2';

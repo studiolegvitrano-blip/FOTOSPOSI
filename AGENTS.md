@@ -113,3 +113,4 @@ Pattern completo sicuro:
 - `GROQ_API_KEY` (Llama 3.3 70B, primario)
 - `GEMINI_API_KEY` (fallback, già configurato)
 - `EVOLUTION_API_URL` / `EVOLUTION_API_KEY`
+- `CEO_PASSWORD` (console `/ceo`, policy: ≥8 char, maiuscola, minuscola, numero, simbolo)

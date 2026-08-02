@@ -1,5 +1,120 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 02/08/2026 (continua 5) — Console CEO `/ceo`: dashboard gestionale fuori dall'evento
+
+### Richiesta utente
+"spostarla [la dashboard di gestione] all'esterno della pagina di gestione" → rotta dedicata `/ceo` (scelta utente, non `/`), protetta da password 8+ caratteri con maiuscole+minuscole+simboli+numeri, con strumenti economico-finanziari, rubrica eventi, verifica file Drive/R2 e memoria occupata su R2/Supabase/Vercel.
+
+### Decisioni architetturali
+- **Rotta dedicata `/ceo`** (login su `/ceo/login`, dashboard su `/ceo`), link discreto "CEO" nella dashboard sposi accanto ad "Admin".
+- **Auth senza tabella DB**: `CEO_PASSWORD` in env var → sessione firmata HMAC-SHA256 (`fotosposi-ceo.<exp>.<sig>`), cookie httpOnly/sameSite=lax/maxAge 12h, key derivata dalla password (cambiare password invalida le sessioni). Zero schema, zero RLS.
+- **Vercel stimato dai dati DB** (niente API Vercel free): baseline build 2.6MB + memoria derivata (media+queue).
+- **Strumenti economici**: ricavi stimati per tier (free/premium/deluxe) + ordini reali per status.
+- **Memoria per evento**: via `listObjectsWithSizes` su R2 (prefix `events/<r2_folder_name|uuid>`), non via DB (`media_uploads` non ha `file_size`).
+
+### Cosa è stato fatto
+
+**1. `packages/r2-storage/src/r2.ts`**: nuova export `listObjectsWithSizes(prefix, maxKeys=100000)` → `{ objects: Array<{key,size}>, truncated, error }` (ListObjectsV2 mantiene `Size`). Esportata da `index.ts`.
+
+**2. `apps/web/src/lib/ceo-auth.ts`** (NUOVO): `validateCeoPasswordPolicy` (≥8, maiuscola, minuscola, numero, simbolo), `signCeoSession`/`verifyCeoSession` (HMAC timingSafeEqual, base64url), `ceoPasswordMatches`, `isCeoPasswordConfigured`, `ceoTokenFromCookies`.
+
+**3. API routes** (NUOVI): `POST /api/ceo/login` (503 se password non configurata o debole, 401 errata, set cookie), `POST /api/ceo/logout`, `GET /api/ceo/check`, `GET /api/ceo/overview` (protetta da sessione) → KPI, rubrica eventi con memoria/Drive/integrità, storage R2/Supabase/Vercel, economico, integrità (media missing in R2 + oggetti R2 orfani).
+
+**4. Pagine** (NUOVI): `apps/web/src/app/ceo/login/page.tsx` (gate password) + `apps/web/src/app/ceo/page.tsx` (dashboard: 4 KPI, card Storage R2/Supabase/Vercel, card Economico, card Integrità, tabella Rubrica eventi con badge tier, memoria R2, Drive sync, integrità, link all'evento).
+
+**5. Test `apps/web/src/lib/__tests__/ceo-auth.test.ts`** (NUOVO, 21 test): policy password (6 casi), firma/verifica sessione (ok, tampered, scaduta con verify nel futuro, password cambiata), `ceoPasswordMatches`, `isCeoPasswordConfigured`, `ceoTokenFromCookies`.
+
+**6. Link CEO** in `apps/web/src/app/dashboard/page.tsx` accanto ad Admin.
+
+### Verifica
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori (fix: `Buffer.from(sig as string)` + typing dei callback in overview).
+- Test: **389/389 verdi** (368 + 21 nuovi CEO).
+- Live su :3100: `POST /api/ceo/login` → `{ok:true}`, `/api/ceo/check` → `{authenticated:true}`, `/api/ceo/overview` con cookie → dati reali (1 evento, 146 media, 0 ordini, R2 134MB/222 oggetti, 0 media mancanti su R2, 1 orfano = `1000144023.jpg` DLQ, ricavi stimati 375€ deluxe).
+- Browser: `/ceo/login` (gate password, bottone disabled finché vuota), login → `/ceo` → dashboard completa renderizzata con tutti i dati reali.
+
+### File modificati
+```
+apps/web/src/lib/ceo-auth.ts                                  NEW (auth CEO: policy, HMAC session, helpers)
+apps/web/src/lib/__tests__/ceo-auth.test.ts                   NEW (21 test)
+apps/web/src/app/api/ceo/login/route.ts                        NEW
+apps/web/src/app/api/ceo/logout/route.ts                       NEW
+apps/web/src/app/api/ceo/check/route.ts                        NEW
+apps/web/src/app/api/ceo/overview/route.ts                     NEW (KPI, rubrica, storage, economico, integrità)
+apps/web/src/app/ceo/login/page.tsx                            NEW (gate password)
+apps/web/src/app/ceo/page.tsx                                  NEW (dashboard CEO)
+packages/r2-storage/src/r2.ts                                  +30 (listObjectsWithSizes)
+packages/r2-storage/src/index.ts                               +1 (export)
+apps/web/src/app/dashboard/page.tsx                            +1 (link CEO)
+apps/web/.env.local                                            +2 (CEO_PASSWORD)
+PROJECT_STATUS.md                                              +45 righe (questa sezione)
+```
+
+### TODO post-push
+1. **Commit + push** del worktree (contiene anche il fix watermark non ancora pushato — decidere se 2 commit separati: watermark + CEO).
+2. **Vercel**: aggiungere `CEO_PASSWORD` alle env di produzione (deve rispettare la policy: ≥8, maiusc, minusc, numero, simbolo).
+3. Verificare in produzione: `https://www.sposi.live/ceo` → login → dashboard.
+4. Il KPI "Ricavi stimati" usa il tier attuale dell'evento; quando Stripe ordini esisteranno, la card Ordini mostrerà i ricavi reali pagati.
+5. Orfano R2 `1000144023.jpg` (DLQ) resta come storico — può essere cancellato via SQL/R2 o lasciato (è il record DLQ di `r2_key mancante`).
+
+---
+
+## Sessione 02/08/2026 (continua 4) — FIX gate verifica watermark: 39 foto "watermark assente" erano falsi negativi → repair 41/41
+
+### Sintomo
+`POST /api/r2/repair-watermark` su evento `ee2cc954-98d7-4e11-828b-668a52e738e2` (Agostino Spera & Danila Villa) riparava solo 3/42 foto: 39 errori **"watermark ancora assente dopo repair"** nonostante il watermark fosse stato applicato e ri-uploadato.
+
+### Root cause (diagnosi con script sharp reali su R2)
+L'evento ha `watermark_text` custom **"Sabrina & Giulio Sposi Viareggio 01/08/2026"** — **senza ❤ (U+2764)**. Il gate di verifica in `repairWatermarkForEvent` (e in `processQueueForEvent`) era:
+
+```ts
+const namesOk = !wmLine1 || presence.hasHeart;   // ← richiede il cuore SEMPRE
+const logoOk = !brandLogo || presence.hasLogo;   // ← richiede stddev logo ≥ 20
+```
+
+Ma `applyOverlay` (`packages/photo-overlay/src/index.ts`) renderizza il cuore PNG **SOLO se `coupleNames` contiene `\u2764`** (split su `RAW_HEART`, riga 132). Con testo senza cuore:
+- `hasHeart` è **sempre false** → `namesOk` sempre false → ogni foto scartata (il testo era stato applicato!).
+- `hasLogo` richiede `logoStddev >= 20`, ma sul logo reale dell'evento si osserva `logoStddev=12.36` → `logoOk` sempre false anche quando il logo c'è (logo semi-trasparente 60%).
+
+Evidenze empiriche (script diag con sharp su R2, POI ELIMINATI perché contenevano credenziali R2 in chiaro):
+- Foto watermarked `mirto.jpg`: `hasNames=true` (testo presente) ma `hasHeart`/`hasLogo` false → la verifica euristica sul cuore è inaffidabile per watermark senza ❤.
+- Diff regionale ORIGINALE vs WATERMARKED: `names.meanAbs=10.3 / highDiffFrac=0.13`, `logo.meanAbs=10.38 / 0.1356`; controllo (ORIG vs ORIG) = `0/0` → il testo c'è davvero.
+- Attenzione: `hasHeart` può anche essere **falso positivo** su contenuto rosso naturale (originale di `1000174524.jpg` → `redPixelCount=629` senza alcun watermark) → non è mai un segnale affidabile da solo.
+
+### Fix applicato
+**`apps/web/src/lib/process-queue.ts`**: nuovo helper esportato `watermarkNamesOk(wmLine1, presence)` che allinea il gate a come `applyOverlay` renderizza davvero:
+1. `wmLine1` vuoto → OK (nessun nome atteso).
+2. `wmLine1` contiene `\u2764` → `applyOverlay` disegna il cuore → richiede `hasHeart`.
+3. `wmLine1` senza cuore → `applyOverlay` NON disegna cuori → richiede **`hasNames`** (testo stddev+edge).
+
+Logo rilassato: `logoOk = !brandLogo || presence.hasLogo || namesOk` — il logo è compositato nella **stessa pipeline sharp** del testo, quindi se il testo è verificato il composite è andato a buon fine → `hasLogo` da solo (soglia stddev troppo stretta) non blocca più la riparazione.
+
+Aggiornati **entrambi** i gate: `processQueueForEvent` (self-healing check post-upload) e `repairWatermarkForEvent`.
+
+### Test
+**NUOVO `apps/web/src/lib/__tests__/process-queue-wm-verify-gate.test.ts`** (5 test, puro):
+- wmLine1 vuoto → OK; testo con ❤ → richiede `hasHeart`; testo senza ❤ (caso ee2cc954) → richiede `hasNames` e PASS anche con `hasHeart=false`; falso positivo cuore naturale non cambia il risultato; ❤️ con VARIANT SELECTOR → trattato come ❤.
+
+### Verifica live
+- `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Test: **368/368 verdi** (era 363 → +5 nuovi).
+- `POST /api/r2/repair-watermark` (dev :3100, CRON_SECRET da `.env.local`) su `ee2cc954` → **`{"repaired":41,"skipped":0,"errors":[]}`**.
+- DB: `media_uploads` evento → **146/146 `watermark_missing=false`**; query globale su `watermark_missing=true` → **0 righe in tutto il DB**.
+- NB: le ~20 foto senza `original_r2_key` (pre-migration 00040) sono state ri-watermarkate con fallback su `r2_key` già watermarked (qualità degradata, come documentato nel codice) — per un risultato pulito andrebbero ricaricate (TODO già esistente).
+
+### File modificati
+```
+apps/web/src/lib/process-queue.ts                                 | +17 (helper watermarkNamesOk esportato + 2 gate aggiornati)
+apps/web/src/lib/__tests__/process-queue-wm-verify-gate.test.ts   | NEW (67 righe, 5 test)
+PROJECT_STATUS.md                                                 | +55 righe (questa sezione)
+```
+
+### TODO post-push
+1. **Push + deploy** del fix → verificare che il prossimo upload con `watermark_text` senza ❤ non venga più marcato `watermark_missing`.
+2. Le ~20 foto `ee2cc954` senza `original_r2_key` restano da ricaricare per watermark pulito (TODO pre-esistente).
+3. Eventuali altre foto `watermark_missing=true` future: rilanciare `/api/r2/repair-watermark` ora che il gate è corretto.
+
+---
+
 ## Sessione 02/08/2026 (continua 3) — r2_key mancante → DLQ (niente più spazzatura in coda) + fix file_name DLQ dashboard + verifica meteo
 
 ### Nuovo bug trovato: item senza `r2_key` restavano appesi in coda per sempre
