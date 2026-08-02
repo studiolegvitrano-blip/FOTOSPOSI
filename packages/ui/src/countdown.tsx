@@ -29,6 +29,9 @@ interface CountdownProps {
   };
   /** Render custom sotto al countdown card per iniettare AddToCalendarMenu (app level). */
   children?: React.ReactNode;
+  /** Sfondo immagine (opzionale): mobile portrait + desktop wide. Se assenti, resta il gradiente. */
+  backgroundImageMobile?: string;
+  backgroundImageDesktop?: string;
 }
 
 function calcDiff(target: Date): { days: number; hours: number; minutes: number; seconds: number } {
@@ -68,6 +71,8 @@ export function Countdown({
   receptionAddress,
   labels: userLabels,
   children,
+  backgroundImageMobile,
+  backgroundImageDesktop,
 }: CountdownProps) {
   const labels = { ...DEFAULT_LABELS, ...userLabels };
   const [phase, setPhase] = useState<EventPhase>(() =>
@@ -85,19 +90,41 @@ export function Countdown({
   }, [targetDate, ceremonyTime, receptionTime, time]);
 
   const pad = (n: number) => String(n).padStart(2, '0');
+  const hasBgImage = Boolean(backgroundImageMobile && backgroundImageDesktop);
+  const mutedClass = hasBgImage ? 'text-white/80' : 'text-text-muted';
+  const brandTextClass = hasBgImage ? 'text-white' : 'text-brand';
+  const headingClass = hasBgImage ? 'text-white drop-shadow-md' : '';
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-brand/5 to-background text-center px-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-brand/10 via-transparent to-transparent pointer-events-none" />
+      {backgroundImageMobile && backgroundImageDesktop ? (
+        <>
+          <img
+            src={backgroundImageMobile}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover md:hidden pointer-events-none"
+          />
+          <img
+            src={backgroundImageDesktop}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover hidden md:block pointer-events-none"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/70 pointer-events-none" />
+        </>
+      ) : (
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-brand/10 via-transparent to-transparent pointer-events-none" />
+      )}
 
       <div className="relative z-10 space-y-8 max-w-2xl mx-auto">
         <div className="space-y-2">
-          <h1 className="text-4xl sm:text-5xl font-bold">{coupleName}</h1>
+          <h1 className={`text-4xl sm:text-5xl font-bold ${headingClass}`}>{coupleName}</h1>
         </div>
 
         {phase === 'countdown' && (
           <>
-            <p className="text-sm uppercase tracking-widest text-text-muted">
+            <p className={`text-sm uppercase tracking-widest ${mutedClass}`}>
               {labels.countdown_intro}
             </p>
             <div className="grid grid-cols-4 gap-4 max-w-sm mx-auto">
@@ -108,10 +135,10 @@ export function Countdown({
                 { value: diff.seconds, label: labels.seconds },
               ].map(({ value, label }) => (
                 <div key={label} className="flex flex-col items-center">
-                  <span className="text-3xl sm:text-4xl font-bold tabular-nums text-brand">
+                  <span className={`text-3xl sm:text-4xl font-bold tabular-nums ${brandTextClass}`}>
                     {pad(value)}
                   </span>
-                  <span className="text-xs text-text-muted uppercase tracking-wider mt-1">
+                  <span className={`text-xs ${mutedClass} uppercase tracking-wider mt-1`}>
                     {label}
                   </span>
                 </div>
@@ -123,12 +150,12 @@ export function Countdown({
         {phase === 'ceremony' && (
           <div className="space-y-3">
             <div className="text-5xl">💍</div>
-            <h2 className="text-2xl sm:text-3xl font-semibold text-brand">
+            <h2 className={`text-2xl sm:text-3xl font-semibold ${brandTextClass}`}>
               {labels.ceremony_title}
             </h2>
-            <p className="text-text-muted">{labels.ceremony_subtitle}</p>
+            <p className={mutedClass}>{labels.ceremony_subtitle}</p>
             {ceremonyAddress && (
-              <p className="text-sm text-text-muted italic">{ceremonyAddress}</p>
+              <p className={`text-sm ${mutedClass} italic`}>{ceremonyAddress}</p>
             )}
           </div>
         )}
@@ -136,12 +163,12 @@ export function Countdown({
         {phase === 'reception' && (
           <div className="space-y-3">
             <div className="text-5xl">🥂</div>
-            <h2 className="text-2xl sm:text-3xl font-semibold text-brand">
+            <h2 className={`text-2xl sm:text-3xl font-semibold ${brandTextClass}`}>
               {labels.reception_title}
             </h2>
-            <p className="text-text-muted">{labels.reception_subtitle}</p>
+            <p className={mutedClass}>{labels.reception_subtitle}</p>
             {receptionAddress && (
-              <p className="text-sm text-text-muted italic">{receptionAddress}</p>
+              <p className={`text-sm ${mutedClass} italic`}>{receptionAddress}</p>
             )}
           </div>
         )}
@@ -149,8 +176,8 @@ export function Countdown({
         {phase === 'ended' && (
           <div className="space-y-3">
             <div className="text-5xl">❤️</div>
-            <h2 className="text-2xl sm:text-3xl font-semibold">{labels.ended_title}</h2>
-            <p className="text-text-muted">{labels.ended_subtitle}</p>
+            <h2 className={`text-2xl sm:text-3xl font-semibold ${headingClass}`}>{labels.ended_title}</h2>
+            <p className={mutedClass}>{labels.ended_subtitle}</p>
           </div>
         )}
 

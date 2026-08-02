@@ -117,6 +117,8 @@ export default function EventDetailPage() {
           ceremonyAddress={ceremonyAddress}
           receptionAddress={receptionAddress}
           labels={countdownLabels}
+          backgroundImageMobile="/countdown-bg-mobile.webp"
+          backgroundImageDesktop="/countdown-bg-desktop.webp"
           onEnter={() => { setShowCountdown(false); contentRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
         >
           <AddToCalendarMenu
