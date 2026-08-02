@@ -1,5 +1,60 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 02/08/2026 — Sfondo immagine countdown + titolo di benvenuto con nomi sposi
+
+### Sfondo immagine countdown (mobile + desktop)
+**Richiesta utente**: "vorrei mettere una bella immagine nello sfondo countdown" + "la foto la fornisco io ma devi cambiarla per il cellulare".
+
+**Nota importante**: questo modello NON supporta input immagini → non posso vedere foto né screenshot. Ho usato **sharp con crop saliency automatico** (`position:'attention'`) e verificato la resa via DOM/browser (Playwright), non visivamente.
+
+**L'utente ha poi fornito 2 PNG già nelle proporzioni giuste** in `G:\Il mio Drive\Scambio file\` (Google Drive esterno al repo):
+- `countdown-bg-mobile.png` (941×1672 ≈ 9:16, brightness ~182/157/126)
+- `countdown-bg-desktop.png` (1672×941 ≈ 16:9, brightness ~168/129/79)
+
+Convertite in WebP (85% quality) e installate in `apps/web/public/`:
+- `countdown-bg-mobile.webp` → 720×1280, 66KB
+- `countdown-bg-desktop.webp` → 1600×900, 102KB
+
+**Modifiche al componente `packages/ui/src/countdown.tsx`** (commit `add2fa5`, PUSHATO):
+- Nuove props opzionali `backgroundImageMobile` / `backgroundImageDesktop`.
+- Se presenti → render 2 `<img>` absolute (mobile `md:hidden`, desktop `hidden md:block`) + overlay scuro `bg-gradient-to-b from-black/50 via-black/30 to-black/70` + testo bianco con `drop-shadow-md` per contrasto.
+- Se assenti → fallback al gradiente originale (retrocompatibile, nessun altro consumer rotto).
+- Testo adattivo: `mutedClass`/`brandTextClass`/`headingClass` cambiano in bianco quando `hasBgImage`.
+
+**Integrazione `apps/web/src/app/events/[id]/page.tsx`**: passa `backgroundImageMobile="/countdown-bg-mobile.webp"` e `backgroundImageDesktop="/countdown-bg-desktop.webp"` (path relativi alla root → funzionano identici su sposi.live E justmarry.live, stesso progetto Vercel).
+
+**Verifica JustMarry**: `https://www.justmarry.live/countdown-bg-mobile.webp` → HTTP 200, 67658 bytes (identico al file). Nessun intervento aggiuntivo: il Countdown è la stessa pagina condivisa da entrambi i domini.
+
+### Titolo di benvenuto con nomi sposi
+**Richiesta utente**: "devi scrivere Benvenuti al Matrimonio di <nome sposa> e <nome sposo> esempio Elena e Mario, e il countdown 'Ci sposiamo tra' ... invece di 'Ci sposiamo tra Agostino Spera & Danila Villa'".
+
+**Implementazione** (IN WORK-TREE, NON ancora commit/push):
+- `packages/ui/src/countdown.tsx`: nuova prop opzionale `welcomeTitle` → se presente, l'h1 mostra `welcomeTitle` invece di `coupleName`.
+- `apps/web/src/app/events/[id]/page.tsx`: calcola `welcomeTitle` dai campi `groom1/groom2_*`:
+  - `brideName` = first_name del partner con `role==='bride'` (groom1 o groom2), fallback groom1.
+  - `groomName` = first_name del partner con `role==='groom'` (groom1 o groom2), fallback groom2.
+  - Se entrambi presenti → `t('cd_welcome_prefix', { bride, groom })`, altrimenti fallback a `couple_name`.
+  - Evento test `ee2cc954` (groom1=Agostino/groom, groom2=Danila/bride) → "Benvenuti al Matrimonio di Danila e Agostino".
+- i18n: nuova chiave `events.cd_welcome_prefix` con placeholder `{bride}`/`{groom}` in 6 lingue:
+  - it: "Benvenuti al Matrimonio di {bride} e {groom}"
+  - en-US/en-GB: "Welcome to the Wedding of {bride} and {groom}"
+  - de: "Willkommen zur Hochzeit von {bride} und {groom}"
+  - fr: "Bienvenue au Mariage de {bride} et {groom}"
+  - es: "Bienvenidos a la Boda de {bride} y {groom}"
+
+**Stato verifica titolo**: typecheck 0 errori (web+ui), JSON 6 lingue validi. La verifica browser NON era conclusa quando la chat si è interrotta (dev server riavviato, Playwright non più disponibile) — da confermare visivamente con la prossima chat.
+
+### File modificati sessione 02/08
+```
+apps/web/public/countdown-bg-mobile.webp     NEW (720×1280 WebP, commit add2fa5)
+apps/web/public/countdown-bg-desktop.webp    NEW (1600×900 WebP, commit add2fa5)
+packages/ui/src/countdown.tsx                +45 (backgroundImage*, welcomeTitle, testo adattivo, commit add2fa5 + work-tree)
+apps/web/src/app/events/[id]/page.tsx        +20 (props sfondo + calcolo brideName/groomName/welcomeTitle)
+apps/web/messages/{it,en-US,en-GB,de,fr,es}.json  +1 chiave ciascuno (events.cd_welcome_prefix)
+```
+
+---
+
 ## Sessione 01/08/2026 (continua) — Widget meteo automatico Open-Meteo (giorno evento, 3 giorni prima)
 
 ### Richiesta

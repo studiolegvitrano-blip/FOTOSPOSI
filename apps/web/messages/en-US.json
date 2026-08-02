@@ -282,6 +282,7 @@
     "privacy": "Guest Privacy",
     "notifications": "Notifications",
     "concierge": "AI Concierge",
+    "cd_welcome_prefix": "Welcome to the Wedding of {bride} and {groom}",
     "cd_countdown_intro": "We're getting married in",
     "cd_days": "Days",
     "cd_hours": "Hours",

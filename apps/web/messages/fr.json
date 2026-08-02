@@ -282,6 +282,7 @@
     "privacy": "Confidentialité invités",
     "notifications": "Notifications",
     "concierge": "Conciergerie IA",
+    "cd_welcome_prefix": "Bienvenue au Mariage de {bride} et {groom}",
     "cd_countdown_intro": "Nous nous marions dans",
     "cd_days": "Jours",
     "cd_hours": "Heures",

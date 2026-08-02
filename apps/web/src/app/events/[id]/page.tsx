@@ -100,6 +100,25 @@ export default function EventDetailPage() {
     ended_subtitle: t('cd_ended_subtitle'),
   };
 
+  // Titolo di benvenuto: "Benvenuti al Matrimonio di <sposa> e <sposo>".
+  // Sposa prima, poi sposo (groom1/groom2 possono essere sposo O sposa — migration 00038).
+  const brideName =
+    event.groom1_role === 'bride'
+      ? event.groom1_first_name
+      : event.groom2_role === 'bride'
+        ? event.groom2_first_name
+        : event.groom1_first_name;
+  const groomName =
+    event.groom1_role === 'groom'
+      ? event.groom1_first_name
+      : event.groom2_role === 'groom'
+        ? event.groom2_first_name
+        : event.groom2_first_name;
+  const welcomeTitle =
+    brideName && groomName
+      ? t('cd_welcome_prefix', { bride: brideName, groom: groomName })
+      : event.couple_name || undefined;
+
   // Città per il widget meteo: priorità alle città specifiche di cerimonia/ricevimento,
   // fallback al comune generico dell'evento. Il widget usa Open-Meteo e appare solo
   // da 3 giorni prima dell'evento — nessun input extra per gli sposi.
@@ -111,6 +130,7 @@ export default function EventDetailPage() {
         <Countdown
           targetDate={event.date}
           coupleName={event.couple_name}
+          welcomeTitle={welcomeTitle}
           time={ceremonyTime || undefined}
           ceremonyTime={ceremonyTime}
           receptionTime={receptionTime}

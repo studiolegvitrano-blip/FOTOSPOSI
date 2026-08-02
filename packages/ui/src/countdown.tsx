@@ -6,6 +6,8 @@ import { getEventPhase, type EventPhase } from '@fotosposi/site-builder';
 interface CountdownProps {
   targetDate: string;
   coupleName: string;
+  /** Titolo di benvenuto custom (es. "Benvenuti al Matrimonio di Elena e Mario"). Se assente, usa coupleName. */
+  welcomeTitle?: string;
   onEnter?: () => void;
   ceremonyTime?: string;
   receptionTime?: string;
@@ -63,6 +65,7 @@ const DEFAULT_LABELS = {
 export function Countdown({
   targetDate,
   coupleName,
+  welcomeTitle,
   onEnter,
   ceremonyTime,
   receptionTime,
@@ -119,7 +122,9 @@ export function Countdown({
 
       <div className="relative z-10 space-y-8 max-w-2xl mx-auto">
         <div className="space-y-2">
-          <h1 className={`text-4xl sm:text-5xl font-bold ${headingClass}`}>{coupleName}</h1>
+          <h1 className={`text-4xl sm:text-5xl font-bold ${headingClass}`}>
+            {welcomeTitle ?? coupleName}
+          </h1>
         </div>
 
         {phase === 'countdown' && (

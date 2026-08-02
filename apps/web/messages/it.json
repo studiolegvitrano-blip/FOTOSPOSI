@@ -284,6 +284,7 @@
     "concierge": "Concierge AI",
     "social_wall": "Social Wall",
     "subtitle": "Sotto-eventi",
+    "cd_welcome_prefix": "Benvenuti al Matrimonio di {bride} e {groom}",
     "cd_countdown_intro": "Ci sposiamo tra",
     "cd_days": "Giorni",
     "cd_hours": "Ore",
