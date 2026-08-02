@@ -261,6 +261,7 @@ export default function GuestEventPage() {
                       eventId={event.id}
                       onShareMedia={handleShareMedia}
                       onOpenImage={(url) => setLightbox(url)}
+                      showUploaderRoles={(event as { show_uploader_roles?: boolean }).show_uploader_roles !== false}
                     />
                   )}
                 </CardContent>

@@ -155,7 +155,7 @@ function OnboardingForm({ user, redirect, onComplete }: {
   const [lastName, setLastName] = useState(nameParts.slice(1).join(' ') || '');
   const [email, setEmail] = useState(user.email || '');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<'testimone' | 'parente' | 'amico' | 'altro'>('amico');
+  const [role, setRole] = useState('testimone-sposa');
   const [customRole, setCustomRole] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -236,11 +236,14 @@ function OnboardingForm({ user, redirect, onComplete }: {
           </div>
           <div>
             <label className="text-sm font-medium" htmlFor="role">Ruolo</label>
-            <select id="role" value={role} onChange={(e) => setRole(e.target.value as typeof role)}
+            <select id="role" value={role} onChange={(e) => setRole(e.target.value)}
               className="mt-1 w-full rounded-md border border-border px-3 py-2 bg-surface">
-              <option value="testimone">Testimone</option>
-              <option value="parente">Parente</option>
+              <option value="testimone-sposa">Testimone della sposa</option>
+              <option value="testimone-sposo">Testimone dello sposo</option>
+              <option value="padre">Padre</option>
+              <option value="madre">Madre</option>
               <option value="amico">Amico</option>
+              <option value="parente">Parente</option>
               <option value="altro">Altro (specifica)</option>
             </select>
             {role === 'altro' && (

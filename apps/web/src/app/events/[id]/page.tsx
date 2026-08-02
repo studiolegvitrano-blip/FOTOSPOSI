@@ -257,6 +257,7 @@ export default function EventDetailPage() {
                         shareWatermarkedMedia(id, eventId, isVideo, `${event?.couple_name} — ${brand}`);
                       }}
                       onOpenImage={(url) => setLightbox(url)}
+                      showUploaderRoles={(event as { show_uploader_roles?: boolean }).show_uploader_roles !== false}
                     />
                   )}
                 </CardContent>

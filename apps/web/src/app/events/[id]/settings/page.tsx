@@ -32,6 +32,32 @@ export default function EventSettingsPage() {
   const [wmSaving, setWmSaving] = useState(false);
   const [wmSaved, setWmSaved] = useState(false);
 
+  // Partecipanti (chi carica foto/video) e toggle "mostra ruoli in galleria".
+  // I ruoli mostrati in galleria sono SOLO Testimone sposa/sposo, Padre, Madre
+  // (vedi guest-roles.ts); gli altri (Amico, Parente, Collega, Altro) restano
+  // salvati ma non compaiono nel feed.
+  type Participant = {
+    user_id: string;
+    name: string;
+    email: string | null;
+    role_at_event: string | null;
+    media_count: number;
+  };
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [showRoles, setShowRoles] = useState(true);
+  const [partLoading, setPartLoading] = useState(false);
+  const [partSaved, setPartSaved] = useState(false);
+  const roleOptions = [
+    { value: '', label: '— Nessun ruolo —' },
+    { value: 'testimone-sposa', label: 'Testimone della sposa' },
+    { value: 'testimone-sposo', label: 'Testimone dello sposo' },
+    { value: 'padre', label: 'Padre' },
+    { value: 'madre', label: 'Madre' },
+    { value: 'amico', label: 'Amico' },
+    { value: 'parente', label: 'Parente' },
+    { value: 'altro', label: 'Altro' },
+  ];
+
   // Dati separati dei due partner (richiesto dall'utente 27/07/2026 per supportare
   // matrimonio stesso-sesso e watermark con soli nomi). Default: 'groom' (neutro);
   // gli sposi specificano il ruolo corretto (es. una coppia eterosessuale metterà
@@ -103,6 +129,15 @@ export default function EventSettingsPage() {
         setLoading(false);
       })
       .catch(() => router.push(`/events/${eventId}`));
+
+    fetch(`/api/events/${eventId}/participants`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return;
+        setParticipants(d.participants ?? []);
+        setShowRoles(d.show_uploader_roles !== false);
+      })
+      .catch(() => { /* sezione opzionale: se fallisce non blocchiamo le impostazioni */ });
   }, [eventId, router]);
 
   const saveWatermark = async () => {
@@ -133,6 +168,34 @@ export default function EventSettingsPage() {
     setNamesSaving(false);
     if (!error) { setNamesSaved(true); setTimeout(() => setNamesSaved(false), 3000); }
     else alert(`Salvataggio non riuscito: ${error}`);
+  };
+
+  const saveParticipantRole = async (userId: string, roleAtEvent: string | null) => {
+    const res = await fetch(`/api/events/${eventId}/participants`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, roleAtEvent }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      alert(`Salvataggio ruolo non riuscito: ${(d as { error?: string }).error ?? res.status}`);
+      return;
+    }
+    setParticipants((prev) =>
+      prev.map((p) => (p.user_id === userId ? { ...p, role_at_event: roleAtEvent } : p)),
+    );
+    setPartSaved(true);
+    setTimeout(() => setPartSaved(false), 3000);
+  };
+
+  const toggleShowRoles = async (value: boolean) => {
+    setShowRoles(value);
+    const res = await fetch(`/api/events/${eventId}/participants`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ showUploaderRoles: value }),
+    });
+    if (!res.ok) setShowRoles(!value);
   };
 
   if (loading || !event) return (
@@ -344,6 +407,64 @@ export default function EventSettingsPage() {
             </Button>
             {wmSaved && <span className="text-sm text-success">Salvato ✓</span>}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2"><Users className="w-4 h-4" /> Partecipanti</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-text-muted">
+            Chi carica foto o video del vostro matrimonio. Assegnate un ruolo: in galleria
+            apparirà solo per Testimone della sposa, Testimone dello sposo, Padre e Madre —
+            gli altri ruoli restano salvati qui per organizzare la festa, ma non vengono mostrati.
+          </p>
+
+          <label className="flex items-center justify-between gap-3 border border-border rounded-md p-3 bg-background cursor-pointer">
+            <span className="text-sm">Mostra il ruolo del caricatore in galleria</span>
+            <input
+              type="checkbox"
+              checked={showRoles}
+              onChange={(e) => toggleShowRoles(e.target.checked)}
+              className="w-5 h-5 accent-brand"
+            />
+          </label>
+
+          {participants.length === 0 ? (
+            <p className="text-sm text-text-muted">
+              {partLoading ? 'Caricamento...' : 'Nessun partecipante ancora: quando gli invitati caricheranno foto o video li troverete qui.'}
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {participants.map((p) => {
+                const isCustom = p.role_at_event && !roleOptions.some((o) => o.value === p.role_at_event);
+                return (
+                  <div key={p.user_id} className="flex flex-wrap items-center justify-between gap-2 border border-border rounded-md p-3 bg-background">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{p.name}</p>
+                      <p className="text-xs text-text-muted truncate">
+                        {p.email ?? '—'} · {p.media_count} {p.media_count === 1 ? 'media' : 'media'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={p.role_at_event ?? ''}
+                        onChange={(e) => saveParticipantRole(p.user_id, e.target.value || null)}
+                        className="rounded-md border border-border px-2 py-1 text-sm bg-background"
+                      >
+                        {roleOptions.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                        {isCustom && <option value={p.role_at_event!}>{p.role_at_event} (personalizzato)</option>}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {partSaved && <p className="text-sm text-success">Salvato ✓</p>}
         </CardContent>
       </Card>
 

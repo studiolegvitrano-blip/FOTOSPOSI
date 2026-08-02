@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import FacebookFeed, { type FeedPost } from './facebook-feed';
 import type { MediaUpload } from '@fotosposi/media';
 import type { WeddingEvent } from '@fotosposi/events';
+import { isGalleryVisibleRole } from '@/lib/guest-roles';
 
 type VideoMessage = MediaUpload & { from_name?: string };
 
@@ -22,11 +23,17 @@ type Props = {
   canManage?: boolean;
   /** Callback per cancellare un media. La pagina padre la connette a DELETE /api/media/[id]. */
   onDeleteMedia?: (postId: string) => Promise<void>;
+  /**
+   * Se true mostra il ruolo del caricatore sotto il nome (solo Testimone sposa/sposo,
+   * Padre, Madre — vedi guest-roles.ts). Default true. Gli altri ruoli (Amico, Parente,
+   * Collega, Altro) non vengono MAI mostrati, a prescindere da questo flag.
+   */
+  showUploaderRoles?: boolean;
 };
 
 const PAGE_SIZE = 4;
 
-export default function EventTimelineFeed({ media, videos, event, eventId, onShareMedia, onOpenImage, canManage, onDeleteMedia }: Props) {
+export default function EventTimelineFeed({ media, videos, event, eventId, onShareMedia, onOpenImage, canManage, onDeleteMedia, showUploaderRoles = true }: Props) {
   const t = useTranslations('feed');
   const c = useTranslations('common');
   const [page, setPage] = useState(1);
@@ -50,8 +57,9 @@ export default function EventTimelineFeed({ media, videos, event, eventId, onSha
         // il post apparirebbe come caricato dagli sposi anche se è di un invitato.
         const uploaderName = (m as any).uploader_name as string | undefined;
         const role = (m as any).uploader_role_at_event as string | undefined;
+        const visibleRole = showUploaderRoles && isGalleryVisibleRole(role) ? role : undefined;
         const author = uploaderName
-          ? (role ? `${uploaderName} — ${role}` : uploaderName)
+          ? (visibleRole ? `${uploaderName} — ${visibleRole}` : uploaderName)
           : authorFallback;
         return {
           id: m.id,
@@ -71,7 +79,8 @@ export default function EventTimelineFeed({ media, videos, event, eventId, onSha
         || (m as any).uploader_name
         || authorFallback;
       const role = (m as any).uploader_role_at_event as string | undefined;
-      const author = role ? `${baseAuthor} — ${role}` : baseAuthor;
+      const visibleRole = showUploaderRoles && isGalleryVisibleRole(role) ? role : undefined;
+      const author = visibleRole ? `${baseAuthor} — ${visibleRole}` : baseAuthor;
       return {
         id,
         author,
@@ -86,7 +95,7 @@ export default function EventTimelineFeed({ media, videos, event, eventId, onSha
     return [...photoPosts, ...videoPosts].sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
-  }, [media, videos, event.couple_name, c]);
+  }, [media, videos, event.couple_name, c, showUploaderRoles]);
 
   // Paginazione in-memory (richiede poche foto per testare l'infinite scroll)
   const visible = posts.slice(0, page * PAGE_SIZE);
