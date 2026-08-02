@@ -1,5 +1,69 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 02/08/2026 (continua 7) — Ruoli partecipanti: in galleria SOLO testimoni sposa/sposo, padre, madre + editor Partecipanti
+
+### Richiesta utente
+1. Mostrare in galleria/feed il ruolo del caricatore **solo** per padre/madre/testimone sposa/testimone sposo.
+2. Raccogliere tutti i ruoli (anche padre/madre/collega ecc.) in fase di registrazione.
+3. Gli altri ruoli NON mostrarli in galleria.
+4. Aggiungere editor "Partecipanti" nelle impostazioni sposi per assegnare i ruoli.
+
+Decisione utente esplicita: "solo padre madre e tesimoni sposa/o, inseriscilo anche tra le informazioni richieste in fase di registrazione e chiedi se gli sposi vedano questi ruoli in galleria. gli altri ruoli prendili in fase di registrazione ma non usarli inseriscilo tra i partecipanti di impostazioni sposi".
+
+### Cosa è stato fatto
+
+**1. Migration `00044_events_show_uploader_roles.sql`** (applicata live + `NOTIFY pgrst, 'reload schema'`): `events.show_uploader_roles BOOLEAN NOT NULL DEFAULT true` — toggle "mostra ruoli in galleria" (default attivo, retrocompatibile).
+
+**2. `apps/web/src/lib/guest-roles.ts` (NUOVO)**: costanti ruoli condivise:
+- `GALLERY_VISIBLE_ROLES = ['testimone-sposa','testimone-sposo','padre','madre']` — SOLO questi appaiono nel feed.
+- `REGISTRATION_ROLES` — tutti i ruoli selezionabili in onboarding (i 4 visibili + amico, parente, altro con `galleryVisible` flag).
+- `isGalleryVisibleRole(role)` — helper puro per il filtro feed.
+
+**3. Form onboarding OAuth** (`apps/web/src/app/auth/callback/page.tsx`): select ruolo estesa da `testimone|parente|amico|altro` a `testimone-sposa | testimone-sposo | padre | madre | amico | parente | altro`. Il POST `/api/auth/setup` con `roleAtEvent` (→ `core_users.role_at_event`) era già funzionante, nessuna modifica lì.
+
+**4. Route NUOVA `apps/web/src/app/api/events/[id]/participants/route.ts`** (server-side, service role perché `core_users` NON ha policy RLS):
+- **GET**: lista partecipanti = uploader distinti da `media_uploads` (con `media_count`) ∪ `event_guests`, arricchiti con nome/email/`role_at_event` dai `core_users` + `show_uploader_roles` dell'evento. Solo sposo (`events.created_by`) o delegato (`event_managers` edit/admin).
+- **PATCH**: `{ userId, roleAtEvent }` → aggiorna `core_users.role_at_event`; oppure `{ showUploaderRoles }` → toggle su `events`.
+
+**5. Sezione "Partecipanti" in `apps/web/src/app/events/[id]/settings/page.tsx`** (+~120 righe): checkbox "Mostra il ruolo del caricatore in galleria" (toggle → PATCH), lista partecipanti ordinata per numero di media con select ruolo per ognuno (incluse le opzioni personalizzate già presenti), salvataggio immediato con conferma "Salvato ✓".
+
+**6. `EventTimelineFeed`** (`apps/web/src/components/event-timeline-feed.tsx`): nuova prop `showUploaderRoles` (default true). Compone l'author come `Nome — Ruolo` SOLO se `showUploaderRoles && isGalleryVisibleRole(role)`, altrimenti solo `Nome`. I ruoli non visualizzabili non compaiono MAI, a prescindere dal toggle.
+
+**7. Integrazione pagine**: `/event/[code]/page.tsx` e `/events/[id]/page.tsx` passano `showUploaderRoles={(event as {...}).show_uploader_roles !== false}` (l'evento arriva già con `select('*')`, il campo è presente a runtime).
+
+**8. Test `apps/web/src/lib/__tests__/guest-roles.test.ts`** (NUOVO, 5 test): GALLERY_VISIBLE_ROLES esatto, true per i 4 visibili, false per amico/parente/collega/custom/null/undefined/vuoto, REGISTRATION_ROLES contiene tutti i ruoli con flag galleryVisible corretto.
+
+### Verifica
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Test: **394/394 verdi** (era 389 → +5 nuovi).
+- Browser :3100 con Service Worker disregistrato (⚠️ il vecchio `/sw.js` serviva chunk stale: il nuovo codice era nel bundle ma il browser eseguiva la versione vecchia — unregister SW → codice fresco):
+  - Ruolo `amico` (NON visibile) → feed mostra "Mancuso Francesca" senza ruolo ✅
+  - Ruolo `padre` (visibile) → feed mostra "Mancuso Francesca — padre" ✅
+  - Ruolo ripristinato a NULL dopo il test.
+- Migration live: colonna `show_uploader_roles` verificata in `information_schema.columns`.
+
+### File modificati
+```
+supabase/migrations/00044_events_show_uploader_roles.sql          NEW (toggle ruoli in galleria)
+apps/web/src/lib/guest-roles.ts                                   NEW (costanti + helper isGalleryVisibleRole)
+apps/web/src/lib/__tests__/guest-roles.test.ts                    NEW (5 test)
+apps/web/src/app/api/events/[id]/participants/route.ts            NEW (GET lista + PATCH ruolo/toggle, service role)
+apps/web/src/app/auth/callback/page.tsx                           +11 (select ruoli estesa, default testimone-sposa)
+apps/web/src/app/events/[id]/settings/page.tsx                    +~120 (sezione Partecipanti)
+apps/web/src/components/event-timeline-feed.tsx                   +17 (prop showUploaderRoles + filtro isGalleryVisibleRole)
+apps/web/src/app/event/[code]/page.tsx                            +1 (passa showUploaderRoles)
+apps/web/src/app/events/[id]/page.tsx                             +1 (passa showUploaderRoles)
+PROJECT_STATUS.md                                                 +60 righe (questa sezione)
+```
+
+### TODO post-push
+1. Commit `b8b19ae` fatto localmente → **push** (contiene anche tutto il work-tree della sessione precedente se non ancora pushato — verificare con `git status`/`git log`).
+2. Verifica in produzione dopo deploy: da account sposo → Impostazioni → Partecipanti: assegnare "Testimone della sposa" a un uploader e verificare che in galleria appaia "Nome — Testimone della sposa"; assegnare "Amico" e verificare che NON appaia il ruolo.
+3. L'attribuzione con ruolo funziona solo per utenti che hanno un `role_at_event` valorizzato (via onboarding OAuth o editor Partecipanti). Il caricatore reale "Mancuso Francesca" (79e11f6e…) aveva `role_at_event=null`: ora lo sposo può assegnargli il ruolo dall'editor senza aspettare che si ri-registri.
+4. ⚠️ Durante il dev-test il Service Worker `/sw.js` ha servito bundle stale — per le prossime sessioni di verifica browser, disregistrare il SW prima di testare modifiche al codice client.
+
+---
+
 ## Sessione 02/08/2026 (continua 6) — Pagina ospite `/event/[code]` allineata alla pagina sposi
 
 ### Richiesta utente
