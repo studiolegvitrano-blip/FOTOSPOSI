@@ -22,3 +22,4 @@ export type Brand = keyof typeof brandColors;
 
 export { ShareButton } from './share-button';
 export { Countdown } from './countdown';
+export { MiniCountdown } from './mini-countdown';

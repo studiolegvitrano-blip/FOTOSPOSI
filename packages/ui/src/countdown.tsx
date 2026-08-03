@@ -96,7 +96,7 @@ export function Countdown({
   const hasBgImage = Boolean(backgroundImageMobile && backgroundImageDesktop);
   const mutedClass = hasBgImage ? 'text-white/80' : 'text-text-muted';
   const brandTextClass = hasBgImage ? 'text-white' : 'text-brand';
-  const headingClass = hasBgImage ? 'text-white drop-shadow-md' : '';
+  const headingClass = hasBgImage ? 'text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]' : '';
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-brand/5 to-background text-center px-4 relative overflow-hidden">
@@ -114,7 +114,8 @@ export function Countdown({
             aria-hidden="true"
             className="absolute inset-0 w-full h-full object-cover hidden md:block pointer-events-none"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/70 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/55 to-black/85 pointer-events-none" />
+          <div className="absolute inset-0 backdrop-blur-[2px] pointer-events-none" />
         </>
       ) : (
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-brand/10 via-transparent to-transparent pointer-events-none" />

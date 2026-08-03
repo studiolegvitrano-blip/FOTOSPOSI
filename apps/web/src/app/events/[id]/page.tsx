@@ -5,7 +5,7 @@ import { hasFeature, type Tier } from '@fotosposi/core';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { ShareButton, Countdown } from '@fotosposi/ui';
+import { ShareButton, Countdown, MiniCountdown } from '@fotosposi/ui';
 import { shareWatermarkedMedia } from '@/lib/share-watermarked';
 import { Share2, Church, Building2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -162,9 +162,21 @@ export default function EventDetailPage() {
           {/* Intestazione evento: full-width sopra le 3 colonne */}
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
+              <span className="inline-block text-xs font-semibold uppercase tracking-widest text-brand bg-brand/10 px-2 py-0.5 rounded mb-2">Sposi</span>
               <h1 className="text-2xl font-bold">{event.couple_name}</h1>
-              <p className="text-text-muted">
-                {new Date(event.date).toLocaleDateString()} — {event.location}
+              <p className="text-text-muted flex items-center gap-2 flex-wrap">
+                <span>{new Date(event.date).toLocaleDateString()} — {event.location}</span>
+                <span className="text-text-muted/60">·</span>
+                <MiniCountdown
+                  targetDate={event.date}
+                  detailedWithinHours={24}
+                  labels={{
+                    days: t('cd_days'),
+                    hours: t('cd_hours'),
+                    minutes: t('cd_minutes'),
+                    seconds: t('cd_seconds'),
+                  }}
+                />
               </p>
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-text-muted mt-1">
                 {event.church && (
