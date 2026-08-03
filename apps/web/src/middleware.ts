@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { routing } from '../i18n/routing';
+import { ceoTokenFromCookies, verifyCeoSession } from './lib/ceo-auth';
 
 function getLocale(request: NextRequest): string {
   const host = request.headers.get('host') || '';
@@ -65,7 +66,19 @@ export async function middleware(request: NextRequest) {
   // escludiamo esplicitamente dal controllo.
   if (request.nextUrl.pathname === '/auth/callback') return response;
 
-  const protectedPaths = ['/dashboard', '/events/new', '/admin'];
+  // /admin/* richiede autenticazione CEO (cookie HMAC firmato con CEO_PASSWORD).
+  // Pattern unico per `/ceo/*` e `/admin/*` — cambia solo la rotta login in fallback.
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    const token = ceoTokenFromCookies(request.headers.get('cookie'));
+    if (!verifyCeoSession(token)) {
+      const loginUrl = new URL('/ceo/login', request.url);
+      loginUrl.searchParams.set('redirect', request.nextUrl.pathname + request.nextUrl.search);
+      return NextResponse.redirect(loginUrl);
+    }
+    return response;
+  }
+
+  const protectedPaths = ['/dashboard', '/events/new'];
   const isProtected = protectedPaths.some((p) => request.nextUrl.pathname.startsWith(p));
   if (!isProtected) return response;
 
