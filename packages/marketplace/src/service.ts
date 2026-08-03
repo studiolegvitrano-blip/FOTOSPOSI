@@ -23,6 +23,8 @@ export interface MarketplaceSupplier {
   account_type: 'commerciale' | 'privato';
   full_name: string | null;
   business_name: string | null;
+  address: string | null;
+  vat_number: string | null;
   region: string | null;
   country: string;
   instagram: string | null;
