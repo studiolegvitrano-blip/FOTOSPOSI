@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { Inter, Playfair_Display } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
 import { routing } from '../../i18n/routing';
+import SiteFooter from '@/components/site-footer';
 import './globals.css';
 
 // Tipografia del redesign: serif elegante per i titoli, sans pulita per il corpo.
@@ -75,6 +76,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body suppressHydrationWarning>
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
+          <SiteFooter />
         </NextIntlClientProvider>
         {/* Service Worker registration per upload resiliente (pattern Immich):
             il SW gestisce IndexedDB queue + Background Sync API + retry su 'online'.
