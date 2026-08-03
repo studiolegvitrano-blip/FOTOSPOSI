@@ -15,6 +15,8 @@ export async function POST(req: NextRequest) {
   const full_name = body.full_name ? String(body.full_name).trim() : '';
   const business_name = body.business_name ? String(body.business_name).trim() : '';
   const phone = body.phone ? String(body.phone).trim() : '';
+  const address = body.address ? String(body.address).trim() : '';
+  const vat_number = body.vat_number ? String(body.vat_number).trim() : '';
   const city = body.city ? String(body.city).trim() : '';
   const region = body.region ? String(body.region).trim() : '';
   const country = body.country ? String(body.country).trim() : 'IT';
@@ -49,6 +51,8 @@ export async function POST(req: NextRequest) {
     business_name: business_name || null,
     email,
     phone: phone || null,
+    address: address || null,
+    vat_number: account_type === 'commerciale' ? (vat_number || null) : null,
     city: city || null,
     region: region || null,
     country: country || 'IT',

@@ -64,6 +64,8 @@ export interface SubmitSupplierApplicationParams {
   business_name?: string | null;
   email: string;
   phone?: string | null;
+  address?: string | null;
+  vat_number?: string | null;
   city?: string | null;
   region?: string | null;
   country?: string;
@@ -244,6 +246,8 @@ export async function submitSupplierApplication(
       website: params.website?.trim() || null,
       email: params.email.trim().toLowerCase(),
       phone: params.phone?.trim() || null,
+      address: params.address?.trim() || null,
+      vat_number: params.vat_number?.trim() || null,
       approved: false,
       is_partner: false,
       account_type: params.account_type,

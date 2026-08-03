@@ -13,6 +13,8 @@ interface FormState {
   business_name: string;
   email: string;
   phone: string;
+  address: string;
+  vat_number: string;
   city: string;
   region: string;
   country: string;
@@ -32,6 +34,8 @@ const INITIAL: FormState = {
   business_name: '',
   email: '',
   phone: '',
+  address: '',
+  vat_number: '',
   city: '',
   region: '',
   country: 'IT',
@@ -262,6 +266,34 @@ export default function CollaboratoriPage() {
                 />
               </div>
             </div>
+
+            {/* Indirizzo (per entrambi) */}
+            <div className={form.account_type === 'commerciale' ? 'space-y-2' : 'space-y-2'}>
+              <label htmlFor="address" className="text-sm font-medium">{t('address_label')}</label>
+              <input
+                id="address"
+                type="text"
+                value={form.address}
+                onChange={(e) => update('address', e.target.value)}
+                placeholder={t('address_placeholder')}
+                className={INPUT_CLASS}
+              />
+            </div>
+
+            {/* Partita IVA (solo commerciale) */}
+            {form.account_type === 'commerciale' && (
+              <div className="space-y-2">
+                <label htmlFor="vat_number" className="text-sm font-medium">{t('vat_label')}</label>
+                <input
+                  id="vat_number"
+                  type="text"
+                  value={form.vat_number}
+                  onChange={(e) => update('vat_number', e.target.value.trim())}
+                  placeholder="IT01234567890"
+                  className={INPUT_CLASS}
+                />
+              </div>
+            )}
 
             {/* Città + Regione */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
