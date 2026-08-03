@@ -1,5 +1,214 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 03/08/2026 (continua) — Migration 00046 live + push 1aa9167 + admin/marketplace esteso + footer globale IG @sposilive + MiniCountdown header + /admin via CEO + emoji reazioni + cleanup artefatti
+
+### Richieste utente (continuazione PROMPT-PROSSIMA-CHAT.md)
+1. Applica migration 00046 al DB di produzione + push di `1aa9167` (Indirizzo + P.IVA).
+2. Estendi `/admin/marketplace` per visualizzare TUTTI i campi del submit.
+3. Aggiungi footer globale con link Instagram `https://www.instagram.com/sposilive/` in tutte le pagine.
+4. Verifica cosa è obsoleto vs in uso nei file modified/untracked; committa solo ciò che è in uso.
+
+### Migration 00046 applicata live (Supabase MCP)
+- `apply_migration` "marketplace_suppliers_address_vat": `ALTER TABLE marketplace_suppliers ADD COLUMN address TEXT, vat_number TEXT` + COMMENT + `NOTIFY pgrst, 'reload schema'`.
+- `execute_sql` esplicito `NOTIFY pgrst, 'reload schema'` (regola ferrea AGENTS.md).
+- Verifica colonne in `information_schema.columns`: address + vat_number presenti.
+- INSERT di test riuscita con `address='Via Test 1'`, `vat_number='IT01234567890'` → colonne visibili al Data API. Riga di test poi DELETE.
+
+### Push commit 1aa9167 (push 51eb786..1aa9167)
+- feat(collaboratori): campi Indirizzo (entrambi) + Partita IVA (solo commerciale) — migration 00046, i18n 6 lingue.
+- Deploy Vercel automatico. Produzione: https://www.sposi.live/collaboratori 200 OK, form contiene `Indirizzo` + `Partita IVA`.
+
+### Commit `4989883` feat(admin/marketplace): estendi vista con tutti i campi candidatura pubblica
+- `packages/marketplace/src/service.ts`: `MarketplaceSupplier` interface + `address`, `vat_number`.
+- `apps/web/src/app/admin/marketplace/page.tsx` riscritta:
+  - 4 KPI (totali / in attesa / approvati / candidature pubbliche `submission_source='public_form'`).
+  - Filtro tab: Tutti / In attesa / Approvati / Solo candidature pubbliche.
+  - Tabella: colonna Tipo (Azienda/Privato) + colonna Sorgente (form/manuale) + Nome/Azienda (displayName + full_name subline).
+  - Click su riga `public_form` → espansione inline dettaglio: account_type, full_name, business_name, address, vat_number (solo commerciale; privato → "non richiesto"), city, region, country, website, instagram (link `instagram.com/<handle>`), years_experience, pricing_from (formattato `da € X.XX`), consenso marketing/termini, sorgente, submitted_at, created_at, descrizione.
+  - Badge `bg-blue-600` "Form /collaboratori" per righe public_form.
+
+### Commit `e723536` feat(footer): footer globale in tutte le pagine + IG handle sposilive
+- `apps/web/src/components/site-footer.tsx` (NUOVO): server component con `getTranslations` + `headers()` per brand detection (Sposi.live/JustMarry.live). Header: logo + brand + tagline + email supporto corretta per dominio (`info@sposi.live` / `info@justmarry.live`).
+- `apps/web/src/app/layout.tsx`: monta `<SiteFooter />` sotto `{children}` → footer visibile in **tutte** le pagine (incluse /admin, /event/[code], /collaboratori, /ceo, /sito/[id]).
+- `apps/web/src/app/page.tsx`: rimosso footer inline (duplicato) → 1 solo footer globale, niente doppia visualizzazione.
+- **Icona Instagram**: link改成 `https://www.instagram.com/sposilive/` (handle richiesto dal cliente). Verificato produzione: 0 vecchi `sposi.live`, 2 nuovi `sposilive` (1 HTML + 1 RSC flight payload — normale per App Router). Altri handle social (FB, TikTok, X) invariati.
+
+### Commit `58024ec` feat(ui): MiniCountdown inline nell'header evento + countdown leggibilita
+- `packages/ui/src/mini-countdown.tsx` (NUOVO): componente compatto. Props: `targetDate`, `detailedWithinHours`, `labels` (i18n). Forma breve ("5g 3o 12m"), forma "HH:MM:SS" entro 24h dall'evento, "Oggi!" il giorno-evento.
+- `packages/ui/src/index.ts`: export `MiniCountdown`.
+- `packages/ui/src/countdown.tsx`: countdown hero leggibilita migliorata — drop-shadow testo `0_2px_8px_rgba(0,0,0,0.6)` (prima `drop-shadow-md`), overlay `from-black/65 via-black/55 to-black/85` (prima `/50 /30 /70`), backdrop-blur `2px`. Contrasto testo bianco su foto sangat migliorato.
+- `apps/web/src/app/event/[code]/page.tsx` + `apps/web/src/app/events/[id]/page.tsx`: header evento con badge ("Sposi"/"Ospiti") + `<MiniCountdown targetDate={event.date} detailedWithinHours={24} labels={{days,hours,minutes,seconds}} />` inline come pill `text-sm` sotto la data.
+
+### Commit `660700e` feat(admin): proteggi /admin/* con sessione CEO via middleware
+- `apps/web/src/middleware.ts`: `/admin/*` richiede cookie HMAC CEO session (`ceoTokenFromCookies` + `verifyCeoSession` da `lib/ceo-auth`). Se assente/invalido → redirect `/ceo/login?redirect=...`. Rimuove `/admin` da `protectedPaths` sposo (ora solo `/dashboard` + `/events/new`).
+- `apps/web/src/app/dashboard/page.tsx`: rimosso link "Admin" dalla nav sposi (ora `/admin` richiede sessione CEO — il link non avrebbe funzionato per la maggior parte degli sposi).
+- `apps/web/src/components/admin-protected.tsx` **CANCELLATO** (gate client-side morto — sostituito dal middleware server-side più robusto, niente flash di contenuto prima del redirect).
+
+### Commit `05d89b9` feat(reactions): emoji wedding sigh=😂 grrr=🎉
+- `apps/web/src/components/facebook-feed.tsx` + `apps/web/src/components/reactions-bar.tsx`: REACTION_EMOJI/REACTIONS allineato. `sigh: '😢' → '😂'` (think-of-funny, contesto feste) e `grrr: '😡' → '🎉'` (party). Le emoji wedding-tier precedenti non facevano semantic sense per reazioni a foto matrimonio.
+
+### Cleanup artefatti (NON committati — cancellati dal disco)
+- `apps/web/src/components/admin-protected.tsx` — gate client morto.
+- `apps/web/src/app/api/collaboratori/apply/route.ts` + cartella `collaboratori/` sotto `api/` — route orfana che puntava a tabella `marketplace_supplier_applications` inesistente (sostituita da `/api/suppliers/submit` in commit `51eb786`). Verificato 0 referenze nel codice.
+- PNG artefatti: `countdown-overlay-reinforced.png`, `guest-countdown.png`, `guest-feed-full.png`, `guest-feed-top.png` — screenshot di sessioni precedenti, 0 referenze.
+- `vitest-out.jpg` — output del test integration `packages/photo-overlay/src/__tests__/index.integration.test.ts:62` (`await sharp(watermarked).toFile('vitest-out.jpg')`). Da aggiungere a `.gitignore` in futuro se si vuole evitare di ricomparire runtime.
+
+### Verifiche
+- Typecheck `npx tsc --noEmit -p apps/web/tsconfig.json` → **0 errori** (dopo pulizia `.next` cache stale che referenziava la route orfana cancellata).
+- Test `npx vitest run` → **394/394 verdi** (33 file, invariati nelle feature nuove).
+- Build produzione `npx next build` → OK, route compilate, nessun errore.
+- Push atomici:
+  - `e723536..05d89b9 master` (5 commit: 4989883 admin/marketplace + e723536 footer IG + 58024ec MiniCountdown + 660700e /admin via CEO + 05d89b9 emoji).
+  - (precedente push sessione: `51eb786..1aa9167` per collaboratori Indirizzo + P.IVA).
+- Produzione verificata: https://www.sposi.live/collaboratori 200 OK con campi Indirizzo + Partita IVA; footer globale IG handle `sposilive` su tutte le pagine (curl).
+
+### File committati (5 commit)
+
+**`4989883` feat(admin/marketplace): estendi vista con tutti i campi candidatura pubblica** (2 file)
+```
+apps/web/src/app/admin/marketplace/page.tsx  | riscritta (~290 righe)
+packages/marketplace/src/service.ts          | +2 (interface: address, vat_number)
+```
+
+**`e723536` feat(footer): footer globale in tutte le pagine + IG handle sposilive** (3 file)
+```
+apps/web/src/components/site-footer.tsx      | NEW (88 righe, server component)
+apps/web/src/app/layout.tsx                   | +2 (import + <SiteFooter/>)
+apps/web/src/app/page.tsx                     | -64 (rimosso footer inline duplicato)
+```
+
+**`58024ec` feat(ui): MiniCountdown inline nell'header evento + countdown leggibilita** (5 file)
+```
+packages/ui/src/mini-countdown.tsx            | NEW (componente compatto inline)
+packages/ui/src/index.ts                      | +1 (export MiniCountdown)
+packages/ui/src/countdown.tsx                 | +2 (drop-shadow + overlay + backdrop-blur)
+apps/web/src/app/event/[code]/page.tsx        | +13 (badge Ospiti + MiniCountdown header)
+apps/web/src/app/events/[id]/page.tsx         | +13 (badge Sposi + MiniCountdown header)
+```
+
+**`660700e` feat(admin): proteggi /admin/* con sessione CEO via middleware** (2 file)
+```
+apps/web/src/middleware.ts                    | +14 (/admin gate CEO via ceoTokenFromCookies+verifyCeoSession)
+apps/web/src/app/dashboard/page.tsx           | -1 (rimosso link Admin nav sposi)
+```
+
+**`05d89b9` feat(reactions): emoji wedding sigh=😂 grrr=🎉** (2 file)
+```
+apps/web/src/components/facebook-feed.tsx    | 2 (REACTION_EMOJI sigh/grrr)
+apps/web/src/components/reactions-bar.tsx     | 2 (REACTIONS sigh/grrr uguali)
+```
+
+### TODO post-push (prossima sessione)
+1. **Verificare in produzione** dopo deploy Vercel (commit `05d89b9`):
+   - https://www.sposi.live/admin/marketplace → richiede login CEO (non sessione sposo) → 4 KPI + filtro candidature pubbliche → click su riga espande dettaglio completo.
+   - Aprire evento da sposo: header mostra badge "Sposi" + MiniCountdown inline (es. "5g 3o 12m") sotto la data.
+   - Aprire evento da ospite `/event/[code]`: header mostra badge "Ospiti" + MiniCountdown inline.
+   - Entro 24h dal matrimonio: MiniCountdown diventa "HH:MM:SS"; il giorno-evento: "Oggi!".
+   - Reazioni feed: hover mostra emoji 😂 (sigh) e 🎉 (grrr).
+   - Footer IG handle `@sposilive` visibile in fondo di OGNI pagina (home, /collaboratori, /admin/marketplace, /ceo, /events/[id], /event/[code], /sito/[id]).
+2. **`.gitignore`** per `vitest-out.jpg` (test di photo-overlay lo ricrea runtime).
+3. **`PROMPT-PROSSIMA-CHAT.md`** non committato (resta untracked — regola sessione precedente invariata).
+4. L'email di supporto nel footer globale è `info@sposi.live` / `info@justmarry.live` (nuovo). La home usava prima `sposiliveit@gmail.com` (vecchio). Verificare se è la mail di supporto corretta o se si vuole ripristinare la gmail pubblica come contatto.
+
+### Note tecniche
+- **Footer server component**: usa `getTranslations` (async, `next-intl/server`) e `headers()` per brand detection. Niente `'use client'`. Si idrata client-side via RSC flight payload (questo spiega la presenza duale di "Seguici su" nel HTML — 1 nel render, 1 nel JSON di idratazione. Normale per App Router, non è duplicazione visibile).
+- **Middleware CEO gate**: `verifyCeoSession(token)` è timing-safe HMAC. Cookie firmato con key derivata da `CEO_PASSWORD`. Pattern identico a `/ceo/*`. PRIMA di togliere `/admin` da `protectedPaths` sposo, verificare che NESSUNA pagina /admin/* debba essere accessibile a sposo (ceo-only).
+- **MiniCountdown vs Countdown**: complementari. Countdown è il componente hero full-screen (3-phase cerimonia/benvenuto/ricevimento) in cima alle pagine evento. MiniCountdown è il componente inline compatto per header evento sotto la data. Nessuno sostituisce l'altro.
+- **RSC flight data** in `https://www.sposi.live/` HTML: Next.js App Router serializza i Server Components come JSON inline nell'HTML per idratare client-side. Per quello in alcuni casi si vedono "2 occorrenze" di una stringa (1 HTML + 1 JSON flight data). NON è un bug.
+- **Cache `.next` stale**: dopo cancellazione della route orfana `collaboratori/apply/`, il typecheck falliva perché `.next/types/app/api/collaboratori/apply/route.ts` continuava a referenziarlo. Risolto con `Remove-Item -Recurse -Force apps/web/.next` prima di tsc/build. Pattern: pulire `.next` dopo aver cancellato route, sennò cache stale continua a rompere tsc.
+
+---
+
+## Sessione 03/08/2026 — Form pubblico `/collaboratori` (Diventa Partner) + campi Indirizzo + Partita IVA
+
+### Richiesta utente
+"Aggiungi alle chiavi i18n in tutte le 6 lingue il namespace collaboratori, poi crea il form /collaboratori". Poi: "in entrambi manca l'indirizzo e nell'azienda la P. Iva" → aggiungere campo Indirizzo (per entrambi i tipi di account) e Partita IVA (solo per account commerciale/azienda).
+
+### Cosa è stato fatto
+
+**1. i18n `collaboratori.*` namespace** in tutti i 6 messaggi JSON (it, en-US, en-GB, de, fr, es): 35 chiavi totali (title, subtitle, account_type_*, category_*, full_name_*, business_name_*, email_*, phone_*, address_*, vat_label, city_*, region_*, country_*, website_*, instagram_*, description_*, years_experience_*, pricing_from_*, agreed_terms, marketing_consent, submit, submitting, success_title, success_message, submit_another, error_generic, required_field). Aggiunte inizialmente con chiavi italiane in sessione (worktree utente) poi allineate/estese in questa sessione. JSON validi (ConvertFrom-Json OK).
+
+**2. Migration `00045_marketplace_suppliers_submission.sql`** (applicata live via Supabase MCP + `NOTIFY pgrst, 'reload schema'`): 12 nuove colonne su `marketplace_suppliers` per il flusso di candidatura pubblica:
+- `account_type TEXT NOT NULL DEFAULT 'privato' CHECK (IN ('commerciale','privato'))`
+- `full_name TEXT`, `business_name TEXT`, `region TEXT`
+- `country TEXT NOT NULL DEFAULT 'IT'`
+- `instagram TEXT`, `years_experience INT`, `pricing_from NUMERIC(10,2)`
+- `agreed_terms BOOLEAN NOT NULL DEFAULT false`
+- `marketing_consent BOOLEAN NOT NULL DEFAULT false`
+- `submitted_at TIMESTAMPTZ NOT NULL DEFAULT now()`
+- `submission_source TEXT NOT NULL DEFAULT 'public_form'`
+
+**3. Migration `00046_marketplace_suppliers_address_vat.sql`** (committata, **NON ancora applicata live** — tool MCP non disponibile questa sessione, porta 5432 bloccata da DNS):
+- `address TEXT` (indirizzo, per entrambi i tipi di account)
+- `vat_number TEXT` (Partita IVA, solo per commerciale)
+
+**4. Service `submitSupplierApplication`** in `packages/marketplace/src/service.ts`: versione mixed con parametri + insert. Validazioni: agreed_terms true, email valida, category in `SUPPLIER_CATEGORIES` (16 enum), almeno full_name o business_name. INSERT con `approved=false`, `is_partner=false`, `submission_source='public_form'`, mappa `name = business_name || full_name`, salva `vat_number` solo se `account_type === 'commerciale'`. Ritorna `{id}` o `{error}`.
+
+Esportate: `SubmitSupplierApplicationParams`, `SupplierAccountType`, `SupplierCategory`, `SUPPLIER_CATEGORIES` constants, `submitSupplierApplication` function in `packages/marketplace/src/index.ts`.
+
+**5. Route `POST /api/suppliers/submit`** (`apps/web/src/app/api/suppliers/submit/route.ts`): validation body (account_type enum, category enum SUPPLIER_CATEGORIES, email regex, full_name OR business_name, agreed_terms), passaggio a service, ritorno `{ok, id}` (HTTP 200) o `{error}` (HTTP 400).
+
+**6. Pagina `/collaboratori/page.tsx`** (NUOVA, ~470 righe): form completo con tutti i campi, i18n via `useTranslations('collaboratori')`. Radio "Tipo di account" commerciale/privato + toggle: campo "Partita IVA" compare **solo** quando commerciale. Submit POST `/api/suppliers/submit` → schermata successo "Richiesta inviata con successo!"
+
+**7. Homepage nav link**: `apps/web/src/app/page.tsx` ha ora il link `/collaboratori` nella barra in alto (label da `nav.collaboratori` già presente nei 6 JSON).
+
+**8. Fix `apps/web/src/app/admin/page.tsx`** (preesistente: `<main>` duplicato -> JSX rotto che rompeva anche la build Vercel). Risolto prima del commit 51eb786 (era nel worktree come corruzione OneDrive).
+
+### Verifica dev
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Test: `npx vitest run` → **394/394 verdi**.
+- Browser dev :3100: form renderizza tutti i campi, fill + submit end-to-end → DB contiene riga con `approved=false`, tutti i campi presenti (verificato via Supabase MCP `execute_sql`). Riga di test poi eliminata.
+- i18n JSON 6 lingue tutti validi (ConvertFrom-Json OK con chiavi address_label/vat_label presenti).
+
+### Push / deploy
+Push 03/08 commit `51eb786` → deploy Vercel → https://www.sposi.live/collaboratori **200 OK** (HTML 50KB con "Diventa Partner", bottone "Invia richiesta"). Verificato via curl: status 200, i match su `account_type`, `full_name`, `submitting`, `success_title` OK.
+
+### Stato push al momento della sessione
+- `origin/master` punta a `51eb786` (prima metà della feature, pushata 03/08 in questa sessione — già in produzione: sposi.live/collaboratori 200 OK).
+- Branch locale `master` è **ahead 1**: 
+  - `1aa9167` (feat collaboratori Indirizzo + P.IVA + migration 00046) — **NON pushato**
+
+(I commit precedenti b8b19ae ruoli, 914bf82 guest, d4bcdde docs, 51eb786 collaboratori v1 sono già pushati.)
+
+⚠️ **Prima di pushare `1aa9167` serve applicare la migration 00046** (v. `PROMPT-PROSSIMA-CHAT.md`): altrimenti il form in produzione rompe al submit con `42703 column "address" does not exist in the schema cache` PostgREST (stesso problema di `watermark_missing` 28/07).
+
+### File committati (1aa9167)
+```
+ apps/web/messages/{it,en-US,en-GB,de,fr,es}.json                     +3 chiavi (address_label, address_placeholder, vat_label)
+ apps/web/src/app/api/suppliers/submit/route.ts                       +4 (parse body + passaggio address/vat_number)
+ apps/web/src/app/collaboratori/page.tsx                              +32 (FormState address/vat_number + JSX condizionale P.IVA)
+ packages/marketplace/src/service.ts                                 +4 (params address/vat_number + insert)
+ supabase/migrations/00046_marketplace_suppliers_address_vat.sql     NEW (11 righe)
+```
+
+### File committati (51eb786, già pushato)
+```
+ apps/web/messages/{it,en-US,en-GB,de,fr,es}.json                     +35 chiavi (namespace collaboratori)
+ apps/web/src/app/api/suppliers/submit/route.ts                       NEW (POST handler, service role)
+ apps/web/src/app/collaboratori/page.tsx                             NEW (form completo)
+ apps/web/src/app/page.tsx                                            +12 (link nav /collaboratori + footer email)
+ apps/web/src/app/admin/page.tsx                                      fix JSX rotto (<main> duplicato)
+ packages/marketplace/src/service.ts                                  +100 (submit + interfacce + SUPPLIER_CATEGORIES)
+ packages/marketplace/src/index.ts                                    +4 (export)
+ supabase/migrations/00045_marketplace_suppliers_submission.sql     NEW (12 colonne)
+```
+
+### TODO post-push (vedi PROMPT-PROSSIMA-CHAT.md)
+1. **Applica migration 00046 via Supabase SQL Editor** + `NOTIFY pgrst, 'reload schema'` (la porta 5432 è bloccata da DNS su questa macchina, tool MCP non disponibile; l'host API 443 è raggiungibile).
+2. **Push di 5 commit**: `git push origin master` → deploy Vercel automatico.
+3. **Verifica produzione**: https://www.sposi.live/collaboratori deve mostrare form con campi Indirizzo (sempre) + Partita IVA (solo commerciale).
+4. **Estendere `/admin/marketplace`** per visualizzare TUTTI i campi del submit (account_type, full_name, business_name, address, vat_number, region, country, instagram, years_experience, pricing_from, description, marketing_consent, submitted_at) — ora mostra solo nome/categoria/città/rating/approved.
+5. **Eliminare route orfana** `apps/web/src/app/api/collaboratori/apply/route.ts` (untracked, punta a tabella inesistente `marketplace_supplier_applications`).
+6. **File untracked NON correlati** da NON committare: `apps/web/src/components/admin-protected.tsx`, `packages/ui/src/mini-countdown.tsx`, `countdown-overlay-reinforced.png`, `guest-countdown.png`, `guest-feed-full.png`, `guest-feed-top.png`, `vitest-out.jpg`.
+7. **Modifiche tracked NON committate** (sessioni precedenti, NON correlate): `apps/web/src/app/dashboard/page.tsx`, `apps/web/src/app/event/[code]/page.tsx`, `apps/web/src/app/events/[id]/page.tsx`, `apps/web/src/components/facebook-feed.tsx`, `apps/web/src/components/reactions-bar.tsx`, `apps/web/src/middleware.ts`, `packages/ui/src/countdown.tsx`, `packages/ui/src/index.ts`.
+
+### Note importanti
+- Il codice della feature Page IVA è **condizionale lato client**: il campo compare solo per commerciale. Lato API, la route filtra `vat_number` a null per privato (deve: anche se il client invia `vat_number` per un privato per bug/manomissione, il server non lo persiste). Validato.
+- La RLS su `marketplace_suppliers` non ha policy INSERT pubblica — la route usa service role (bypassa RLS), pattern già usato per `/api/auth/check-user`, `/api/auth/setup`.
+- `SUPPLIER_CATEGORIES` (16 enum da CHECK 00020) è esportato dal package marketplace e usato dal form per popolare il `<select>` categoria — coerenza garantita con il DB.
+
+---
+
 ## Sessione 02/08/2026 (continua 7) — Ruoli partecipanti: in galleria SOLO testimoni sposa/sposo, padre, madre + editor Partecipanti
 
 ### Richiesta utente
