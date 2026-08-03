@@ -49,6 +49,7 @@
     "admin": "Admin",
     "login": "Anmelden",
     "signup": "Registrieren",
+    "collaboratori": "Partner",
     "logout": "Abmelden",
     "language": "Sprache",
     "settings": "Einstellungen"
@@ -174,7 +175,7 @@
     ],
     "final_cta_title": "Erstellen Sie Ihre kostenlose Einladungsseite",
     "final_cta_subtitle": "Fertig in wenigen Minuten. Ohne Kreditkarte.",
-    "footer_tagline": "Fotos, Spiele und Erinnerungen Ihrer Hochzeit – an einem Ort.",
+    "footer_tagline": "Kontakte",
     "showcase_title": "Unsere Gäste haben unseren ECHTEN Tag eingefangen.",
     "showcase_subtitle": "Von der Zeremonie bis zum Toast — jeder Handyfoto Ihrer Gäste ist sofort in der App. Öffnen Sie Ihren Tag mit einem QR.",
     "showcase_cta": "Gratis-Hochzeitsseite erstellen",
@@ -696,8 +697,8 @@
     "love": "Ich liebe",
     "adore": "Ich liebe",
     "wow": "Wow",
-    "sigh": "Ach",
-    "grrr": "Grrr"
+    "sigh": "Lach",
+    "grrr": "Party"
   },
   "feed": {
     "mi_piaci": "Gefällt mir",
@@ -717,8 +718,8 @@
     "reaction_love": "Ich liebe",
     "reaction_adore": "Ich liebe",
     "reaction_wow": "Wow",
-    "reaction_sigh": "Ach",
-    "reaction_grrr": "Grrr",
+    "reaction_sigh": "Lach",
+    "reaction_grrr": "Party",
     "persone_ammirano": "Leute bewundern die Erinnerungen"
   },
   "calendar_menu": {
@@ -751,5 +752,38 @@
     "thunderstorm": "Gewitter",
     "hail": "Hagel",
     "unknown": "Gemischte Bedingungen"
+  },
+  "collaboratori": {
+    "title": "Werden Sie Sposi.live-Partner",
+    "subtitle": "Sind Sie Fotograf, Hochzeitsplaner, Caterer oder Anbieter von Hochzeitsdienstleistungen? Treten Sie unserem Marktplatz bei und lassen Sie sich von tausenden Paaren entdecken, die ihren großen Tag planen.",
+    "account_type_label": "Kontotyp",
+    "account_type_commerciale": "Unternehmen / USt-IdNr.",
+    "account_type_privato": "Privat / Freiberuflich",
+    "category_label": "Hauptkategorie",
+    "category_placeholder": "Wählen Sie Ihre Kategorie",
+    "full_name_label": "Vor- und Nachname",
+    "full_name_placeholder": "Max Mustermann",
+    "business_name_label": "Firmen-/Markenname (optional)",
+    "business_name_placeholder": "Max Mustermann Fotografie",
+    "email_label": "Kontakt-E-Mail",
+    "phone_label": "Telefon (optional)",
+    "city_label": "Stadt",
+    "region_label": "Bundesland / Region",
+    "country_label": "Land",
+    "website_label": "Webseite (optional)",
+    "instagram_label": "Instagram (optional)",
+    "description_label": "Stellen Sie sich kurz vor",
+    "description_placeholder": "Beschreiben Sie Ihren Stil, Ihre Dienstleistungen und was Sie besonders macht. Max 2000 Zeichen.",
+    "years_experience_label": "Jahre Erfahrung",
+    "pricing_from_label": "Preis ab (€)",
+    "agreed_terms": "Ich akzeptiere die Nutzungsbedingungen und Datenschutzerklärung von Sposi.live.",
+    "marketing_consent": "Ich möchte Updates und Neuigkeiten vom Sposi.live-Marktplatz erhalten.",
+    "submit": "Anfrage senden",
+    "submitting": "Wird gesendet...",
+    "success_title": "Anfrage erfolgreich gesendet!",
+    "success_message": "Vielen Dank für Ihre Bewerbung. Unser Team wird sie innerhalb von 48 Stunden prüfen und Sie per E-Mail kontaktieren.",
+    "submit_another": "Weitere Anfrage senden",
+    "error_generic": "Fehler beim Senden. Bitte versuchen Sie es später erneut.",
+    "required_field": "Pflichtfeld"
   }
 }

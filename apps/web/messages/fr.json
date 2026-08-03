@@ -49,6 +49,7 @@
     "admin": "Admin",
     "login": "Connexion",
     "signup": "Inscription",
+    "collaboratori": "Partenaires",
     "logout": "Déconnexion",
     "language": "Langue",
     "settings": "Paramètres"
@@ -174,7 +175,7 @@
     ],
     "final_cta_title": "Créez votre site d'invitation gratuit",
     "final_cta_subtitle": "Prêt en quelques minutes. Sans carte bancaire.",
-    "footer_tagline": "Les photos, jeux et souvenirs de votre mariage, au même endroit.",
+    "footer_tagline": "Contacts",
     "showcase_title": "Nos invités ont capturé notre journée VRAIE.",
     "showcase_subtitle": "De la cérémonie au toast, chaque cliché de vos invités vit déjà dans l'appli. Ouvrez votre journée avec un QR.",
     "showcase_cta": "Créez votre site de mariage gratuit",
@@ -696,8 +697,8 @@
     "love": "J'adore",
     "adore": "J'adore",
     "wow": "Wow",
-    "sigh": "Ouh",
-    "grrr": "Grrr"
+    "sigh": "Rire",
+    "grrr": "Fête"
   },
   "feed": {
     "mi_piaci": "J'aime",
@@ -717,8 +718,8 @@
     "reaction_love": "J'adore",
     "reaction_adore": "J'adore",
     "reaction_wow": "Wow",
-    "reaction_sigh": "Ouh",
-    "reaction_grrr": "Grrr",
+    "reaction_sigh": "Rire",
+    "reaction_grrr": "Fête",
     "persone_ammirano": "Les gens admirent les souvenirs"
   },
   "calendar_menu": {
@@ -751,5 +752,38 @@
     "thunderstorm": "Orage",
     "hail": "Grêle",
     "unknown": "Conditions mixtes"
+  },
+  "collaboratori": {
+    "title": "Devenez Partenaire Sposi.live",
+    "subtitle": "Vous êtes photographe, wedding planner, traiteur ou prestataire de services de mariage ? Rejoignez notre marketplace et faites-vous découvrir par des milliers de couples qui préparent leur grand jour.",
+    "account_type_label": "Type de compte",
+    "account_type_commerciale": "Entreprise / N° TVA",
+    "account_type_privato": "Particulier / Freelance",
+    "category_label": "Catégorie principale",
+    "category_placeholder": "Sélectionnez votre catégorie",
+    "full_name_label": "Nom complet",
+    "full_name_placeholder": "Marie Dupont",
+    "business_name_label": "Nom commercial / marque (facultatif)",
+    "business_name_placeholder": "Marie Dupont Photographie",
+    "email_label": "Email de contact",
+    "phone_label": "Téléphone (facultatif)",
+    "city_label": "Ville",
+    "region_label": "Région / Département",
+    "country_label": "Pays",
+    "website_label": "Site web (facultatif)",
+    "instagram_label": "Instagram (facultatif)",
+    "description_label": "Présentez-vous en quelques mots",
+    "description_placeholder": "Décrivez votre style, vos services et ce qui vous distingue. Max 2000 caractères.",
+    "years_experience_label": "Années d'expérience",
+    "pricing_from_label": "Tarif à partir de (€)",
+    "agreed_terms": "J'accepte les Conditions d'utilisation et la Politique de confidentialité de Sposi.live.",
+    "marketing_consent": "Je souhaite recevoir les actualités de la marketplace Sposi.live.",
+    "submit": "Envoyer la candidature",
+    "submitting": "Envoi en cours...",
+    "success_title": "Candidature envoyée avec succès !",
+    "success_message": "Merci pour votre candidature. Notre équipe l'examinera sous 48h et vous contactera par email.",
+    "submit_another": "Envoyer une autre candidature",
+    "error_generic": "Erreur d'envoi. Veuillez réessayer plus tard.",
+    "required_field": "Champ obligatoire"
   }
 }

@@ -49,6 +49,7 @@
     "admin": "Admin",
     "login": "Sign in",
     "signup": "Sign up",
+    "collaboratori": "Partners",
     "logout": "Sign out",
     "language": "Language",
     "settings": "Settings"
@@ -174,7 +175,7 @@
     ],
     "final_cta_title": "Create your free invitation site",
     "final_cta_subtitle": "Ready in minutes. No card required.",
-    "footer_tagline": "Your wedding's photos, games and memories — all in one place.",
+    "footer_tagline": "Contacts",
     "showcase_title": "Our guests captured the REAL day.",
     "showcase_subtitle": "From the ceremony to the toast, every guest shot lives in the app the moment it's taken. Open your day with a QR.",
     "showcase_cta": "Start your wedding site free",
@@ -696,8 +697,8 @@
     "love": "Love",
     "adore": "Adore",
     "wow": "Wow",
-    "sigh": "Sigh",
-    "grrr": "Grrr"
+    "sigh": "Laughs",
+    "grrr": "Party"
   },
   "feed": {
     "mi_piaci": "Like",
@@ -717,8 +718,8 @@
     "reaction_love": "Love",
     "reaction_adore": "Adore",
     "reaction_wow": "Wow",
-    "reaction_sigh": "Sigh",
-    "reaction_grrr": "Grrr",
+    "reaction_sigh": "Laughs",
+    "reaction_grrr": "Party",
     "persone_ammirano": "People are admiring the memories"
   },
   "calendar_menu": {
@@ -751,5 +752,38 @@
     "thunderstorm": "Thunderstorm",
     "hail": "Hail",
     "unknown": "Mixed conditions"
+  },
+  "collaboratori": {
+    "title": "Become a Sposi.live Partner",
+    "subtitle": "Are you a photographer, wedding planner, caterer, or wedding service provider? Join our marketplace and let thousands of couples planning their big day discover you.",
+    "account_type_label": "Account type",
+    "account_type_commerciale": "Business / VAT registered",
+    "account_type_privato": "Private / Freelance",
+    "category_label": "Primary category",
+    "category_placeholder": "Select your category",
+    "full_name_label": "Full name",
+    "full_name_placeholder": "Jane Doe",
+    "business_name_label": "Business / brand name (optional)",
+    "business_name_placeholder": "Jane Doe Photography",
+    "email_label": "Contact email",
+    "phone_label": "Phone (optional)",
+    "city_label": "City",
+    "region_label": "County / Region",
+    "country_label": "Country",
+    "website_label": "Website (optional)",
+    "instagram_label": "Instagram (optional)",
+    "description_label": "Tell us about you",
+    "description_placeholder": "Describe your style, your services, and what makes you unique. Max 2000 characters.",
+    "years_experience_label": "Years of experience",
+    "pricing_from_label": "Pricing from (€)",
+    "agreed_terms": "I accept the Terms of Service and Privacy Policy of Sposi.live.",
+    "marketing_consent": "I want to receive updates and news from the Sposi.live marketplace.",
+    "submit": "Send application",
+    "submitting": "Submitting...",
+    "success_title": "Application sent successfully!",
+    "success_message": "Thank you for applying. Our team will review it within 48 hours and contact you by email.",
+    "submit_another": "Submit another application",
+    "error_generic": "Submission error. Please try again later.",
+    "required_field": "Required field"
   }
 }

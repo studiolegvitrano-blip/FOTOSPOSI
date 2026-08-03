@@ -49,6 +49,7 @@
     "admin": "Admin",
     "login": "Iniciar sesión",
     "signup": "Registrarse",
+    "collaboratori": "Colaboradores",
     "logout": "Cerrar sesión",
     "language": "Idioma",
     "settings": "Ajustes"
@@ -174,7 +175,7 @@
     ],
     "final_cta_title": "Crea tu web de invitación gratis",
     "final_cta_subtitle": "Lista en minutos. Sin tarjeta de crédito.",
-    "footer_tagline": "Fotos, juegos y recuerdos de vuestra boda, en un solo lugar.",
+    "footer_tagline": "Contactos",
     "showcase_title": "Nuestros invitados capturaron nuestro día REAL.",
     "showcase_subtitle": "De la ceremonia al brindis, cada foto de tus invitados ya está en la app. Abre tu día con un QR.",
     "showcase_cta": "Crea tu web de boda gratis",
@@ -696,8 +697,8 @@
     "love": "Me encanta",
     "adore": "Me encanta",
     "wow": "Wow",
-    "sigh": "Ay",
-    "grrr": "Grrr"
+    "sigh": "Risa",
+    "grrr": "Fiesta"
   },
   "feed": {
     "mi_piaci": "Me gusta",
@@ -717,8 +718,8 @@
     "reaction_love": "Me encanta",
     "reaction_adore": "Me encanta",
     "reaction_wow": "Wow",
-    "reaction_sigh": "Ay",
-    "reaction_grrr": "Grrr",
+    "reaction_sigh": "Risa",
+    "reaction_grrr": "Fiesta",
     "persone_ammirano": "La gente está admirando los recuerdos"
   },
   "calendar_menu": {
@@ -751,5 +752,38 @@
     "thunderstorm": "Tormenta",
     "hail": "Granizo",
     "unknown": "Condiciones mixtas"
+  },
+  "collaboratori": {
+    "title": "Conviértete en Partner de Sposi.live",
+    "subtitle": "¿Eres fotógrafo, wedding planner, catering o proveedor de servicios para bodas? Únete a nuestro marketplace y deja que miles de parejas que planean su gran día te descubran.",
+    "account_type_label": "Tipo de cuenta",
+    "account_type_commerciale": "Empresa / NIF-CIF",
+    "account_type_privato": "Particular / Freelance",
+    "category_label": "Categoría principal",
+    "category_placeholder": "Selecciona tu categoría",
+    "full_name_label": "Nombre y apellidos",
+    "full_name_placeholder": "María García",
+    "business_name_label": "Nombre comercial / marca (opcional)",
+    "business_name_placeholder": "María García Fotografía",
+    "email_label": "Email de contacto",
+    "phone_label": "Teléfono (opcional)",
+    "city_label": "Ciudad",
+    "region_label": "Comunidad autónoma / Provincia",
+    "country_label": "País",
+    "website_label": "Sitio web (opcional)",
+    "instagram_label": "Instagram (opcional)",
+    "description_label": "Preséntate brevemente",
+    "description_placeholder": "Cuenta tu estilo, tus servicios y qué te diferencia. Máx 2000 caracteres.",
+    "years_experience_label": "Años de experiencia",
+    "pricing_from_label": "Precio desde (€)",
+    "agreed_terms": "Acepto los Términos de Servicio y la Política de Privacidad de Sposi.live.",
+    "marketing_consent": "Deseo recibir actualizaciones y noticias del marketplace de Sposi.live.",
+    "submit": "Enviar solicitud",
+    "submitting": "Enviando...",
+    "success_title": "¡Solicitud enviada con éxito!",
+    "success_message": "Gracias por tu candidatura. Nuestro equipo la revisará en 48 horas y te contactará por email.",
+    "submit_another": "Enviar otra solicitud",
+    "error_generic": "Error al enviar. Inténtalo de nuevo más tarde.",
+    "required_field": "Campo obligatorio"
   }
 }

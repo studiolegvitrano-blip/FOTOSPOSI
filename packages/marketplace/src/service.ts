@@ -20,7 +20,60 @@ export interface MarketplaceSupplier {
   lng: number | null;
   affiliate_link: string | null;
   commission_info: string | null;
+  account_type: 'commerciale' | 'privato';
+  full_name: string | null;
+  business_name: string | null;
+  region: string | null;
+  country: string;
+  instagram: string | null;
+  years_experience: number | null;
+  pricing_from: number | null;
+  agreed_terms: boolean;
+  marketing_consent: boolean;
+  submitted_at: string;
+  submission_source: string;
   created_at: string;
+}
+
+export type SupplierAccountType = 'commerciale' | 'privato';
+
+export const SUPPLIER_CATEGORIES = [
+  'fotografo',
+  'video',
+  'catering',
+  'location',
+  'fiori',
+  'musica',
+  'abiti',
+  'torte',
+  'parrucchiere',
+  'estetista',
+  'makeup',
+  'autonoleggio',
+  'wedding_planner',
+  'animazione',
+  'servizio_consigliato',
+  'altro',
+] as const;
+export type SupplierCategory = typeof SUPPLIER_CATEGORIES[number];
+
+export interface SubmitSupplierApplicationParams {
+  account_type: SupplierAccountType;
+  category: SupplierCategory;
+  full_name?: string | null;
+  business_name?: string | null;
+  email: string;
+  phone?: string | null;
+  city?: string | null;
+  region?: string | null;
+  country?: string;
+  website?: string | null;
+  instagram?: string | null;
+  description?: string | null;
+  years_experience?: number | null;
+  pricing_from?: number | null;
+  agreed_terms: boolean;
+  marketing_consent: boolean;
 }
 
 export interface PartnerVisit {
@@ -163,4 +216,51 @@ export async function getPartnerVisits(supplierId: string): Promise<{ visits?: P
   const { data, error } = await supabase.from('partner_visits').select('*').eq('supplier_id', supplierId).order('created_at', { ascending: false });
   if (error) return { error: error.message };
   return { visits: data ?? [] };
+}
+
+export async function submitSupplierApplication(
+  params: SubmitSupplierApplicationParams
+): Promise<{ id?: string; error?: string }> {
+  if (!params.agreed_terms) return { error: 'Devi accettare i termini di servizio e la privacy policy.' };
+  if (!params.email || !params.email.includes('@')) return { error: 'Email non valida.' };
+  if (!params.category || !SUPPLIER_CATEGORIES.includes(params.category as SupplierCategory)) {
+    return { error: 'Categoria non valida.' };
+  }
+  if (!params.full_name && !params.business_name) {
+    return { error: 'Inserisci almeno il nome e cognome o il nome azienda.' };
+  }
+
+  const displayName = (params.business_name || params.full_name || '').trim();
+  if (!displayName) return { error: 'Nome visualizzato mancante.' };
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('marketplace_suppliers')
+    .insert({
+      name: displayName,
+      category: params.category,
+      description: params.description?.slice(0, 2000) ?? null,
+      city: params.city?.trim() || null,
+      website: params.website?.trim() || null,
+      email: params.email.trim().toLowerCase(),
+      phone: params.phone?.trim() || null,
+      approved: false,
+      is_partner: false,
+      account_type: params.account_type,
+      full_name: params.full_name?.trim() || null,
+      business_name: params.business_name?.trim() || null,
+      region: params.region?.trim() || null,
+      country: params.country?.trim() || 'IT',
+      instagram: params.instagram?.trim() || null,
+      years_experience: Number.isFinite(params.years_experience) ? Number(params.years_experience) : null,
+      pricing_from: Number.isFinite(params.pricing_from) ? Number(params.pricing_from) : null,
+      agreed_terms: true,
+      marketing_consent: !!params.marketing_consent,
+      submission_source: 'public_form',
+    })
+    .select('id')
+    .single();
+
+  if (error) return { error: error.message };
+  return { id: data?.id };
 }

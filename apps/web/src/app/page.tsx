@@ -71,9 +71,15 @@ export default async function Home() {
             </Link>
             <Link
               href="/signup"
-              className="text-sm bg-white text-black px-4 py-2 rounded-md font-semibold hover:bg-white/90 transition-colors shadow-sm"
+              className="text-sm font-medium text-white/85 hover:text-white px-3 py-2 rounded-md transition-colors"
             >
               {n('signup')}
+            </Link>
+            <Link
+              href="/collaboratori"
+              className="text-sm bg-white text-black px-4 py-2 rounded-md font-semibold hover:bg-white/90 transition-colors shadow-sm"
+            >
+              {n('collaboratori')}
             </Link>
           </div>
         </div>
@@ -287,7 +293,9 @@ export default async function Home() {
           <span className="flex items-center gap-3 text-sm text-text-muted">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={logoLight} alt="" className="h-8 w-auto" />
-            {c('brand_name')} — {t('footer_tagline')}
+            {c('brand_name')} — 2026 · {t('footer_tagline')}{' '}·{' '}
+            <a href="mailto:sposiliveit@gmail.com" className="hover:text-brand transition-colors">sposiliveit@gmail.com</a>{' / '}
+            <a href="mailto:info@sposi.live" className="hover:text-brand transition-colors">info@sposi.live</a>
           </span>
           <LanguageSwitcher />
         </div>

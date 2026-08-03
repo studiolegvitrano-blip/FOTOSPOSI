@@ -2,40 +2,28 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { createClient, signOut } from '@fotosposi/core';
+import { createClient } from '@fotosposi/core';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 
 export default function AdminPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<any>(null);
   const [events, setEvents] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user: u } }) => {
-      if (!u) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-      setUser(u);
-      Promise.all([
-        supabase.from('events').select('*').order('created_at', { ascending: false }).limit(50),
-        supabase.from('core_users').select('*').limit(50),
-      ]).then(([eventsRes, usersRes]) => {
-        if (eventsRes.data) setEvents(eventsRes.data);
-        if (usersRes.data) setUsers(usersRes.data);
-        setLoading(false);
-      });
+    Promise.all([
+      supabase.from('events').select('*').order('created_at', { ascending: false }).limit(50),
+      supabase.from('core_users').select('*').limit(50),
+    ]).then(([eventsRes, usersRes]) => {
+      if (eventsRes.data) setEvents(eventsRes.data);
+      if (usersRes.data) setUsers(usersRes.data);
+      setLoading(false);
     });
-  }, [router]);
-
-  const handleLogout = async () => {
-    await signOut();
-    router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
-  };
+  }, []);
 
   if (loading) return <p className="text-center mt-8">Caricamento...</p>;
 
@@ -54,7 +42,6 @@ export default function AdminPage() {
           <Button variant="outline" asChild><Link href="/admin/leads">Lead B2B</Link></Button>
           <Button variant="outline" asChild><Link href="/admin/system">Sistema</Link></Button>
           <Button variant="outline" asChild><Link href="/dashboard">Dashboard</Link></Button>
-          <Button variant="ghost" onClick={handleLogout}>Esci</Button>
         </div>
       </div>
 
@@ -120,6 +107,6 @@ export default function AdminPage() {
           </Table>
         </CardContent>
       </Card>
-    </main>
+      </main>
   );
 }
