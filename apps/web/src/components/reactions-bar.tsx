@@ -14,8 +14,8 @@ const REACTIONS: { type: ReactionType; emoji: string }[] = [
   { type: 'love', emoji: '❤️' },
   { type: 'adore', emoji: '😍' },
   { type: 'wow', emoji: '😮' },
-  { type: 'sigh', emoji: '😢' },
-  { type: 'grrr', emoji: '😡' },
+  { type: 'sigh', emoji: '😂' },
+  { type: 'grrr', emoji: '🎉' },
 ];
 
 export default function ReactionsBar({ onPick, size = 40 }: Props) {

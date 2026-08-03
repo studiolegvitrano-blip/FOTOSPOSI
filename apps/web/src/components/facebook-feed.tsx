@@ -76,8 +76,8 @@ const REACTION_EMOJI: Record<ReactionType, string> = {
   love: '❤️',
   adore: '😍',
   wow: '😮',
-  sigh: '😢',
-  grrr: '😡',
+  sigh: '😂',
+  grrr: '🎉',
 };
 
 export default function FacebookFeed({
