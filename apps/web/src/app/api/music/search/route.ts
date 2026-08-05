@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerSideClient } from '@fotosposi/core';
-import { searchTracks, ensureSpotifyCredentials } from '@fotosposi/music';
+import { searchTracks } from '@fotosposi/music';
 
 /**
- * GET /api/spotify/search?q=...&limit=20
- * Proxy server-side per la ricerca brani Spotify (Client Credentials flow).
- * Il token (cache module-level) non deve MAI andare nel browser.
+ * GET /api/music/search?q=...&limit=20
+ * Proxy server-side per la ricerca brani (iTunes Search API, senza token).
+ * Nessuna credenziale richiesta — l'accesso è solo per utenti autenticati.
  */
 
 export const runtime = 'nodejs';
@@ -33,11 +33,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ tracks: [] });
   }
 
-  const creds = ensureSpotifyCredentials();
-  if (!creds.ok) {
-    return NextResponse.json({ error: creds.reason }, { status: 503 });
-  }
-
   const limitRaw = Number(request.nextUrl.searchParams.get('limit') ?? '20');
   const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(20, Math.floor(limitRaw))) : 20;
 
@@ -46,7 +41,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ tracks });
   } catch (e) {
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Errore ricerca Spotify' },
+      { error: e instanceof Error ? e.message : 'Errore ricerca brani' },
       { status: 500 },
     );
   }

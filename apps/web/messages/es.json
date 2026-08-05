@@ -801,9 +801,9 @@
     "playlist_title": "Playlist compartida",
     "empty": "Todavía no hay canciones. ¡Busca una canción y añádela!",
     "added_by": "añadido por {name}",
-    "open_spotify": "Abrir en Spotify",
     "export_m3u": "M3U",
-    "export_pdf": "PDF"
+    "export_pdf": "PDF",
+    "open_track": "Abrir canción"
   },
   "faq": {
     "title": "Preguntas frecuentes",

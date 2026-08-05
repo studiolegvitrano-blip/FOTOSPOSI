@@ -1,13 +1,14 @@
 // CRUD su tabella event_songs (playlist matrimonio condivisa)
 // vedi migration 00047 — feature "colonna sonora condivisa" 04/08/2026
+// Provider di ricerca: iTunes Search API (05/08/2026 — Spotify richiede Premium).
 
 import { createServiceClient } from '@fotosposi/core';
-import type { SpotifyTrack } from './spotify';
+import type { TrackItem } from './itunes';
 
 export interface EventSong {
   id: string;
   event_id: string;
-  spotify_id: string;
+  track_id: string;
   title: string;
   artist: string;
   album: string | null;
@@ -23,7 +24,7 @@ export interface EventSong {
 
 export interface AddSongParams {
   event_id: string;
-  track: SpotifyTrack;
+  track: TrackItem;
   added_by_user_id?: string | null;
   added_by_name?: string | null;
   brand?: string;
@@ -35,28 +36,14 @@ export interface SongListResult {
 }
 
 /**
- * Helper: artisti Spotify → string "Artist1, Artist2".
+ * Helper: artisti → string "Artist1, Artist2".
  */
-export function formatArtists(track: SpotifyTrack): string {
+export function formatArtists(track: TrackItem): string {
   return track.artists.map((a) => a.name).join(', ');
 }
 
-export function ensureSpotifyCredentials(): {
-  ok: boolean;
-  reason?: string;
-} {
-  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
-    return {
-      ok: false,
-      reason:
-        'Spotify non configurato: richiede SPOTIFY_CLIENT_ID e SPOTIFY_CLIENT_SECRET env.',
-    };
-  }
-  return { ok: true };
-}
-
 /**
- * Aggiunge un brano alla playlist matrimonio. Non deduplica (multipli约会 OK).
+ * Aggiunge un brano alla playlist matrimonio. Non deduplica (multipli OK).
  */
 export async function addSong(
   params: AddSongParams,
@@ -73,12 +60,12 @@ export async function addSong(
 
   if (!event_id) return { error: 'event_id mancante' };
   if (!track || !track.id || !track.external_url) {
-    return { error: 'track Spotify non valida' };
+    return { error: 'track non valida' };
   }
 
   const insert = {
     event_id,
-    spotify_id: track.id,
+    track_id: track.id,
     title: track.name,
     artist: formatArtists(track),
     album: track.album?.name ?? null,

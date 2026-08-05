@@ -1,5 +1,54 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 05/08/2026 — Switch provider ricerca brani: Spotify (richiede Premium) → iTunes Search API (gratis, no token)
+
+### Contesto
+L'utente ha provato a configurare la Spotify Web API per la feature Colonna Sonora (04/08). Spotify blocca l'accesso alla Web API senza abbonamento **Premium** ("Your application is blocked from accessing the Web API since you do not have a Spotify Premium subscription"). Il rollout gratuito del 2024 non copre tutti gli account. Scelta utente esplicita: **iTunes Search API** (gratis, senza account/token/rate-limit per uso moderato).
+
+### Modulo `packages/music` — switch a iTunes
+- **`src/itunes.ts` (NUOVO, sostituisce `spotify.ts` eliminato)**: ricerca via `GET https://itunes.apple.com/search?media=music&entity=song&country=IT&term=...&limit=N` (max 20). Nessuna credenziale richiesta.
+  - Type `TrackItem` (provider-agnostic): `id, name, uri, external_url, preview_url, duration_ms, artists[{id,name}], album{id,name,images}, art_url`.
+  - `upscaleArtwork(url, size=300)`: iTunes artwork si scarica alla taglia richiesta sostituendo il suffisso `100x100bb`/`60x60bb`/`30x30bb` → `300x300bb`.
+  - `setItunesFetchForTests(fn)` per DIP nei test.
+  - Campi mancanti (preview/durata/artwork) gestiti come null.
+- **`src/service.ts`**: `EventSong.spotify_id` → `track_id`, `AddSongParams.track` da `SpotifyTrack` → `TrackItem`, rimosso `ensureSpotifyCredentials` (non più necessaria). `formatArtists` invariata.
+- **`src/index.ts`**: export `TrackItem`, `TrackSearchResult`, `searchTracks`, `upscaleArtwork`, `setItunesFetchForTests`; rimossi `getSpotifyToken`, `isSpotifyConfigured`, `resetSpotifyCacheForTests`, `ensureSpotifyCredentials`.
+- **`src/__tests__/itunes.test.ts` (NUOVO, 7 test)**: parse shape iTunes, `upscaleArtwork` (100/60/30→300), query vuota → nessuna chiamata, limit cap 20, errore HTTP 500, campi mancanti → null.
+
+### Route API
+- **`apps/web/src/app/api/music/search/route.ts` (NUOVA)**: sostituisce `/api/spotify/search` (eliminato). Stesso gate autenticazione (401 anon), **nessun check credenziali** (prima 503 senza SPOTIFY_CLIENT_ID/SECRET). `?q=&limit=` max 20.
+- **`apps/web/src/app/api/events/[id]/songs/route.ts`**: `SpotifyTrack` → `TrackItem`, messaggio errore "track non valida".
+
+### UI + i18n
+- **`music-playlist.tsx`**: fetch `/api/spotify/search` → `/api/music/search`; `TrackItem` locale allineato allo shape server (era sbilanciato: `title/artist` vs `name/artists` — bug latente mai esposto perché Spotify non era mai stato configurato); icona link esterno title `open_spotify` → `open_track`.
+- **i18n 6 lingue** (it, en-US, en-GB, de, fr, es): chiave `music.open_spotify` rinominata `music.open_track` (it: "Apri brano", en-US/en-GB: "Open track", de: "Song öffnen", fr: "Ouvrir le morceau", es: "Abrir canción"). Modificati SOLO via Node (regola AGENTS.md).
+
+### Migration `00048_event_songs_track_id.sql` (NUOVA, DA APPLICARE LIVE)
+```sql
+ALTER TABLE event_songs RENAME COLUMN spotify_id TO track_id;
+DROP INDEX IF EXISTS idx_event_songs_spotify_event;
+CREATE INDEX IF NOT EXISTS idx_event_songs_track_event ON event_songs(track_id, event_id);
+COMMENT ...;
+NOTIFY pgrst, 'reload schema';
+```
+⚠️ **NON ancora applicata**: serve SQL Editor Supabase (o conferma per applicarla). Il codice usa già `track_id` → senza migration l'insert/select fallisce con `42703 column "track_id" does not exist in the schema cache` (stesso pattern PostgREST cache stale documentato in AGENTS.md).
+
+### Verifica
+- `npx tsc --noEmit -p packages/music/tsconfig.json` → 0 errori.
+- `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori (dopo pulizia `.next` cache stale che referenziava la route `/api/spotify/search` eliminata).
+- `npx vitest run packages/music` → **18/18** (11 export + 7 itunes; era 19 = 11 export + 8 spotify).
+- `npx vitest run` → **412/412 verdi** (35 file).
+- `npx next build` → OK, `/api/music/search` compilata, `/events/[id]/music` invariata.
+- Test reale iTunes API: `searchTracks('A Sky Full of Stars Coldplay')` → 3 risultati, `A Sky Full of Stars - Coldplay | 268466ms | music.apple.com/it/album/... | artworkUrl100`.
+
+### TODO post-push
+1. **Applicare migration 00048** live (SQL Editor Supabase + `NOTIFY pgrst` incluso nel file).
+2. **Push + deploy** → verificare in produzione: ricerca brani su `/events/[id]/music` e `/event/[code]/music`, aggiunta brano, link "Apri brano" → Apple Music, export M3U/PDF (URL ora music.apple.com).
+3. **Rimuovere `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET`** da Vercel env se mai configurate (non più usate) e non configurare: il PROMPT-PROSSIMA-CHAT punto 2 (SPOTIFY_CONFIG) è superato.
+4. Verificare che le eventuali righe già presenti in `event_songs` (se la migration era già applicata con dati Spotify) restino coerenti: `external_url` punta a open.spotify.com per le vecchie — ok, link ancora funzionanti.
+
+---
+
 ## Sessione 04/08/2026 — Colonna Sonora condivisa (Spotify search + event_songs + export M3U/PDF) + pagina FAQ pubblica + fix BOM package.json
 
 ### Richieste utente

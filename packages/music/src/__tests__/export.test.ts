@@ -1,18 +1,18 @@
-﻿﻿﻿﻿﻿import { describe, it, expect } from 'vitest';
+﻿import { describe, it, expect } from 'vitest';
 import { exportM3U, buildPlaylistPdfHtml } from '../export';
 import type { EventSong } from '../service';
 
 const baseSong: EventSong = {
   id: 'song-1',
   event_id: 'ev-1',
-  spotify_id: '6DCZcDsp4o0Qza7Hgv4z0E',
+  track_id: '1441146346',
   title: 'A Sky Full of Stars',
   artist: 'Coldplay',
   album: 'Ghost Stories',
-  art_url: 'https://i.scdn.co/image/ab67616d0000b2732a3b8b8b8b8',
+  art_url: 'https://is1-ssl.mzstatic.com/image/thumb/300x300bb.jpg',
   duration_ms: 268_040,
-  preview_url: 'https://p.scdn.co/mp3-preview/abc',
-  external_url: 'https://open.spotify.com/track/6DCZcDsp4o0Qza7Hgv4z0E',
+  preview_url: 'https://audio-ssl.itunes.apple.com/itunes-assets/abc.m4a',
+  external_url: 'https://music.apple.com/it/album/1441146346',
   added_by_user_id: 'user-1',
   added_by_name: 'Agostino Spera',
   added_at: '2026-08-04T12:00:00Z',
@@ -24,13 +24,13 @@ const songs: EventSong[] = [
   {
     ...baseSong,
     id: 'song-2',
-    spotify_id: '5QjJy2Cmz7g8o0Qza7Hgv4z0F',
+    track_id: '1441186772',
     title: 'Perfect',
     artist: 'Ed Sheeran',
     album: '÷ (Divide)',
     duration_ms: 263_440,
     added_by_name: 'Danila Villa',
-    external_url: 'https://open.spotify.com/track/5QjJy2Cmz7g8o0Qza7Hgv4z0F',
+    external_url: 'https://music.apple.com/it/album/1441186772',
   },
 ];
 
@@ -51,10 +51,10 @@ describe('export M3U', () => {
     const m = exportM3U(songs);
     // brano 1
     expect(m).toContain('#EXTINF:268,A Sky Full of Stars - Coldplay');
-    expect(m).toContain('https://open.spotify.com/track/6DCZcDsp4o0Qza7Hgv4z0E');
+    expect(m).toContain('https://music.apple.com/it/album/1441146346');
     // brano 2
     expect(m).toContain('#EXTINF:263,Perfect - Ed Sheeran');
-    expect(m).toContain('https://open.spotify.com/track/5QjJy2Cmz7g8o0Qza7Hgv4z0F');
+    expect(m).toContain('https://music.apple.com/it/album/1441186772');
   });
 
   it('durata null diventa -1 (placeholder M3U standard)', () => {

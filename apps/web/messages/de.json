@@ -801,9 +801,9 @@
     "playlist_title": "Gemeinsame Playlist",
     "empty": "Noch keine Songs. Suche einen Song und füge ihn hinzu!",
     "added_by": "hinzugefügt von {name}",
-    "open_spotify": "Auf Spotify öffnen",
     "export_m3u": "M3U",
-    "export_pdf": "PDF"
+    "export_pdf": "PDF",
+    "open_track": "Song öffnen"
   },
   "faq": {
     "title": "Häufige Fragen",

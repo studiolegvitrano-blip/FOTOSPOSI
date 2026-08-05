@@ -12,19 +12,20 @@ import { Music, Search, Trash2, Download, FileText, Plus, Loader2, ExternalLink 
 
 interface TrackItem {
   id: string;
-  title: string;
-  artist: string;
-  album: string | null;
-  art_url: string | null;
-  duration_ms: number | null;
-  preview_url: string | null;
+  name: string;
+  uri: string;
   external_url: string;
+  preview_url: string | null;
+  duration_ms: number | null;
+  artists: Array<{ id: string; name: string }>;
+  album: { id: string | null; name: string; images: Array<{ url: string; width: number | null; height: number | null }> };
+  art_url: string | null;
 }
 
 interface SongItem {
   id: string;
   event_id: string;
-  spotify_id: string;
+  track_id: string;
   title: string;
   artist: string;
   album: string | null;
@@ -102,7 +103,7 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
     setSearching(true);
     setSearchError('');
     try {
-      const res = await fetch(`/api/spotify/search?q=${encodeURIComponent(q)}&limit=10`);
+      const res = await fetch(`/api/music/search?q=${encodeURIComponent(q)}&limit=10`);
       const data = await res.json();
       if (!res.ok) {
         setSearchError(data.error || c('error_generic'));
@@ -200,15 +201,15 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
                 <li key={track.id} className="py-2 flex items-center gap-3">
                   {track.art_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={track.art_url} alt={track.title} className="w-10 h-10 rounded object-cover" />
+                    <img src={track.art_url} alt={track.name} className="w-10 h-10 rounded object-cover" />
                   ) : (
                     <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
                       <Music className="w-5 h-5 text-text-muted" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{track.title}</p>
-                    <p className="text-xs text-text-muted truncate">{track.artist} · {formatDuration(track.duration_ms)}</p>
+                    <p className="font-medium truncate">{track.name}</p>
+                    <p className="text-xs text-text-muted truncate">{track.artists.map((a) => a.name).join(', ')} · {formatDuration(track.duration_ms)}</p>
                   </div>
                   <Button
                     size="sm"
@@ -266,7 +267,7 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
                       {song.added_by_name ? ` · ${t('added_by', { name: song.added_by_name })}` : ''}
                     </p>
                   </div>
-                  <a href={song.external_url} target="_blank" rel="noopener noreferrer" title={t('open_spotify')}>
+                  <a href={song.external_url} target="_blank" rel="noopener noreferrer" title={t('open_track')}>
                     <ExternalLink className="w-4 h-4 text-text-muted" />
                   </a>
                   {canDelete(song) && (

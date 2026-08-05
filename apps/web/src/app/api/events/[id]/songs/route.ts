@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServiceClient, createServerSideClient } from '@fotosposi/core';
 import { addSong, listSongs } from '@fotosposi/music';
-import type { SpotifyTrack } from '@fotosposi/music';
+import type { TrackItem } from '@fotosposi/music';
 
 /**
  * Colonna sonora condivisa — POST aggiunge un brano, GET lista brani.
@@ -50,7 +50,7 @@ export async function POST(
     return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });
   }
 
-  let body: { track?: SpotifyTrack; added_by_name?: string };
+  let body: { track?: TrackItem; added_by_name?: string };
   try {
     body = await request.json();
   } catch {
@@ -58,7 +58,7 @@ export async function POST(
   }
 
   if (!body?.track || !body.track.id || !body.track.external_url) {
-    return NextResponse.json({ error: 'track Spotify non valida' }, { status: 400 });
+    return NextResponse.json({ error: 'track non valida' }, { status: 400 });
   }
 
   // Brand derivato dall'evento (sposi.live vs justmarry.live), non dal client.
