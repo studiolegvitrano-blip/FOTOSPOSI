@@ -133,8 +133,8 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
         setError(data.error || c('error_generic'));
         return;
       }
-      setSongs((prev) => [...prev, data.song]);
       setResults((prev) => prev.filter((r) => r.id !== track.id));
+      await loadSongs();
     } catch {
       setError(c('error_generic'));
     } finally {
