@@ -7,8 +7,8 @@
 2. Pagina FAQ pubblica.
 
 ### Modulo `packages/music` (NUOVO, 19 test)
-- **Tabella `event_songs`** (migration `00047_event_songs_shared_playlist.sql`, NON ancora applicata live): `id, event_id, track_id TEXT, track_name TEXT, artist_name TEXT, album_name TEXT, duration_ms INT, external_url TEXT, added_by_user_id UUID, created_at` + unique `(event_id, track_id)` + RLS: read autenticato dell'evento, insert/delete sposo/delegato, delete owner uploader.
-- **API pubbliche** in `packages/music/src/index.ts`: `EventSong`, `TrackItem`, `searchTracks(query, limit?, fetchFn?)` (Spotify `/v1/search` con Basic auth da `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET`, token cache 1h, errori con classe chiara), `addSong`, `listSongs`, `deleteSong` (gate creator/owner), `exportM3U` (stringa con `#EXTM3U` + `#EXTINF`), `buildPlaylistPdfHtml` (HTML con `@font-face` Playfair + `@media print` + data relativa in italiano), `formatDuration`.
+- **Tabella `event_songs`** (migration `00047_event_songs_shared_playlist.sql`, GIÀ applicata live nella sessione precedente + `NOTIFY pgrst, 'reload schema'`): `id, event_id, spotify_id TEXT, title TEXT, artist TEXT, album TEXT, art_url TEXT, duration_ms INT, preview_url TEXT, external_url TEXT, added_by_user_id UUID REFERENCES core_users (ON DELETE SET NULL), added_by_name TEXT, added_at TIMESTAMPTZ DEFAULT now(), brand TEXT DEFAULT 'Sposi.live'`. Indici `idx_event_songs_event_id/event_added/spotify_event`. RLS: read/insert per sposo (`events.created_by`) o ospite registrato (`event_guests`), delete per uploader (`added_by_user_id`) o sposo. NON deduplica (multipli OK — scelta feature).
+- **API pubbliche** in `packages/music/src/index.ts`: `EventSong`, `TrackItem`, `searchTracks(query, limit?, fetchFn?)` (Spotify `/v1/search` con Basic auth da `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET`, token cache 1h, errori con classe chiara), `addSong`, `listSongs`, `deleteSong`, `getSongById`, `formatArtists`, `ensureSpotifyCredentials`, `exportM3U` (stringa con `#EXTM3U` + `#EXTINF`), `buildPlaylistPdfHtml` (HTML con `@font-face` Playfair + `@media print` + data relativa in italiano), `formatDuration`.
 - 19 test (export 11 + spotify 8): token cache, rate-limit 429 → nuovo token, missing client_id → `MissingSpotifyCredentialsError`, export M3U content, HTML contiene brani.
 
 ### API routes (NUOVE)
@@ -41,9 +41,8 @@
 - WORKING TREE PRONTO PER COMMIT — non ancora committato/pushato in questa sessione (in attesa della prossima).
 
 ### TODO post-push
-1. **Applicare migration 00047 live** via Supabase MCP + `NOTIFY pgrst, 'reload schema'` (regola ferrea AGENTS.md).
-2. Configurare `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET` in Vercel env (senza → `/api/spotify/search` ritorna 503).
-3. Verificare in produzione: pagina music sposi + guest, ricerca Spotify, aggiunta/eliminazione brano, export M3U/PDF, widget count in sidebar, pagina FAQ con accordion.
+1. Configurare `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET` in Vercel env (senza → `/api/spotify/search` ritorna 503).
+2. Verificare in produzione: pagina music sposi + guest, ricerca Spotify, aggiunta/eliminazione brano, export M3U/PDF, widget count in sidebar, pagina FAQ con accordion.
 
 ---
 
