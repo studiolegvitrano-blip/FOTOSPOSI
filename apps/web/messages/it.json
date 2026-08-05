@@ -805,7 +805,8 @@
     "added_by": "aggiunto da {name}",
     "export_m3u": "M3U",
     "export_pdf": "PDF",
-    "open_track": "Apri brano"
+    "open_track": "Apri brano",
+    "preview": "Ascolta anteprima"
   },
   "faq": {
     "title": "Domande frequenti",

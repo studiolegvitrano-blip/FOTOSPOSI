@@ -803,7 +803,8 @@
     "added_by": "añadido por {name}",
     "export_m3u": "M3U",
     "export_pdf": "PDF",
-    "open_track": "Abrir canción"
+    "open_track": "Abrir canción",
+    "preview": "Escuchar la vista previa"
   },
   "faq": {
     "title": "Preguntas frecuentes",

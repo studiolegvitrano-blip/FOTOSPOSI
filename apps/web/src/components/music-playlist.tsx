@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { getCurrentUser } from '@fotosposi/core';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Music, Search, Trash2, Download, FileText, Plus, Loader2, ExternalLink } from 'lucide-react';
+import { Music, Search, Trash2, Download, FileText, Plus, Loader2, ExternalLink, Play, Pause } from 'lucide-react';
 
 interface TrackItem {
   id: string;
@@ -65,6 +65,31 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
   const [addingId, setAddingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [searchError, setSearchError] = useState('');
+
+  // Player anteprima 30s (iTunes preview_url)
+  const [playingUrl, setPlayingUrl] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePreview = useCallback((url: string | null | undefined) => {
+    if (!url) return;
+    if (playingUrl === url) {
+      audioRef.current?.pause();
+      setPlayingUrl(null);
+      return;
+    }
+    setPlayingUrl(url);
+    requestAnimationFrame(() => {
+      audioRef.current?.play().catch(() => setPlayingUrl(null));
+    });
+  }, [playingUrl]);
+
+  // Pulizia: ferma l'audio quando il componente si smonta.
+  useEffect(() => {
+    const audio = audioRef.current;
+    return () => {
+      audio?.pause();
+    };
+  }, []);
 
   const loadSongs = useCallback(async () => {
     try {
@@ -211,6 +236,17 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
                     <p className="font-medium truncate">{track.name}</p>
                     <p className="text-xs text-text-muted truncate">{track.artists.map((a) => a.name).join(', ')} · {formatDuration(track.duration_ms)}</p>
                   </div>
+                  {track.preview_url && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title={t('preview')}
+                      onClick={() => togglePreview(track.preview_url)}
+                      className="shrink-0"
+                    >
+                      {playingUrl === track.preview_url ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
@@ -267,6 +303,17 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
                       {song.added_by_name ? ` · ${t('added_by', { name: song.added_by_name })}` : ''}
                     </p>
                   </div>
+                  {song.preview_url && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title={t('preview')}
+                      onClick={() => togglePreview(song.preview_url)}
+                      className="shrink-0"
+                    >
+                      {playingUrl === song.preview_url ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    </Button>
+                  )}
                   <a href={song.external_url} target="_blank" rel="noopener noreferrer" title={t('open_track')}>
                     <ExternalLink className="w-4 h-4 text-text-muted" />
                   </a>
@@ -287,6 +334,14 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
           )}
         </CardContent>
       </Card>
+
+      <audio
+        ref={audioRef}
+        src={playingUrl ?? undefined}
+        onEnded={() => setPlayingUrl(null)}
+        className="hidden"
+        preload="auto"
+      />
     </main>
   );
 }
