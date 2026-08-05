@@ -804,7 +804,8 @@
     "export_m3u": "M3U",
     "export_pdf": "PDF",
     "open_track": "Abrir canción",
-    "preview": "Escuchar la vista previa"
+    "preview": "Escuchar la vista previa",
+    "export_error": "Error al exportar"
   },
   "faq": {
     "title": "Preguntas frecuentes",

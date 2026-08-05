@@ -53,6 +53,28 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
   const router = useRouter();
 
   const [songs, setSongs] = useState<SongItem[]>([]);
+
+  const downloadExport = useCallback(async (format: 'm3u' | 'pdf') => {
+    try {
+      const res = await fetch(`/api/events/${eventId}/songs/export?format=${format}`, { credentials: 'same-origin' });
+      if (!res.ok) {
+        alert(t('export_error'));
+        return;
+      }
+      const blob = await res.blob();
+      const ext = format === 'm3u' ? 'm3u' : 'html';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `playlist-matrimonio.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch {
+      alert(t('export_error'));
+    }
+  }, [eventId, t]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [canManage, setCanManage] = useState(false);
@@ -269,13 +291,11 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
             {t('playlist_title')} ({songs.length})
           </CardTitle>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" asChild>
-              <a href={`/api/events/${eventId}/songs/export?format=m3u`} download>
-                <Download className="w-4 h-4" /> {t('export_m3u')}
-              </a>
+            <Button size="sm" variant="outline" onClick={() => downloadExport('m3u')}>
+              <Download className="w-4 h-4" /> {t('export_m3u')}
             </Button>
             <Button size="sm" variant="outline" asChild>
-              <a href={`/api/events/${eventId}/songs/export?format=pdf`} download>
+              <a href={`/api/events/${eventId}/songs/export?format=pdf`} target="_blank" rel="noopener noreferrer">
                 <FileText className="w-4 h-4" /> {t('export_pdf')}
               </a>
             </Button>
