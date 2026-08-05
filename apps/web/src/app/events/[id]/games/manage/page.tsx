@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { getEventFeatures, setEventFeature, seedDefaultQuizQuestions, getQuizQuestions, AVAILABLE_FEATURES } from '@fotosposi/games';
 import type { EventFeature } from '@fotosposi/games';
-import { getEventTier, hasFeature } from '@fotosposi/core';
+import { hasFeature } from '@fotosposi/core';
 import type { Tier } from '@fotosposi/core';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -27,7 +27,12 @@ export default function ManageGamesPage() {
     if (!eventId) return;
     loadFeatures();
     getQuizQuestions(eventId).then((r) => { if (r.questions) setQuizCount(r.questions.length); });
-    getEventTier(eventId).then((r) => { if (r.tier) setTier(r.tier); });
+    // getEventTier degrada all'anon key nel browser → RLS blocca la lettura di events.
+    // La route server-side usa il service role.
+    fetch(`/api/events/${eventId}/tier`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.tier) setTier(d.tier); })
+      .catch(() => {});
   }, [eventId]);
 
   const loadFeatures = async () => {

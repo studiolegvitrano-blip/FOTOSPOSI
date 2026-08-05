@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { createClient, getEventTier, type Tier } from '@fotosposi/core';
+import { createClient, type Tier } from '@fotosposi/core';
 import { validateCoupon, calculateVolumePrice } from '@fotosposi/commerce';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,12 @@ export default function TierPage() {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-      getEventTier(eventId).then(({ tier }) => { if (tier) setCurrentTier(tier); });
+      // getEventTier degrada all'anon key nel browser e la RLS blocca la lettura di
+      // `events` → tier sempre 'free'. La route server-side usa il service role.
+      fetch(`/api/events/${eventId}/tier`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => { if (d?.tier) setCurrentTier(d.tier); })
+        .catch(() => {});
     });
   }, [eventId, router]);
 
