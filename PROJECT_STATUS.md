@@ -1,5 +1,52 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 04/08/2026 — Colonna Sonora condivisa (Spotify search + event_songs + export M3U/PDF) + pagina FAQ pubblica + fix BOM package.json
+
+### Richieste utente
+1. Feature "Colonna Sonora": colonna sonora condivisa dell'evento con ricerca Spotify, playlist persistente, export M3U/PDF.
+2. Pagina FAQ pubblica.
+
+### Modulo `packages/music` (NUOVO, 19 test)
+- **Tabella `event_songs`** (migration `00047_event_songs_shared_playlist.sql`, NON ancora applicata live): `id, event_id, track_id TEXT, track_name TEXT, artist_name TEXT, album_name TEXT, duration_ms INT, external_url TEXT, added_by_user_id UUID, created_at` + unique `(event_id, track_id)` + RLS: read autenticato dell'evento, insert/delete sposo/delegato, delete owner uploader.
+- **API pubbliche** in `packages/music/src/index.ts`: `EventSong`, `TrackItem`, `searchTracks(query, limit?, fetchFn?)` (Spotify `/v1/search` con Basic auth da `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET`, token cache 1h, errori con classe chiara), `addSong`, `listSongs`, `deleteSong` (gate creator/owner), `exportM3U` (stringa con `#EXTM3U` + `#EXTINF`), `buildPlaylistPdfHtml` (HTML con `@font-face` Playfair + `@media print` + data relativa in italiano), `formatDuration`.
+- 19 test (export 11 + spotify 8): token cache, rate-limit 429 → nuovo token, missing client_id → `MissingSpotifyCredentialsError`, export M3U content, HTML contiene brani.
+
+### API routes (NUOVE)
+- `apps/web/src/app/api/events/[id]/songs/route.ts` — GET lista + POST addSong (valida `track.id` + `external_url`, brand da `events.brand`, ritorna 201).
+- `apps/web/src/app/api/events/[id]/songs/[songId]/route.ts` — DELETE, gate creator/owner, 403/404.
+- `apps/web/src/app/api/events/[id]/songs/export/route.ts` — GET `?format=m3u|pdf` (Content-Type `audio/x-mpegurl` / `text/html`).
+- `apps/web/src/app/api/spotify/search/route.ts` — GET `?q=&limit=` (max 20), 503 senza credenziali.
+- Pattern auth: `createServerSideClient` + `auth.getUser()`, `createServiceClient()` per service role (come le altre route).
+
+### Pagine + componenti
+- `apps/web/src/components/music-playlist.tsx` (NUOVO, client condiviso sposi/guest): ricerca Spotify con debounce, lista brani con elimina (`canDelete = canManage || currentUserId === added_by_user_id`), link "Apri su Spotify", export M3U/PDF, badge "Salvato ✓".
+- `apps/web/src/app/events/[id]/music/page.tsx` (NUOVO) — back link `/events/${id}`.
+- `apps/web/src/app/event/[code]/music/page.tsx` (NUOVO) — risolve `eventId` dal code via `POST /api/guest/event`, errore "Link non valido o scaduto".
+- `apps/web/src/components/mini-music-widget.tsx` (NUOVO) — widget compatto sidebar con count brani, props `{ eventId, href }`.
+- Sidebar aggiornate in `events/[id]/page.tsx` e `event/[code]/page.tsx`: link Music (dopo guestbook) + `<MiniMusicWidget>`.
+- `apps/web/src/app/faq/page.tsx` (NUOVO, server component `getTranslations`): nav brand-aware replicata dalla home, accordion `<details>/<summary>`, 7 gruppi (generale, piattaforma, foto, giochi, commerce, privacy, tecnico), 6+6+6+6+6+6+7 = 43 Q&A. Footer NON ri-montato (globale nel layout).
+- Home nav: link `/faq` con `nav.faq`.
+
+### i18n (6 lingue: it, en-US, en-GB, de, fr, es)
+- Namespace `music.*` (12 chiavi) + `events.music` + `nav.faq` + namespace `faq.*` completo (title/subtitle/groups 7 + q/a per gruppo). Diff pulito: 6 file, +894/-12.
+- ⚠️ **Lezione encoding**: modificare i JSON i18n SOLO con Node (UTF-8, 2 spazi). PowerShell `ConvertTo-Json` corrompe l'encoding (ï¿½) e cambia indentazione — mai più. Recupero fatto con `git checkout -- apps/web/messages/*.json` + ri-applicazione via script Node.
+
+### Fix BOM package.json (bug che bloccava la build)
+- `apps/web/package.json` e `packages/music/package.json` avevano **BOM (U+FEFF)** + indentazione ConvertTo-Json (4 spazi) introdotti da PowerShell in sessioni precedenti → `next build` falliva con `Unexpected token '﻿'` sul package.json di `@fotosposi/music` (e sul default uniqueName di Next). Normalizzati con Node (BOM rimosso, `JSON.stringify(data, null, 2)`). Verificato: `node_modules/@fotosposi/music` è symlink al workspace → un solo fix basta.
+
+### Verifica
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Test: **413/413 verdi** (era 394 → +19 music), 35 file.
+- Build: `npx next build` → OK, route nuove compilate: `/event/[code]/music` (1.19kB), `/events/[id]/music` (533B), `/faq` (2.2kB).
+- WORKING TREE PRONTO PER COMMIT — non ancora committato/pushato in questa sessione (in attesa della prossima).
+
+### TODO post-push
+1. **Applicare migration 00047 live** via Supabase MCP + `NOTIFY pgrst, 'reload schema'` (regola ferrea AGENTS.md).
+2. Configurare `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET` in Vercel env (senza → `/api/spotify/search` ritorna 503).
+3. Verificare in produzione: pagina music sposi + guest, ricerca Spotify, aggiunta/eliminazione brano, export M3U/PDF, widget count in sidebar, pagina FAQ con accordion.
+
+---
+
 ## Sessione 03/08/2026 (continua) — Migration 00046 live + push 1aa9167 + admin/marketplace esteso + footer globale IG @sposilive + MiniCountdown header + /admin via CEO + emoji reazioni + cleanup artefatti
 
 ### Richieste utente (continuazione PROMPT-PROSSIMA-CHAT.md)

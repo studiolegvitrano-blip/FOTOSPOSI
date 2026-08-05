@@ -52,7 +52,8 @@
     "collaboratori": "Colaboradores",
     "logout": "Cerrar sesión",
     "language": "Idioma",
-    "settings": "Ajustes"
+    "settings": "Ajustes",
+    "faq": "FAQ"
   },
   "home": {
     "badge": "La web de boda que tus invitados usarán de verdad",
@@ -295,7 +296,8 @@
     "cd_reception_title": "¡Bienvenidos al banquete!",
     "cd_reception_subtitle": "Que empiece la fiesta",
     "cd_ended_title": "¡Gracias a todos!",
-    "cd_ended_subtitle": "Fue un día inolvidable"
+    "cd_ended_subtitle": "Fue un día inolvidable",
+    "music": "Música"
   },
   "site_builder": {
     "title": "Web de boda",
@@ -788,5 +790,150 @@
     "submit_another": "Enviar otra solicitud",
     "error_generic": "Error al enviar. Inténtalo de nuevo más tarde.",
     "required_field": "Campo obligatorio"
+  },
+  "music": {
+    "title": "Banda sonora de la boda",
+    "subtitle": "Propón canciones para la boda: los novios y los invitados crean la playlist juntos.",
+    "search_title": "Buscar una canción",
+    "search_placeholder": "Título, artista o álbum...",
+    "search_btn": "Buscar",
+    "add": "Añadir",
+    "playlist_title": "Playlist compartida",
+    "empty": "Todavía no hay canciones. ¡Busca una canción y añádela!",
+    "added_by": "añadido por {name}",
+    "open_spotify": "Abrir en Spotify",
+    "export_m3u": "M3U",
+    "export_pdf": "PDF"
+  },
+  "faq": {
+    "title": "Preguntas frecuentes",
+    "subtitle": "Todo lo que necesitas saber sobre Sposi.live, JustMarry.live y la plataforma de bodas.",
+    "groups": {
+      "generale": "General",
+      "piattaforma": "La plataforma",
+      "foto": "Fotos y vídeos",
+      "giochi": "Juegos y diversión",
+      "commerce": "Tienda y lista de bodas",
+      "privacy": "Privacidad",
+      "tecnico": "Técnico"
+    },
+    "q": {
+      "generale": {
+        "g1": "¿Qué es Sposi.live?",
+        "g2": "¿Cuánto cuesta?",
+        "g3": "¿Necesito una tarjeta de crédito?",
+        "g4": "¿Puedo probarlo antes?",
+        "g5": "¿Funciona en el extranjero?",
+        "g6": "Mi boda es en otro país, ¿puedo usar JustMarry.live?"
+      },
+      "piattaforma": {
+        "p1": "¿Cómo funciona la creación de un evento?",
+        "p2": "¿Qué pueden hacer los invitados?",
+        "p3": "¿Puedo invitar con un código QR?",
+        "p4": "¿Cuánto dura la ventana de subida?",
+        "p5": "¿Puedo gestionar varios eventos?",
+        "p6": "¿Qué pasa si cambia la fecha de la boda?"
+      },
+      "foto": {
+        "f1": "¿Dónde se guardan las fotos?",
+        "f2": "¿Se comprimen las fotos?",
+        "f3": "¿Puedo descargar las fotos en alta calidad?",
+        "f4": "¿Hay copia de seguridad en Google Drive?",
+        "f5": "¿La marca de agua es obligatoria?",
+        "f6": "¿Quién puede eliminar fotos?"
+      },
+      "giochi": {
+        "j1": "¿Qué juegos están incluidos?",
+        "j2": "¿Qué es el Libro de invitados en vídeo?",
+        "j3": "¿Qué es la Cápsula del tiempo?",
+        "j4": "¿Cómo funciona la Caza de fotos?",
+        "j5": "¿Qué es The Feed?",
+        "j6": "¿Puedo activar juegos solo para algunos invitados?"
+      },
+      "commerce": {
+        "c1": "¿Cómo funciona la Tienda de la boda?",
+        "c2": "¿Cómo funciona la Lista de bodas?",
+        "c3": "¿Son seguros los pagos?",
+        "c4": "¿Cómo funcionan los pagos con Stripe?",
+        "c5": "¿Puedo vender productos con Gelato?",
+        "c6": "¿Quién paga las comisiones?"
+      },
+      "privacy": {
+        "pr1": "¿Cómo tratáis los datos de los invitados?",
+        "pr2": "¿Sois conformes al RGPD?",
+        "pr3": "¿Puedo eliminar mis datos de boda?",
+        "pr4": "¿Las fotos son públicas?",
+        "pr5": "¿El reconocimiento facial es obligatorio?",
+        "pr6": "¿Cómo puedo ejercer mis derechos?"
+      },
+      "tecnico": {
+        "t1": "¿Qué navegadores se soportan?",
+        "t2": "¿Funciona en el móvil?",
+        "t3": "¿Puedo usar la PWA sin conexión?",
+        "t4": "¿Y si un invitado tiene problemas de subida?",
+        "t5": "¿Y si se cae la conexión durante la subida?",
+        "t6": "¿Cómo contacto con el soporte?",
+        "t7": "¿Qué proveedores de pago usáis?"
+      }
+    },
+    "a": {
+      "generale": {
+        "g1": "Sposi.live es una plataforma completa de bodas: sitio del evento, fotos y vídeos, juegos interactivos, lista de bodas, tienda y mucho más.",
+        "g2": "El plan Free es gratis para siempre. Premium y Deluxe son pagos únicos con funciones avanzadas.",
+        "g3": "No. Puedes crear un evento Free sin tarjeta de crédito.",
+        "g4": "Sí, el plan Free permite probar todas las funciones esenciales.",
+        "g5": "Sí, JustMarry.live es la versión internacional de la plataforma.",
+        "g6": "Por supuesto. JustMarry.live soporta bodas internacionales."
+      },
+      "piattaforma": {
+        "p1": "Introduce la fecha, los nombres y los lugares. En minutos la plataforma genera el sitio y activa las funciones.",
+        "p2": "Los invitados pueden subir fotos y vídeos, participar en juegos y contribuir a la playlist.",
+        "p3": "Sí, cada evento tiene un código QR que los invitados escanean.",
+        "p4": "La ventana se abre 18 días antes y se cierra 2 días después.",
+        "p5": "Sí, puedes gestionar varios eventos desde la misma cuenta.",
+        "p6": "Puedes actualizar fecha y lugar en cualquier momento."
+      },
+      "foto": {
+        "f1": "Las fotos se guardan en Cloudflare R2 y se respaldan en el Google Drive de la pareja.",
+        "f2": "Sí, las fotos de más de 2 MB se comprimen. Los originales quedan disponibles en los planes de pago.",
+        "f3": "Sí, la pareja puede descargar fotos en alta calidad.",
+        "f4": "Sí, con Google Drive todo se sincroniza automáticamente.",
+        "f5": "Se aplica una marca de agua en la galería, el original queda limpio.",
+        "f6": "Solo la pareja, los delegados y quien subió la foto pueden eliminarla."
+      },
+      "giochi": {
+        "j1": "Están incluidos The Feed, Rate the Fit, Caza de fotos, Quiz de la pareja, Photomatón, First Drink, Wow Walk y Vídeo challenges.",
+        "j2": "El Libro de invitados en vídeo permite grabar mensajes que la pareja conserva para siempre.",
+        "j3": "La Cápsula del tiempo sella mensajes y fotos para una fecha futura.",
+        "j4": "Los invitados se registran, reciben retos y ganan puntos.",
+        "j5": "The Feed es un flujo en vivo de las fotos y vídeos del evento.",
+        "j6": "Sí, puedes activar o desactivar cada juego."
+      },
+      "commerce": {
+        "c1": "La Tienda permite a la pareja crear un catálogo de productos.",
+        "c2": "La Lista de bodas permite a los invitados contribuir con dinero o un objeto.",
+        "c3": "Sí, todos los pagos pasan por Stripe con cifrado.",
+        "c4": "Stripe gestiona los pagos, nunca tocamos los datos bancarios.",
+        "c5": "Sí, con Gelato puedes vender productos personalizados.",
+        "c6": "Las comisiones de procesamiento son las estándar de Stripe."
+      },
+      "privacy": {
+        "pr1": "Tratamos los datos de los invitados solo para la boda.",
+        "pr2": "Sí, somos conformes al RGPD.",
+        "pr3": "Sí, puedes eliminar el evento y sus datos.",
+        "pr4": "No, las fotos solo las ven los invitados.",
+        "pr5": "No, el reconocimiento facial es opcional y consentido.",
+        "pr6": "Contáctanos por el correo del pie de página."
+      },
+      "tecnico": {
+        "t1": "Soportamos Chrome, Safari, Firefox y Edge recientes.",
+        "t2": "Sí, la plataforma es totalmente responsive y funciona como PWA.",
+        "t3": "La PWA funciona sin conexión; las subidas se ponen en cola.",
+        "t4": "Contacta con el soporte, la mayoría de problemas se solucionan actualizando.",
+        "t5": "Las subidas se reanudan automáticamente.",
+        "t6": "Escríbenos al correo de soporte del pie de página.",
+        "t7": "Usamos Stripe para pagos, Resend para correos y Spotify para la playlist."
+      }
+    }
   }
 }

@@ -52,7 +52,8 @@
     "collaboratori": "Partners",
     "logout": "Sign out",
     "language": "Language",
-    "settings": "Settings"
+    "settings": "Settings",
+    "faq": "FAQ"
   },
   "home": {
     "badge": "The wedding website your guests will actually use",
@@ -295,7 +296,8 @@
     "cd_reception_title": "Welcome to the reception!",
     "cd_reception_subtitle": "Let the party begin",
     "cd_ended_title": "Thank you all!",
-    "cd_ended_subtitle": "It was an unforgettable day"
+    "cd_ended_subtitle": "It was an unforgettable day",
+    "music": "Soundtrack"
   },
   "site_builder": {
     "title": "Wedding website",
@@ -788,5 +790,150 @@
     "submit_another": "Submit another application",
     "error_generic": "Submission error. Please try again later.",
     "required_field": "Required field"
+  },
+  "music": {
+    "title": "Wedding Soundtrack",
+    "subtitle": "Suggest songs for the wedding: the couple and guests build the playlist together.",
+    "search_title": "Search a song",
+    "search_placeholder": "Title, artist or album...",
+    "search_btn": "Search",
+    "add": "Add",
+    "playlist_title": "Shared playlist",
+    "empty": "No songs yet. Search a song and add it!",
+    "added_by": "added by {name}",
+    "open_spotify": "Open on Spotify",
+    "export_m3u": "M3U",
+    "export_pdf": "PDF"
+  },
+  "faq": {
+    "title": "Frequently Asked Questions",
+    "subtitle": "Everything you need to know about Sposi.live, JustMarry.live and the wedding platform.",
+    "groups": {
+      "generale": "General",
+      "piattaforma": "The platform",
+      "foto": "Photos & videos",
+      "giochi": "Games & fun",
+      "commerce": "Shop & gift registry",
+      "privacy": "Privacy & data",
+      "tecnico": "Technical"
+    },
+    "q": {
+      "generale": {
+        "g1": "What is Sposi.live?",
+        "g2": "How much does it cost?",
+        "g3": "Do I need a credit card to start?",
+        "g4": "Can I try it before deciding?",
+        "g5": "Does it work abroad?",
+        "g6": "My wedding is in another country, can I use JustMarry.live?"
+      },
+      "piattaforma": {
+        "p1": "How does event creation work?",
+        "p2": "What can guests do?",
+        "p3": "Can I invite people with a QR code?",
+        "p4": "How long is the upload window?",
+        "p5": "Can I manage multiple events?",
+        "p6": "What happens if the wedding date changes?"
+      },
+      "foto": {
+        "f1": "Where are photos stored?",
+        "f2": "Are photos compressed?",
+        "f3": "Can I download photos in high quality?",
+        "f4": "Is there a Google Drive backup?",
+        "f5": "Is the watermark mandatory?",
+        "f6": "Who can delete photos from the gallery?"
+      },
+      "giochi": {
+        "j1": "Which games are included?",
+        "j2": "What is the Video Guestbook?",
+        "j3": "What is the Time Capsule?",
+        "j4": "How does Photo Hunt work?",
+        "j5": "What is The Feed?",
+        "j6": "Can I enable games only for some guests?"
+      },
+      "commerce": {
+        "c1": "How does the wedding Shop work?",
+        "c2": "How does the Gift Registry work?",
+        "c3": "Are payments secure?",
+        "c4": "How do Stripe payments work?",
+        "c5": "Can I sell custom products with Gelato?",
+        "c6": "Who pays the fees?"
+      },
+      "privacy": {
+        "pr1": "How do you handle guests data?",
+        "pr2": "Are we GDPR compliant?",
+        "pr3": "Can I delete my wedding data?",
+        "pr4": "Are photos public?",
+        "pr5": "Is facial recognition mandatory?",
+        "pr6": "How can I exercise my rights?"
+      },
+      "tecnico": {
+        "t1": "Which browsers are supported?",
+        "t2": "Does it work on mobile?",
+        "t3": "Can I use the PWA offline?",
+        "t4": "What if a guest has an upload issue?",
+        "t5": "What if my connection drops during upload?",
+        "t6": "How do I contact support?",
+        "t7": "Which payment providers do you use?"
+      }
+    },
+    "a": {
+      "generale": {
+        "g1": "Sposi.live is a complete wedding platform: event website, photo and video collection, interactive games, gift registry, shop and much more.",
+        "g2": "The Free plan is free forever. Premium and Deluxe are one-time payments that include advanced features such as unlimited videos, original quality and full games.",
+        "g3": "No. You can create a Free event without a credit card and decide later whether to upgrade.",
+        "g4": "Yes, the Free plan lets you try all the core features at no cost.",
+        "g5": "Yes, JustMarry.live is the international version of the platform with English, German, French and Spanish translations.",
+        "g6": "Of course. JustMarry.live supports international weddings with localized content per country."
+      },
+      "piattaforma": {
+        "p1": "Enter the date, the couple names and the ceremony and reception venues. Within minutes the platform generates the event website and activates the available features.",
+        "p2": "Guests can upload photos and videos, join games, sign the guestbook, vote and contribute to the shared playlist.",
+        "p3": "Yes, every event has a QR code that guests scan with their phone to access the event features directly.",
+        "p4": "The upload window opens 18 days before the event and closes 2 days after, so everyone has time to upload without stress.",
+        "p5": "Yes, you can create and manage multiple events from the same account, each with its own settings and guests.",
+        "p6": "You can update the date and location at any time from the event settings."
+      },
+      "foto": {
+        "f1": "Photos are stored on Cloudflare R2 for instant viewing and permanently on the couple Google Drive as backup.",
+        "f2": "Yes, photos over 2 MB are compressed for fast uploads. Originals remain available to the couple on paid plans.",
+        "f3": "Yes, the couple can download high-quality photos from both the gallery and the Google Drive backup.",
+        "f4": "Yes, if you connect Google Drive, all photos and videos are automatically synced into organized folders.",
+        "f5": "A watermark with the couple names and logo is applied automatically on gallery photos, while the original stays clean on Drive.",
+        "f6": "Only the couple, delegates and the uploader of the photo can delete it from the gallery."
+      },
+      "giochi": {
+        "j1": "The Feed, Rate the Fit, Photo Hunt, Couple Quiz, Selfie Booth, First Drink, Wow Walk and Video Challenges are included. Advanced games require Premium or Deluxe.",
+        "j2": "The Video Guestbook lets guests record a video message that the couple can keep forever.",
+        "j3": "The Time Capsule lets you seal messages and photos to be reopened on a future date, such as your 10th anniversary.",
+        "j4": "Guests register, receive photo challenges and earn points by uploading the requested photos. Highest score wins.",
+        "j5": "The Feed is a live stream of the event photos and videos, shown in real time during the party.",
+        "j6": "Yes, you can enable or disable each game from the settings based on your plan and preferences."
+      },
+      "commerce": {
+        "c1": "The Shop lets the couple create a catalog of wedding-related products that guests can purchase.",
+        "c2": "The Gift Registry lets guests contribute with cash or a chosen item from the list, with secure payment.",
+        "c3": "Yes, all payments are processed through Stripe with encryption and PCI compliance.",
+        "c4": "Payments are handled by Stripe, the world leader in online payments. We never handle card data directly.",
+        "c5": "Yes, through Gelato you can sell custom print-on-demand products without managing inventory.",
+        "c6": "Payment processing fees are Stripe standard fees. Platform fees vary by plan."
+      },
+      "privacy": {
+        "pr1": "We process guest data only for the wedding operations: photos, game participation and event-related communications.",
+        "pr2": "Yes, we are GDPR compliant. You can export or delete all data at any time.",
+        "pr3": "Yes, you can delete the event and all associated data from the settings.",
+        "pr4": "No, photos are only visible to the event guests through the QR code or invitation.",
+        "pr5": "No, facial recognition is an optional feature that requires explicit consent from each guest.",
+        "pr6": "You can contact us at the email address in the footer to request access, rectification or deletion of your data."
+      },
+      "tecnico": {
+        "t1": "We support recent versions of Chrome, Safari, Firefox and Edge on desktop and mobile.",
+        "t2": "Yes, the whole platform is responsive and works perfectly on mobile, also as an installable PWA.",
+        "t3": "The PWA supports offline mode for core features, while uploads are queued and completed when you are back online.",
+        "t4": "Contact us via support. Most issues are solved by refreshing the browser and retrying.",
+        "t5": "Uploads pause and resume automatically as soon as the connection is back, thanks to the offline queue.",
+        "t6": "Email us at the support address in the footer, we reply within 24 working hours.",
+        "t7": "We use Stripe for payments, Resend for emails and Spotify for the shared playlist."
+      }
+    }
   }
 }

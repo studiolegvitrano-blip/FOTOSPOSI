@@ -70,6 +70,12 @@ export default async function Home() {
               {n('login')}
             </Link>
             <Link
+              href="/faq"
+              className="text-sm font-medium text-white/85 hover:text-white px-3 py-2 rounded-md transition-colors"
+            >
+              {n('faq')}
+            </Link>
+            <Link
               href="/signup"
               className="text-sm font-medium text-white/85 hover:text-white px-3 py-2 rounded-md transition-colors"
             >

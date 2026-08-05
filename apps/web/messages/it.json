@@ -52,7 +52,8 @@
     "collaboratori": "Collaboratori",
     "logout": "Esci",
     "language": "Lingua",
-    "settings": "Impostazioni"
+    "settings": "Impostazioni",
+    "faq": "FAQ"
   },
   "collaboratori": {
     "title": "Diventa Partner di Sposi.live",
@@ -333,7 +334,8 @@
     "cd_reception_title": "Benvenuti al ricevimento!",
     "cd_reception_subtitle": "Che la festa abbia inizio",
     "cd_ended_title": "Grazie a tutti!",
-    "cd_ended_subtitle": "È stato un giorno indimenticabile"
+    "cd_ended_subtitle": "È stato un giorno indimenticabile",
+    "music": "Colonna Sonora"
   },
   "site_builder": {
     "title": "Sito evento",
@@ -790,5 +792,150 @@
     "thunderstorm": "Temporale",
     "hail": "Grandine",
     "unknown": "Condizioni miste"
+  },
+  "music": {
+    "title": "Colonna Sonora",
+    "subtitle": "Proponi le canzoni per il matrimonio: gli sposi e gli invitati costruiscono la playlist insieme.",
+    "search_title": "Cerca una canzone",
+    "search_placeholder": "Titolo, artista o album...",
+    "search_btn": "Cerca",
+    "add": "Aggiungi",
+    "playlist_title": "Playlist condivisa",
+    "empty": "Nessun brano ancora. Cerca una canzone e aggiungila!",
+    "added_by": "aggiunto da {name}",
+    "open_spotify": "Apri su Spotify",
+    "export_m3u": "M3U",
+    "export_pdf": "PDF"
+  },
+  "faq": {
+    "title": "Domande frequenti",
+    "subtitle": "Tutto quello che devi sapere su Sposi.live, JustMarry.live e la piattaforma matrimonio.",
+    "groups": {
+      "generale": "Generale",
+      "piattaforma": "La piattaforma",
+      "foto": "Foto e video",
+      "giochi": "Giochi e divertimento",
+      "commerce": "Shop e lista nozze",
+      "privacy": "Privacy e dati",
+      "tecnico": "Tecnico"
+    },
+    "q": {
+      "generale": {
+        "g1": "Cos’è Sposi.live?",
+        "g2": "Quanto costa?",
+        "g3": "Serve una carta di credito per iniziare?",
+        "g4": "Posso provarlo prima di decidere?",
+        "g5": "Funziona anche all’estero?",
+        "g6": "Il mio matrimonio è in un altro paese, posso usare JustMarry.live?"
+      },
+      "piattaforma": {
+        "p1": "Come funziona la creazione di un evento?",
+        "p2": "Cosa possono fare gli invitati?",
+        "p3": "Posso invitare le persone con un QR code?",
+        "p4": "Quanto dura la finestra di upload?",
+        "p5": "Posso gestire più eventi insieme?",
+        "p6": "Cosa succede se cambia la data del matrimonio?"
+      },
+      "foto": {
+        "f1": "Dove vengono salvate le foto?",
+        "f2": "Le foto vengono compresse?",
+        "f3": "Posso scaricare le foto in alta qualità?",
+        "f4": "C’è un backup su Google Drive?",
+        "f5": "Il watermark è obbligatorio?",
+        "f6": "Chi può cancellare le foto dalla galleria?"
+      },
+      "giochi": {
+        "j1": "Quali giochi sono inclusi?",
+        "j2": "Cos’è il Video Guestbook?",
+        "j3": "Cos’è la Capsula del Tempo?",
+        "j4": "Come funziona la Caccia alla Foto?",
+        "j5": "Cos’è il Wall?",
+        "j6": "Posso attivare i giochi solo per alcuni invitati?"
+      },
+      "commerce": {
+        "c1": "Come funziona lo Shop del matrimonio?",
+        "c2": "Come funziona la Lista Nozze?",
+        "c3": "I pagamenti sono sicuri?",
+        "c4": "Come funzionano i pagamenti con Stripe?",
+        "c5": "Posso vendere prodotti personalizzati con Gelato?",
+        "c6": "Chi paga le commissioni?"
+      },
+      "privacy": {
+        "pr1": "Come trattate i dati degli invitati?",
+        "pr2": "Siamo conformi al GDPR?",
+        "pr3": "Posso cancellare i dati del mio matrimonio?",
+        "pr4": "Le foto sono visibili a tutti?",
+        "pr5": "Il riconoscimento facciale è obbligatorio?",
+        "pr6": "Come posso esercitare i miei diritti?"
+      },
+      "tecnico": {
+        "t1": "Quali browser sono supportati?",
+        "t2": "Funziona da cellulare?",
+        "t3": "Posso usare la PWA anche offline?",
+        "t4": "Come faccio se un invitato ha problemi con l’upload?",
+        "t5": "Cosa succede se la connessione cade durante l’upload?",
+        "t6": "Come contatto il supporto?",
+        "t7": "Quali provider di pagamento usate?"
+      }
+    },
+    "a": {
+      "generale": {
+        "g1": "Sposi.live è una piattaforma completa per la gestione del matrimonio: sito evento, raccolta foto e video, giochi interattivi, lista nozze, shop e molto altro.",
+        "g2": "Il piano Free è gratuito per sempre. Premium e Deluxe sono a pagamento una tantum e includono funzioni avanzate come video illimitati, qualità originale e giochi completi.",
+        "g3": "No. Puoi creare un evento Free senza carta di credito e decidere in seguito se passare a un piano a pagamento.",
+        "g4": "Sì, il piano Free ti permette di provare tutte le funzioni principali senza costi.",
+        "g5": "Sì, JustMarry.live è la versione internazionale della piattaforma con traduzioni in inglese, tedesco, francese e spagnolo.",
+        "g6": "Certo. JustMarry.live supporta matrimoni internazionali con contenuti localizzati per paese."
+      },
+      "piattaforma": {
+        "p1": "Inserisci la data, i nomi degli sposi e le sedi di cerimonia e ricevimento. In pochi minuti la piattaforma genera il sito evento e attiva le funzioni disponibili.",
+        "p2": "Gli invitati possono caricare foto e video, partecipare ai giochi, firmare il guestbook, votare e contribuire alla playlist condivisa.",
+        "p3": "Sì, ogni evento ha un QR code che gli invitati scansionano con il telefono per accedere direttamente alle funzioni dell’evento.",
+        "p4": "La finestra di upload parte 18 giorni prima dell’evento e si chiude 2 giorni dopo, così tutti hanno il tempo di caricare senza stress.",
+        "p5": "Sì, puoi creare e gestire più eventi dallo stesso account, ciascuno con le proprie impostazioni e invitati.",
+        "p6": "Puoi aggiornare la data e la posizione in qualsiasi momento dalle impostazioni dell’evento."
+      },
+      "foto": {
+        "f1": "Le foto vengono salvate su Cloudflare R2 per la visualizzazione immediata e in modo permanente sul Google Drive dello sposo come backup.",
+        "f2": "Sì, le foto oltre 2 MB vengono compresse per garantire caricamenti veloci. Le foto originali restano comunque disponibili per gli sposi sui piani a pagamento.",
+        "f3": "Sì, gli sposi possono scaricare le foto in alta qualità, sia dalla galleria sia dal backup su Google Drive.",
+        "f4": "Sì, se colleghi Google Drive, tutte le foto e i video vengono sincronizzati automaticamente in cartelle organizzate.",
+        "f5": "Il watermark con i nomi degli sposi e il logo è applicato automaticamente sulle foto visibili in galleria, mentre l’originale resta pulito su Drive.",
+        "f6": "Solo gli sposi, i delegati e l’uploader della foto possono eliminarla dalla galleria."
+      },
+      "giochi": {
+        "j1": "Sono inclusi Wall, Vota il Vestito, Caccia alla Foto, Quiz sugli Sposi, Tavolo Selfie, Primo Alcolico, Wow Walk e Sfide Video. I giochi avanzati richiedono il piano Premium o Deluxe.",
+        "j2": "Il Video Guestbook permette agli invitati di registrare un messaggio video di auguri che gli sposi potranno conservare per sempre.",
+        "j3": "La Capsula del Tempo permette di sigillare messaggi e foto da riaprire in una data futura, per esempio al decimo anniversario.",
+        "j4": "Gli invitati si registrano, ricevono dei compiti fotografici e guadagnano punti caricando le foto richieste. Vince chi ottiene più punti.",
+        "j5": "Il Wall è un flusso live di foto e video dell’evento che viene proiettato o mostrato in tempo reale durante la festa.",
+        "j6": "Sì, puoi attivare o disattivare ogni gioco dalle impostazioni, in base al piano e alle preferenze."
+      },
+      "commerce": {
+        "c1": "Lo Shop permette agli sposi di creare un catalogo di prodotti legati al matrimonio che gli invitati possono acquistare.",
+        "c2": "La Lista Nozze permette agli invitati di contribuire con un regalo in denaro o un oggetto scelto dalla lista, con pagamento sicuro.",
+        "c3": "Sì, tutti i pagamenti sono processati tramite Stripe con crittografia e conformità PCI.",
+        "c4": "I pagamenti sono gestiti da Stripe, il leader mondiale dei pagamenti online. Non gestiamo mai direttamente i dati della carta.",
+        "c5": "Sì, tramite Gelato puoi vendere prodotti personalizzati stampati su richiesta senza gestire magazzino.",
+        "c6": "Le commissioni di elaborazione pagamento sono quelle standard di Stripe. Le commissioni di piattaforma variano in base al piano."
+      },
+      "privacy": {
+        "pr1": "Trattiamo i dati degli invitati solo per il funzionamento del matrimonio: foto, partecipazione ai giochi e comunicazioni relative all’evento.",
+        "pr2": "Sì, siamo conformi al GDPR. Puoi esportare o cancellare tutti i dati in qualsiasi momento.",
+        "pr3": "Sì, puoi cancellare l’evento e tutti i dati associati dalle impostazioni.",
+        "pr4": "No, le foto sono visibili solo agli invitati dell’evento attraverso il QR code o l’invito.",
+        "pr5": "No, il riconoscimento facciale è una funzione opzionale che richiede il consenso esplicito di ogni invitato.",
+        "pr6": "Puoi contattarci scrivendo all’indirizzo email indicato nel footer per richiedere l’accesso, la rettifica o la cancellazione dei tuoi dati."
+      },
+      "tecnico": {
+        "t1": "Supportiamo Chrome, Safari, Firefox ed Edge nelle versioni recenti, su desktop e mobile.",
+        "t2": "Sì, l’intera piattaforma è responsive e funziona perfettamente da telefono, anche come app installabile (PWA).",
+        "t3": "La PWA supporta la modalità offline per le funzioni principali, mentre l’upload viene messo in coda e completato quando torni online.",
+        "t4": "Puoi contattarci dal supporto. La maggior parte dei problemi si risolve aggiornando il browser e riprovando.",
+        "t5": "L’upload viene messo in pausa e ripreso automaticamente appena la connessione torna disponibile, grazie alla coda offline.",
+        "t6": "Scrivici all’email di supporto indicata nel footer, ti rispondiamo entro 24 ore lavorative.",
+        "t7": "Usiamo Stripe per i pagamenti online, Resend per le email e Spotify per la playlist condivisa."
+      }
+    }
   }
 }

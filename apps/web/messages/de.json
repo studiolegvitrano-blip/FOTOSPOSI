@@ -52,7 +52,8 @@
     "collaboratori": "Partner",
     "logout": "Abmelden",
     "language": "Sprache",
-    "settings": "Einstellungen"
+    "settings": "Einstellungen",
+    "faq": "FAQ"
   },
   "home": {
     "badge": "Die Hochzeitswebsite, die Ihre Gäste wirklich nutzen",
@@ -295,7 +296,8 @@
     "cd_reception_title": "Willkommen zur Feier!",
     "cd_reception_subtitle": "Die Party kann beginnen",
     "cd_ended_title": "Danke an alle!",
-    "cd_ended_subtitle": "Es war ein unvergesslicher Tag"
+    "cd_ended_subtitle": "Es war ein unvergesslicher Tag",
+    "music": "Musik"
   },
   "site_builder": {
     "title": "Hochzeitswebsite",
@@ -788,5 +790,150 @@
     "submit_another": "Weitere Anfrage senden",
     "error_generic": "Fehler beim Senden. Bitte versuchen Sie es später erneut.",
     "required_field": "Pflichtfeld"
+  },
+  "music": {
+    "title": "Musik für die Hochzeit",
+    "subtitle": "Schlag Songs für die Hochzeit vor: Brautpaar und Gäste gestalten die Playlist gemeinsam.",
+    "search_title": "Song suchen",
+    "search_placeholder": "Titel, Künstler oder Album...",
+    "search_btn": "Suchen",
+    "add": "Hinzufügen",
+    "playlist_title": "Gemeinsame Playlist",
+    "empty": "Noch keine Songs. Suche einen Song und füge ihn hinzu!",
+    "added_by": "hinzugefügt von {name}",
+    "open_spotify": "Auf Spotify öffnen",
+    "export_m3u": "M3U",
+    "export_pdf": "PDF"
+  },
+  "faq": {
+    "title": "Häufige Fragen",
+    "subtitle": "Alles, was Sie über Sposi.live, JustMarry.live und die Hochzeitsplattform wissen müssen.",
+    "groups": {
+      "generale": "Allgemein",
+      "piattaforma": "Die Plattform",
+      "foto": "Fotos & Videos",
+      "giochi": "Spiele & Spaß",
+      "commerce": "Shop & Geschenkliste",
+      "privacy": "Datenschutz",
+      "tecnico": "Technik"
+    },
+    "q": {
+      "generale": {
+        "g1": "Was ist Sposi.live?",
+        "g2": "Was kostet es?",
+        "g3": "Brauche ich eine Kreditkarte?",
+        "g4": "Kann ich es erst testen?",
+        "g5": "Funktioniert es auch im Ausland?",
+        "g6": "Meine Hochzeit ist im Ausland, kann ich JustMarry.live nutzen?"
+      },
+      "piattaforma": {
+        "p1": "Wie funktioniert die Erstellung eines Events?",
+        "p2": "Was können Gäste tun?",
+        "p3": "Kann ich Gäste per QR-Code einladen?",
+        "p4": "Wie lange ist das Upload-Fenster?",
+        "p5": "Kann ich mehrere Events verwalten?",
+        "p6": "Was passiert, wenn sich das Datum ändert?"
+      },
+      "foto": {
+        "f1": "Wo werden Fotos gespeichert?",
+        "f2": "Werden Fotos komprimiert?",
+        "f3": "Kann ich Fotos in hoher Qualität herunterladen?",
+        "f4": "Gibt es ein Google-Drive-Backup?",
+        "f5": "Ist das Wasserzeichen Pflicht?",
+        "f6": "Wer kann Fotos löschen?"
+      },
+      "giochi": {
+        "j1": "Welche Spiele sind enthalten?",
+        "j2": "Was ist das Video-Gästebuch?",
+        "j3": "Was ist die Zeitkapsel?",
+        "j4": "Wie funktioniert die Fotosuche?",
+        "j5": "Was ist The Feed?",
+        "j6": "Kann ich Spiele nur für einige Gäste aktivieren?"
+      },
+      "commerce": {
+        "c1": "Wie funktioniert der Shop?",
+        "c2": "Wie funktioniert die Geschenkliste?",
+        "c3": "Sind Zahlungen sicher?",
+        "c4": "Wie funktionieren Stripe-Zahlungen?",
+        "c5": "Kann ich Produkte mit Gelato verkaufen?",
+        "c6": "Wer zahlt die Gebühren?"
+      },
+      "privacy": {
+        "pr1": "Wie behandeln Sie Gastdaten?",
+        "pr2": "Sind wir DSGVO-konform?",
+        "pr3": "Kann ich meine Hochzeitsdaten löschen?",
+        "pr4": "Sind Fotos öffentlich?",
+        "pr5": "Ist Gesichtserkennung Pflicht?",
+        "pr6": "Wie kann ich meine Rechte ausüben?"
+      },
+      "tecnico": {
+        "t1": "Welche Browser werden unterstützt?",
+        "t2": "Funktioniert es auf dem Handy?",
+        "t3": "Kann ich die PWA offline nutzen?",
+        "t4": "Was, wenn ein Gast Upload-Probleme hat?",
+        "t5": "Was, wenn die Verbindung abbricht?",
+        "t6": "Wie kontaktiere ich den Support?",
+        "t7": "Welche Zahlungsanbieter nutzen Sie?"
+      }
+    },
+    "a": {
+      "generale": {
+        "g1": "Sposi.live ist eine komplette Hochzeitsplattform: Event-Website, Foto- und Videosammlung, interaktive Spiele, Geschenkliste, Shop und vieles mehr.",
+        "g2": "Der Free-Plan ist für immer kostenlos. Premium und Deluxe sind Einmalzahlungen mit erweiterten Funktionen wie unbegrenzten Videos und Originalqualität.",
+        "g3": "Nein. Sie können ein Free-Event ohne Kreditkarte erstellen und später upgraden.",
+        "g4": "Ja, mit dem Free-Plan können Sie alle Kernfunktionen kostenlos testen.",
+        "g5": "Ja, JustMarry.live ist die internationale Version der Plattform mit Übersetzungen.",
+        "g6": "Natürlich. JustMarry.live unterstützt internationale Hochzeiten mit lokalisierten Inhalten."
+      },
+      "piattaforma": {
+        "p1": "Sie geben Datum, Namen und Orte ein. In wenigen Minuten erstellt die Plattform die Event-Website und aktiviert die verfügbaren Funktionen.",
+        "p2": "Gäste können Fotos und Videos hochladen, an Spielen teilnehmen, das Gästebuch signieren und zur Playlist beitragen.",
+        "p3": "Ja, jedes Event hat einen QR-Code, den Gäste mit dem Handy scannen.",
+        "p4": "Das Upload-Fenster öffnet 18 Tage vor und schließt 2 Tage nach dem Event.",
+        "p5": "Ja, Sie können mehrere Events aus demselben Konto verwalten.",
+        "p6": "Sie können Datum und Ort jederzeit in den Einstellungen aktualisieren."
+      },
+      "foto": {
+        "f1": "Fotos werden auf Cloudflare R2 gespeichert und dauerhaft auf dem Google Drive des Paares gesichert.",
+        "f2": "Ja, Fotos über 2 MB werden komprimiert. Originale bleiben auf bezahlten Plänen verfügbar.",
+        "f3": "Ja, das Paar kann Fotos in hoher Qualität herunterladen.",
+        "f4": "Ja, mit Google Drive werden alle Fotos automatisch synchronisiert.",
+        "f5": "Ein Wasserzeichen wird automatisch auf Galerie-Fotos angewendet, das Original bleibt sauber.",
+        "f6": "Nur das Paar, Delegierte und der Uploader können Fotos löschen."
+      },
+      "giochi": {
+        "j1": "Enthalten sind The Feed, Rate the Fit, Fotosuche, Paar-Quiz, Selfie-Kabine, First Drink, Wow Walk und Video Challenges.",
+        "j2": "Das Video-Gästebuch lässt Gäste Videobotschaften aufnehmen, die das Paar für immer behalten kann.",
+        "j3": "Die Zeitkapsel versiegelt Nachrichten und Fotos für ein zukünftiges Datum.",
+        "j4": "Gäste registrieren sich, erhalten Foto-Challenges und sammeln Punkte.",
+        "j5": "The Feed ist ein Live-Stream der Event-Fotos und -Videos.",
+        "j6": "Ja, Sie können jedes Spiel in den Einstellungen aktivieren oder deaktivieren."
+      },
+      "commerce": {
+        "c1": "Der Shop lässt das Paar einen Katalog von Hochzeitsprodukten erstellen.",
+        "c2": "Die Geschenkliste lässt Gäste mit Geld oder einem gewählten Gegenstand beitragen.",
+        "c3": "Ja, alle Zahlungen laufen über Stripe mit Verschlüsselung.",
+        "c4": "Zahlungen werden von Stripe abgewickelt, wir berühren Kreditkartendaten nie.",
+        "c5": "Ja, über Gelato können Sie Print-on-Demand-Produkte verkaufen.",
+        "c6": "Verarbeitungsgebühren sind Stripe-Standardgebühren."
+      },
+      "privacy": {
+        "pr1": "Wir verarbeiten Gastdaten nur für den Hochzeitsbetrieb.",
+        "pr2": "Ja, wir sind DSGVO-konform. Sie können Daten jederzeit exportieren oder löschen.",
+        "pr3": "Ja, Sie können das Event und alle Daten löschen.",
+        "pr4": "Nein, Fotos sind nur für Event-Gäste sichtbar.",
+        "pr5": "Nein, Gesichtserkennung ist optional mit ausdrücklicher Zustimmung.",
+        "pr6": "Kontaktieren Sie uns über die E-Mail im Footer."
+      },
+      "tecnico": {
+        "t1": "Wir unterstützen aktuelle Versionen von Chrome, Safari, Firefox und Edge.",
+        "t2": "Ja, die Plattform ist vollständig responsiv und funktioniert als PWA.",
+        "t3": "Die PWA unterstützt Offline-Modus; Uploads werden in die Warteschlange gestellt.",
+        "t4": "Kontaktieren Sie den Support. Die meisten Probleme lösen sich durch Aktualisieren.",
+        "t5": "Uploads pausieren und werden automatisch fortgesetzt.",
+        "t6": "Schreiben Sie an die Support-E-Mail im Footer.",
+        "t7": "Wir nutzen Stripe für Zahlungen, Resend für E-Mails und Spotify für die Playlist."
+      }
+    }
   }
 }

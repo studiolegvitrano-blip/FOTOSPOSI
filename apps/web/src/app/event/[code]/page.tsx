@@ -18,6 +18,7 @@ import WeatherWidget from '@/components/weather-widget';
 import type { WeddingEvent, SubEvent, EventWindow } from '@fotosposi/events';
 import type { MediaUpload } from '@fotosposi/media';
 import EventTimelineFeed from '@/components/event-timeline-feed';
+import MiniMusicWidget from '@/components/mini-music-widget';
 import FullGalleryLightbox from '@/components/full-gallery-lightbox';
 
 export default function GuestEventPage() {
@@ -248,6 +249,8 @@ export default function GuestEventPage() {
               <Button variant="secondary" className="w-full justify-center" asChild><a href={`/events/${event.id}/games`}>{t('games')}</a></Button>
               <Button variant="outline" className="w-full justify-center" asChild><a href={`/events/${event.id}/games/jokes`}>{j('title')}</a></Button>
               <Button variant="outline" className="w-full justify-center" asChild><a href={`/events/${event.id}/guestbook`}>{t('guestbook')}</a></Button>
+              <Button variant="outline" className="w-full justify-center" asChild><a href={`/event/${code}/music`}>{t('music')}</a></Button>
+              <MiniMusicWidget eventId={event.id} href={`/event/${code}/music`} />
               <Button variant="outline" className="w-full justify-center" asChild><a href={`/e/${event.id}/capsule`}>Capsula del Tempo</a></Button>
             </aside>
 

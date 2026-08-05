@@ -17,6 +17,7 @@ import type { WeddingEvent, SubEvent, EventWindow } from '@fotosposi/events';
 import type { MediaUpload } from '@fotosposi/media';
 import EventTimelineFeed from '@/components/event-timeline-feed';
 import FullGalleryLightbox from '@/components/full-gallery-lightbox';
+import MiniMusicWidget from '@/components/mini-music-widget';
 
 export default function EventDetailPage() {
   const params = useParams();
@@ -223,6 +224,8 @@ export default function EventDetailPage() {
               <Button variant="secondary" className="w-full justify-center" asChild><Link href={`/events/${eventId}/games`}>{t('games')}</Link></Button>
               <Button variant="secondary" className="w-full justify-center" asChild><Link href={`/events/${eventId}/shop`}>{t('shop')}</Link></Button>
               <Button variant="outline" className="w-full justify-center" asChild><Link href={`/events/${eventId}/guestbook`}>{t('guestbook')}</Link></Button>
+              <Button variant="outline" className="w-full justify-center" asChild><Link href={`/events/${eventId}/music`}>{t('music')}</Link></Button>
+              <MiniMusicWidget eventId={eventId} href={`/events/${eventId}/music`} />
               <Button variant="outline" className="w-full justify-center" asChild><Link href={`/events/${eventId}/wall`}>{t('wall')}</Link></Button>
               <Button variant="outline" className="w-full justify-center" asChild><Link href={`/events/${eventId}/video-challenges`}>{t('video_challenges')}</Link></Button>
               <Button variant="outline" className="w-full justify-center" asChild><Link href={`/events/${eventId}/wow-walk`}>{t('wow_walk')}</Link></Button>
