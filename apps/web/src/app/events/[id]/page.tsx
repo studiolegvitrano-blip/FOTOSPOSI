@@ -35,12 +35,32 @@ export default function EventDetailPage() {
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [evtWindow, setEvtWindow] = useState<EventWindow | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showCountdown, setShowCountdown] = useState(true);
+  const [showCountdown, setShowCountdown] = useState(false);
   const [isCreator, setIsCreator] = useState(false);
   const [canManage, setCanManage] = useState(false);
   const [ceremonyTime, setCeremonyTime] = useState<string | undefined>();
   const [receptionTime, setReceptionTime] = useState<string | undefined>();
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Il countdown appare al max 1 volta al giorno per evento: il timestamp dell'ultima
+  // visualizzazione è salvato in localStorage. Al refresh/ritorno sulla pagina viene
+  // mostrato di nuovo solo se non è già stato visto oggi.
+  useEffect(() => {
+    if (!eventId) return;
+    try {
+      const key = `fotosposi-countdown-${eventId}`;
+      const last = Number(localStorage.getItem(key) || '0');
+      const today = new Date().toDateString();
+      if (last && new Date(last).toDateString() === today) {
+        setShowCountdown(false);
+        return;
+      }
+      localStorage.setItem(key, String(Date.now()));
+      setShowCountdown(true);
+    } catch {
+      setShowCountdown(true);
+    }
+  }, [eventId]);
 
   useEffect(() => {
     if (!eventId) return;
