@@ -159,6 +159,10 @@ export default function GuestEventPage() {
 
   const weatherCity = event.venue_city || event.church_city || event.location;
 
+  const brandLogoUrl = event.brand === 'weddingmoments'
+    ? '/logo-justmarry-trans.png'
+    : '/logo-sposi-trans.png';
+
   const countdownLabels = {
     countdown_intro: t('cd_countdown_intro'),
     days: t('cd_days'),
@@ -186,6 +190,8 @@ export default function GuestEventPage() {
           receptionTime={receptionTime}
           ceremonyAddress={ceremonyAddress}
           receptionAddress={receptionAddress}
+          brandLogoDataUri={brandLogoUrl}
+          brandLogoAlt={event.brand === 'weddingmoments' ? 'JustMarry.live' : 'Sposi.live'}
           labels={countdownLabels}
           backgroundImageMobile="/countdown-bg-mobile.webp"
           backgroundImageDesktop="/countdown-bg-desktop.webp"

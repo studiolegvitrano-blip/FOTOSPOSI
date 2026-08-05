@@ -145,6 +145,11 @@ export default function EventDetailPage() {
   // da 3 giorni prima dell'evento — nessun input extra per gli sposi.
   const weatherCity = event.venue_city || event.church_city || event.location;
 
+  // Logo brand per la fase ended del countdown (mostrato sotto il messaggio di ringraziamento).
+  const brandLogoUrl = event.brand === 'weddingmoments'
+    ? '/logo-justmarry-trans.png'
+    : '/logo-sposi-trans.png';
+
   return (
     <>
       {showWidget && (
@@ -157,6 +162,8 @@ export default function EventDetailPage() {
           receptionTime={receptionTime}
           ceremonyAddress={ceremonyAddress}
           receptionAddress={receptionAddress}
+          brandLogoDataUri={brandLogoUrl}
+          brandLogoAlt={event.brand === 'weddingmoments' ? 'JustMarry.live' : 'Sposi.live'}
           labels={countdownLabels}
           backgroundImageMobile="/countdown-bg-mobile.webp"
           backgroundImageDesktop="/countdown-bg-desktop.webp"
@@ -336,6 +343,8 @@ export default function EventDetailPage() {
                 <Button variant="outline" className="w-full justify-start" asChild><Link href={`/events/${eventId}/notifications`}>{t('notifications')}</Link></Button>
                 <Button variant="outline" className="w-full justify-start" asChild><Link href={`/events/${eventId}/concierge`}>{t('concierge')}</Link></Button>
                 <Button variant="outline" className="w-full justify-start" asChild><Link href={`/events/${eventId}/guests`}>{t('guests')}</Link></Button>
+                <Button variant="outline" className="w-full justify-start" asChild><Link href={`/events/${eventId}/invitations`}>Lista invitati</Link></Button>
+                <Button variant="outline" className="w-full justify-start" asChild><Link href={`/events/${eventId}/rsvp`}>Conferme RSVP</Link></Button>
                 <Button variant="outline" className="w-full justify-start" asChild><Link href={`/events/${eventId}/capsule`}>Capsula del Tempo</Link></Button>
                 <Button variant="outline" className="w-full justify-start" asChild><Link href={`/kiosk/${event.code || eventId}`}>{t('kiosk')}</Link></Button>
                 <Button variant="outline" className="w-full justify-start" asChild><Link href={`/events/${eventId}/qr`}>{t('qr_code')}</Link></Button>

@@ -347,3 +347,6 @@ export {
   generateSiteText,
   getGeneratedTexts,
 } from './service';
+
+export { buildRsvpSummaryPdfHtml } from './rsvp';
+export type { RsvpSummaryEntry, RsvpGuestRow, RsvpSummaryMeta, RsvpSummaryNumbers } from './rsvp';

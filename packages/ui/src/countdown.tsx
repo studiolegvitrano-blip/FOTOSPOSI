@@ -14,6 +14,10 @@ interface CountdownProps {
   time?: string;
   ceremonyAddress?: string;
   receptionAddress?: string;
+  /** Logo brand da mostrare nella fase ended sotto il messaggio (URL pubblico o data URI). */
+  brandLogoDataUri?: string | null;
+  /** Alt (testo del logo) per accessibilità. */
+  brandLogoAlt?: string;
   /** Etichette i18n passate dal caller (per evitare dipendenze next-intl in packages/ui). */
   labels?: {
     countdown_intro: string;
@@ -58,8 +62,8 @@ const DEFAULT_LABELS = {
   ceremony_subtitle: 'Stiamo per dire il nostro Sì',
   reception_title: 'Benvenuti al ricevimento!',
   reception_subtitle: 'Che la festa abbia inizio',
-  ended_title: 'Grazie a tutti!',
-  ended_subtitle: 'È stato un giorno indimenticabile',
+  ended_title: 'Grazie di aver reso questo giorno ancora più bello',
+  ended_subtitle: 'Con affetto, i vostri Sposi',
 };
 
 export function Countdown({
@@ -72,6 +76,8 @@ export function Countdown({
   time,
   ceremonyAddress,
   receptionAddress,
+  brandLogoDataUri,
+  brandLogoAlt,
   labels: userLabels,
   children,
   backgroundImageMobile,
@@ -180,10 +186,18 @@ export function Countdown({
         )}
 
         {phase === 'ended' && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="text-5xl">❤️</div>
             <h2 className={`text-2xl sm:text-3xl font-semibold ${headingClass}`}>{labels.ended_title}</h2>
-            <p className={mutedClass}>{labels.ended_subtitle}</p>
+            <p className={`text-base sm:text-lg ${mutedClass} max-w-md mx-auto leading-relaxed`}>{labels.ended_subtitle}</p>
+            {brandLogoDataUri && (
+              <img
+                src={brandLogoDataUri}
+                alt={brandLogoAlt ?? ''}
+                className="h-10 sm:h-12 mx-auto mt-3"
+                aria-hidden={!brandLogoAlt}
+              />
+            )}
           </div>
         )}
 
