@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 export interface RsvpGuestForm {
   name: string;
@@ -86,11 +86,6 @@ export default function RsvpForm({
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const addGuest = () =>
     setGuests((g) => [...g, { name: '', type: 'adult', age: '', intolerances: [], other: '' }]);
@@ -177,10 +172,6 @@ export default function RsvpForm({
       </div>
     </div>
   );
-
-  if (!mounted) {
-    return <div style={{ minHeight: 320 }} aria-busy="true" />;
-  }
 
   return (
     <div style={{ textAlign: 'left' }}>

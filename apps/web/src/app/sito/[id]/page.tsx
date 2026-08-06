@@ -4,7 +4,12 @@ import { generateIcsLink } from '@fotosposi/site-builder';
 import type { SiteDraft } from '@fotosposi/site-builder';
 import WeddingFeedDemo from '@/components/wedding-feed-demo';
 import WeatherWidget from '@/components/weather-widget';
-import RsvpForm from '@/components/rsvp-form';
+import dynamic from 'next/dynamic';
+
+const RsvpForm = dynamic(() => import('@/components/rsvp-form'), {
+  ssr: false,
+  loading: () => <div style={{ minHeight: 320 }} aria-busy="true" />,
+});
 
 async function getDraft(draftId: string): Promise<{ draft: SiteDraft | null; template: any | null }> {
   const cookieStore = await cookies();
