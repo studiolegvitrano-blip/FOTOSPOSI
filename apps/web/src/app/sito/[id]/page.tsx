@@ -4,12 +4,7 @@ import { generateIcsLink } from '@fotosposi/site-builder';
 import type { SiteDraft } from '@fotosposi/site-builder';
 import WeddingFeedDemo from '@/components/wedding-feed-demo';
 import WeatherWidget from '@/components/weather-widget';
-import dynamic from 'next/dynamic';
-
-const RsvpForm = dynamic(() => import('@/components/rsvp-form'), {
-  ssr: false,
-  loading: () => <div style={{ minHeight: 320 }} aria-busy="true" />,
-});
+import RsvpFormClient from '@/components/rsvp-form-client';
 
 async function getDraft(draftId: string): Promise<{ draft: SiteDraft | null; template: any | null }> {
   const cookieStore = await cookies();
@@ -183,7 +178,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
               <p style={{ fontSize: 14, lineHeight: 1.7, opacity: 0.8, marginBottom: 12 }}>{c.rsvpMessage || 'Conferma la tua presenza'}</p>
               {c.rsvpDeadline && <p style={{ fontSize: 12, opacity: 0.5, marginBottom: 16 }}>Entro il {new Date(c.rsvpDeadline).toLocaleDateString('it-IT')}</p>}
               <div style={{ maxWidth: 420, margin: '0 auto', textAlign: 'left' }}>
-                <RsvpForm
+                <RsvpFormClient
                   eventId={draft.event_id}
                   submitLabel="Conferma presenza"
                   successTitle="Grazie!"
