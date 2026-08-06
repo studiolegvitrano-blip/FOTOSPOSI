@@ -4,6 +4,16 @@
 const MAX_GUESTS = 15;
 const MAX_INTOLERANCES = 10;
 
+export const VALID_DIET_TYPES = ['onnivoro', 'vegetariano', 'vegano', 'pescatariano', 'altro'] as const;
+export type DietType = (typeof VALID_DIET_TYPES)[number];
+
+export function validateDietType(raw: unknown): DietType | null {
+  if (raw === undefined || raw === null || raw === '') return 'onnivoro';
+  if (typeof raw !== 'string') return null;
+  const t = raw.trim().toLowerCase().slice(0, 40);
+  return (VALID_DIET_TYPES as readonly string[]).includes(t) ? (t as DietType) : null;
+}
+
 export function validateIntolerances(raw: unknown): string[] | null {
   if (raw === undefined || raw === null || raw === '') return [];
   if (!Array.isArray(raw)) return null;

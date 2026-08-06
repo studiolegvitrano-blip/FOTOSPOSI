@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateGuests, validateIntolerances } from '../validation';
+import { validateDietType, validateGuests, validateIntolerances, VALID_DIET_TYPES } from '../validation';
 
 describe('validateIntolerances', () => {
   it('ritorna [] per undefined/null/stringa vuota', () => {
@@ -130,5 +130,42 @@ describe('validateGuests', () => {
   });
   it('rifiuta elemento primitivo dentro l\'array', () => {
     expect(validateGuests(['stringa', { name: 'X', type: 'adult' }])).toBeNull();
+  });
+});
+
+describe('validateDietType', () => {
+  it('default "onnivoro" per undefined/null/stringa vuota', () => {
+    expect(validateDietType(undefined)).toBe('onnivoro');
+    expect(validateDietType(null)).toBe('onnivoro');
+    expect(validateDietType('')).toBe('onnivoro');
+  });
+  it('accetta tutti i tipi validi', () => {
+    expect(VALID_DIET_TYPES).toEqual(['onnivoro', 'vegetariano', 'vegano', 'pescatariano', 'altro']);
+    expect(validateDietType('onnivoro')).toBe('onnivoro');
+    expect(validateDietType('vegetariano')).toBe('vegetariano');
+    expect(validateDietType('vegano')).toBe('vegano');
+    expect(validateDietType('pescatariano')).toBe('pescatariano');
+    expect(validateDietType('altro')).toBe('altro');
+  });
+  it('case-insensitive', () => {
+    expect(validateDietType('VEGANO')).toBe('vegano');
+    expect(validateDietType('VeGeTaRiAnO')).toBe('vegetariano');
+  });
+  it('trimma whitespace', () => {
+    expect(validateDietType('  vegano  ')).toBe('vegano');
+  });
+  it('rifiuta tipo non valido', () => {
+    expect(validateDietType('fruttariano')).toBeNull();
+    expect(validateDietType('cruelty-free')).toBeNull();
+    expect(validateDietType('meat')).toBeNull();
+  });
+  it('rifiuta non-stringa', () => {
+    expect(validateDietType(42)).toBeNull();
+    expect(validateDietType({})).toBeNull();
+    expect(validateDietType([])).toBeNull();
+    expect(validateDietType(true)).toBeNull();
+  });
+  it('tronca a 40 caratteri', () => {
+    expect(validateDietType('a'.repeat(50))).toBeNull();
   });
 });

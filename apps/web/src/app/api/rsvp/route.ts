@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@fotosposi/core';
-import { validateGuests, validateIntolerances } from './validation';
+import { validateDietType, validateGuests, validateIntolerances } from './validation';
 
 /**
  * POST /api/rsvp — submit conferma presenza dal sito-evento pubblico.
@@ -24,6 +24,7 @@ interface RsvpBody {
   eventId?: unknown;
   hostName?: unknown;
   hostIntolerances?: unknown;
+  dietType?: unknown;
   guests?: unknown;
   message?: unknown;
 }
@@ -49,6 +50,10 @@ export async function POST(request: NextRequest) {
   if (hostIntolerances === null) {
     return NextResponse.json({ error: 'intolleranze non valide' }, { status: 400 });
   }
+  const dietType = validateDietType(body.dietType);
+  if (dietType === null) {
+    return NextResponse.json({ error: 'tipo dieta non valido' }, { status: 400 });
+  }
   const guests = validateGuests(body.guests);
   if (guests === null) {
     return NextResponse.json({ error: 'accompagnatori non validi' }, { status: 400 });
@@ -72,6 +77,7 @@ export async function POST(request: NextRequest) {
       event_id: eventId,
       host_name: hostName,
       host_intolerances: hostIntolerances,
+      diet_type: dietType,
       guests,
       message,
       brand: event.brand === 'weddingmoments' ? 'JustMarry.live' : 'Sposi.live',

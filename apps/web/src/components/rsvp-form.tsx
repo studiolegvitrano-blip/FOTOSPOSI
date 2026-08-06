@@ -47,6 +47,13 @@ interface Props {
   otherPlaceholder?: string;
   messageLabel?: string;
   messagePlaceholder?: string;
+  dietLabel?: string;
+  dietHint?: string;
+  dietOnnivoro?: string;
+  dietVegetariano?: string;
+  dietVegano?: string;
+  dietPescatariano?: string;
+  dietAltro?: string;
   errorGeneric?: string;
   submittingLabel?: string;
 }
@@ -75,12 +82,20 @@ export default function RsvpForm({
   otherPlaceholder = 'Scrivi la tua intolleranza',
   messageLabel = 'Messaggio (opzionale)',
   messagePlaceholder = 'Vuoi dire qualcosa agli sposi?',
+  dietLabel = 'Tipo dieta',
+  dietHint = 'Aiuta il catering a preparare il menu giusto.',
+  dietOnnivoro = 'Onnivoro',
+  dietVegetariano = 'Vegetariano',
+  dietVegano = 'Vegano',
+  dietPescatariano = 'Pescatariano',
+  dietAltro = 'Altro',
   errorGeneric = 'Errore nell\'invio. Riprova.',
   submittingLabel = 'Invio in corso...',
 }: Props) {
   const [hostName, setHostName] = useState('');
   const [hostIntolerances, setHostIntolerances] = useState<string[]>([]);
   const [hostOther, setHostOther] = useState('');
+  const [dietType, setDietType] = useState<'onnivoro' | 'vegetariano' | 'vegano' | 'pescatariano' | 'altro'>('onnivoro');
   const [guests, setGuests] = useState<RsvpGuestForm[]>([]);
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -109,6 +124,7 @@ export default function RsvpForm({
         eventId,
         hostName: hostName.trim(),
         hostIntolerances: hostIntolerancesAll,
+        dietType,
         guests: guests
           .filter((g) => g.name.trim() !== '')
           .map((g) => ({
@@ -189,6 +205,40 @@ export default function RsvpForm({
           placeholder={hostNamePlaceholder}
           style={inputStyle}
         />
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 6 }}>{dietLabel}</label>
+        <p style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>{dietHint}</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {([
+            ['onnivoro', dietOnnivoro],
+            ['vegetariano', dietVegetariano],
+            ['vegano', dietVegano],
+            ['pescatariano', dietPescatariano],
+            ['altro', dietAltro],
+          ] as const).map(([key, label]) => {
+            const active = dietType === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setDietType(key)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 999,
+                  fontSize: 13,
+                  border: active ? '1px solid #0b2e4f' : '1px solid rgba(0,0,0,0.2)',
+                  background: active ? '#0b2e4f' : 'transparent',
+                  color: active ? '#fff' : 'inherit',
+                  cursor: 'pointer',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div style={{ marginBottom: 16 }}>

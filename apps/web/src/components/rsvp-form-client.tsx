@@ -27,6 +27,13 @@ export default function RsvpFormClient(props: {
   otherPlaceholder?: string;
   messageLabel?: string;
   messagePlaceholder?: string;
+  dietLabel?: string;
+  dietHint?: string;
+  dietOnnivoro?: string;
+  dietVegetariano?: string;
+  dietVegano?: string;
+  dietPescatariano?: string;
+  dietAltro?: string;
   errorGeneric?: string;
   submittingLabel?: string;
 }) {
