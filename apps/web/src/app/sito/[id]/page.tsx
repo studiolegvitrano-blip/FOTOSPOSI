@@ -55,7 +55,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
     <html lang="it">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>{c.coupleNames || 'Matrimonio'} Â· Sito invito</title>
+        <title>{c.coupleNames || 'Matrimonio'} · Sito invito</title>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Georgia&family=Montserrat:wght@300;400;600;700&family=Poppins:wght@300;400;600;700&family=Playfair+Display:wght@400;600;700&family=Lora:wght@400;600&display=swap" rel="stylesheet" />
         <style>{`
           * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -113,7 +113,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
               <p style={{ fontSize: 15, lineHeight: 1.7, marginBottom: 4 }}>{c.ceremonyAddress || ''}</p>
               {c.ceremonyTime && <p style={{ fontSize: 14, color: p0, marginBottom: 12 }}>Ore {c.ceremonyTime}</p>}
               {c.ceremonyNote && <p style={{ fontSize: 14, opacity: 0.7, lineHeight: 1.6 }}>{c.ceremonyNote}</p>}
-              {c.ceremonyAddress && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.ceremonyAddress)}`} target="_blank" style={{ fontSize: 13, color: p0, textDecoration: 'underline', display: 'inline-block', marginTop: 8 }}>Apri in Maps â†—</a>}
+              {c.ceremonyAddress && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.ceremonyAddress)}`} target="_blank" style={{ fontSize: 13, color: p0, textDecoration: 'underline', display: 'inline-block', marginTop: 8 }}>Apri in Maps ↗</a>}
             </div>
           )}
 
@@ -123,7 +123,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
               <p style={{ fontSize: 15, lineHeight: 1.7, marginBottom: 4 }}>{c.receptionAddress || ''}</p>
               {c.receptionTime && <p style={{ fontSize: 14, color: p0, marginBottom: 12 }}>Ore {c.receptionTime}</p>}
               {c.receptionNote && <p style={{ fontSize: 14, opacity: 0.7, lineHeight: 1.6 }}>{c.receptionNote}</p>}
-              {c.receptionAddress && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.receptionAddress)}`} target="_blank" style={{ fontSize: 13, color: p0, textDecoration: 'underline', display: 'inline-block', marginTop: 8 }}>Apri in Maps â†—</a>}
+              {c.receptionAddress && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.receptionAddress)}`} target="_blank" style={{ fontSize: 13, color: p0, textDecoration: 'underline', display: 'inline-block', marginTop: 8 }}>Apri in Maps ↗</a>}
             </div>
           )}
 
@@ -140,7 +140,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
               {c.registryText && <p style={{ fontSize: 14, lineHeight: 1.7, opacity: 0.8, marginBottom: 16 }}>{c.registryText}</p>}
               {c.registryIban && <p style={{ fontSize: 12, fontFamily: 'monospace', background: p3, padding: '8px 16px', borderRadius: 8, display: 'inline-block', marginBottom: 8 }}>IBAN: {c.registryIban}</p>}
               {c.registryIntestatario && <p style={{ fontSize: 12, opacity: 0.6 }}>Intestato a: {c.registryIntestatario}</p>}
-              {c.registryLink && <a href={c.registryLink} target="_blank" style={{ display: 'inline-block', marginTop: 16, padding: '10px 24px', borderRadius: 999, fontSize: 14, background: p0, color: p3, textDecoration: 'none' }}>Vai alla lista â†—</a>}
+                {c.registryLink && <a href={c.registryLink} target="_blank" style={{ display: 'inline-block', marginTop: 16, padding: '10px 24px', borderRadius: 999, fontSize: 14, background: p0, color: p3, textDecoration: 'none' }}>Vai alla lista ↗</a>}
             </div>
           )}
 
@@ -168,7 +168,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
           {c.playlistEnabled && c.playlistLink && (
             <div className="section" style={{ textAlign: 'center', background: p1, color: p2 }}>
               <h2 style={{ fontSize: 18, color: p0, marginBottom: 12 }}>Playlist</h2>
-              <a href={c.playlistLink} target="_blank" style={{ fontSize: 14, color: p0, textDecoration: 'underline' }}>Ascolta la playlist â†—</a>
+              <a href={c.playlistLink} target="_blank" style={{ fontSize: 14, color: p0, textDecoration: 'underline' }}>Ascolta la playlist ↗</a>
             </div>
           )}
 
@@ -233,7 +233,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
               {c.navettaOrari && <p style={{ fontSize: 14, lineHeight: 1.7, opacity: 0.8, marginBottom: 12, whiteSpace: 'pre-line' }}>{c.navettaOrari}</p>}
               {c.navettaMappa && (
                 <a href={c.navettaMappa} target="_blank" style={{ display: 'inline-block', padding: '10px 24px', borderRadius: 999, fontSize: 14, background: p0, color: p3, textDecoration: 'none', marginBottom: 12 }}>
-                  Mappa parcheggio â†—
+                  Mappa parcheggio ↗
                 </a>
               )}
               {c.navettaNote && <p style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.6, whiteSpace: 'pre-line' }}>{c.navettaNote}</p>}
@@ -241,7 +241,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
               {c.navettaMatchmaking && (
                 <div style={{ marginTop: 16, padding: 16, borderRadius: 12, background: p1 }}>
                   <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Auto Amica</p>
-                  <p style={{ fontSize: 13, opacity: 0.7 }}>Chi dÃ  un passaggio e chi cerca si organizzano qui</p>
+                  <p style={{ fontSize: 13, opacity: 0.7 }}>Chi dà un passaggio e chi cerca si organizzano qui</p>
                 </div>
               )}
             </div>
@@ -268,7 +268,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
           )}
 
           <div style={{ padding: '32px', textAlign: 'center', fontSize: 12, opacity: 0.4, color: p2, background: p1 }}>
-            <p>Creato con Sposi.live Â· Il tuo invito digitale</p>
+            <p>Creato con Sposi.live · Il tuo invito digitale</p>
           </div>
         </div>
       </body>
