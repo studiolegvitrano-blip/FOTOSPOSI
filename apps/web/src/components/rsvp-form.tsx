@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export interface RsvpGuestForm {
   name: string;
@@ -86,6 +86,11 @@ export default function RsvpForm({
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const addGuest = () =>
     setGuests((g) => [...g, { name: '', type: 'adult', age: '', intolerances: [], other: '' }]);
@@ -109,12 +114,14 @@ export default function RsvpForm({
         eventId,
         hostName: hostName.trim(),
         hostIntolerances: hostIntolerancesAll,
-        guests: guests.map((g) => ({
-          name: g.name.trim(),
-          type: g.type,
-          age: g.type === 'minor' ? Number(g.age) : null,
-          intolerances: g.other.trim() ? [...g.intolerances, g.other.trim()] : g.intolerances,
-        })),
+        guests: guests
+          .filter((g) => g.name.trim() !== '')
+          .map((g) => ({
+            name: g.name.trim(),
+            type: g.type,
+            age: g.type === 'minor' ? (g.age === '' || g.age == null ? null : Math.floor(Number(g.age))) : null,
+            intolerances: g.other.trim() ? [...g.intolerances, g.other.trim()] : g.intolerances,
+          })),
         message: message.trim() || null,
       };
       const res = await fetch('/api/rsvp', {
@@ -170,6 +177,10 @@ export default function RsvpForm({
       </div>
     </div>
   );
+
+  if (!mounted) {
+    return <div style={{ minHeight: 320 }} aria-busy="true" />;
+  }
 
   return (
     <div style={{ textAlign: 'left' }}>
