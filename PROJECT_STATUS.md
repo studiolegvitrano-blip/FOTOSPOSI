@@ -1,5 +1,51 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 07/08/2026 (continua) — CRITICO: fix RLS infinite recursion su core_users (dashboard 500 per TUTTI) + verifica OAuth produzione
+
+### Contesto
+Continuazione della sessione: diagnosi login Google in produzione e verifica dello stato reale dell'app. Durante il test con sessione valida su `www.sposi.live/dashboard` è emerso un **bug CRITICO che rompeva la dashboard per OGNI utente autenticato**: la lista eventi falliva con HTTP 500.
+
+### Bug CRITICO trovato e FIXATO: RLS infinite recursion su `core_users`
+- **Sintomo**: `GET /rest/v1/events?select=*&created_by=eq.<uuid>` → **500** `42P17 "infinite recursion detected in policy for relation core_users"`. La dashboard mostrava "Nessun evento ancora" per chiunque (anche lo sposo con eventi reali).
+- **Root cause**: la policy `core_users_select_tenant_admin` (creata in migration 00053/00054) conteneva **subquery autoreferenziali su `core_users` nel proprio USING**:
+  ```sql
+  tenant_id = (SELECT tenant_id FROM core_users WHERE id = auth.uid())
+  AND (SELECT role FROM core_users WHERE id = auth.uid()) IN ('admin','manager')
+  ```
+  Ogni volta che UNA QUALSIASI policy di una qualsiasi tabella (events, media_uploads, votes, ecc.) referenziava `core_users`, Postgres valutava le policy RLS di `core_users` → quella policy faceva un'altra subquery su `core_users` → la RLS di `core_users` veniva rivalutata → **recursion infinito** → 500 su ogni query authenticated che tocca queste tabelle.
+- **Fix**: migration **`00056_fix_rls_recursion_core_users.sql`** (NUOVA, applicata live + scritta in `supabase/migrations/`):
+  - Due funzioni `SECURITY DEFINER` (`public.current_user_tenant_id()`, `public.current_user_role()`) che leggono tenant_id/role dell'utente corrente bypassando RLS.
+  - `core_users_select_tenant_admin` riscritta per usare le funzioni invece delle subquery autoreferenziali.
+  - `REVOKE EXECUTE ... FROM PUBLIC, anon` + `GRANT EXECUTE TO authenticated` (le funzioni servono solo dentro le policy RLS, non come RPC pubblico).
+  - `NOTIFY pgrst, 'reload schema'`.
+- **Verifica**: come `authenticated` (sposo `93350340...`): `SELECT * FROM events WHERE created_by = auth.uid()` → restituisce `d88403f7` (Marinella e Salvo) ✅; `media_uploads`/`votes` non più 500 ✅. Advisor sicurezza: restano solo i 2 WARN attesi sulle funzioni (necessarie per le policy RLS) + `auth_leaked_password_protection` (limite piano).
+- **Impatto**: bug introdotto da commit `f4795b1` (migration 00054, policy restrittive) — la dashboard era rotta per tutti gli utenti. Ora risolto.
+
+### Diagnosi login Google in produzione — OAuth FUNZIONANTE ✅
+- **Confermato**: il flusso OAuth Google è sano in produzione. Con una sessione Google valida (`studiotecsv@gmail.com`, login 07:19Z) nel browser:
+  - `/dashboard` si apre **senza redirect** a `/login` → il middleware riconosce la sessione.
+  - Cookie `sb-krgqyluuiltckmhbeuue-auth-token.0/.1` presenti e validi (base64url, chunked).
+- **`/login?error=oauth_failed` osservato** = ramo di `exchangeCodeForSession` fallito (code reuse / PKCE verifier perso chiudendo/riaprendo il tab durante OAuth) — caso noto già gestito con redirect a `/login?error=oauth_failed`, NON un bug di sessione.
+- **Nota service worker**: `sw.js` (`CACHE_NAME='spositive-v2'`, `cacheFirst` su tutto il non-API) tiene in cache **versioni stale dei chunk** (`auth/callback/page-7fc160248dfcfe69.js` = corrente, ma anche `page-d7ed581574f4f993.js` e `page-e745e36074de5a4d.js` vecchi). Se un utente sperimenta bundle obsoleti dopo un deploy, la soluzione è un `CACHE_NAME` bump + `skipWaiting` nel SW. Non è la causa del bug OAuth (il bundle deployato è già il nuovo).
+
+### File modificati
+```
+supabase/migrations/00056_fix_rls_recursion_core_users.sql    NEW (fix RLS recursion + helper SECURITY DEFINER)
+PROJECT_STATUS.md                                              +50 righe (questa sezione)
+```
+
+### Verifiche
+- `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori (invariato, nessun codice JS toccato).
+- Test: nessun test JS toccato (fix puro SQL DB).
+
+### TODO post-push
+1. Commit + push atomico (incluso il work-tree pre-esistente: marketplace reframe, dashboard, i18n nav, PROJECT_STATUS).
+2. Verificare in produzione con account sposo reale (`Agostinospera@hotmail.it` / `agospe@blu.it`): la dashboard deve mostrare l'evento "Marinella e Salvo" (prima: "Nessun evento ancora").
+3. Rivedere le migration 00053/00054: la policy `core_users_select_tenant_admin` autoreferenziale è il pattern da evitare — usare sempre funzioni SECURITY DEFINER per self-lookup nelle policy.
+4. Valutare bump `CACHE_NAME` + `skipWaiting` in `public/sw.js` per i prossimi deploy (evita bundle stale per gli utenti con SW attivo).
+
+---
+
 ## Sessione 07/08/2026 — Verifica produzione feature invitations + RSVP + countdown + fix redirect login Music
 
 ### Contesto
@@ -28,10 +74,19 @@ Esecuzione del cronoprogramma (PROMPT-PROSSIMA-CHAT.md) post-redeploy Vercel: ve
 - `npx vitest run` → **472/472 verdi** (39 file).
 - `npx next build` → OK.
 
+### Diagnosi Google OAuth (punto 4 cronoprogramma) — VERIFICATA OK ✅
+Verifica end-to-end in produzione dei due flussi che usano lo stesso OAuth 2.0 Client ID `846532943146-m9fjc60gu8maqd0trfh7d69ctktbudv4.apps.googleusercontent.com`:
+
+1. **Login Supabase Auth Google (flusso PKCE) ✅**: log auth Supabase 06/08 mostrano flusso completo senza errori: `GET /authorize` → 302 "Redirecting to external provider" → `GET /callback` → 302 (ritorno da Google) → `POST /token` → **200 PKCE Login** (user `39d2631c-181d-49ef-a84b-fdfefba993b7`, 2 login riusciti: 20:38 e 21:15 UTC). Zero status ≥ 400, zero errori provider. Il redirect URI `https://krgqyluuiltckmhbeuue.supabase.co/auth/v1/callback` è quindi autorizzato.
+2. **Drive backup (`/api/auth/google`) ✅**: curl di `https://www.sposi.live/api/auth/google?event_id=...` → redirect a Google che apre la pagina di login (HTTP 200, NESSUN `redirect_uri_mismatch`) con `redirect_uri=https://www.sposi.live/api/auth/google/callback`. Stesso esito per `https://www.justmarry.live/api/auth/google/callback`. Entrambi gli URI sono autorizzati in Google Cloud Console.
+3. Il sintomo storico "torna a /login dopo OAuth" era già stato risolto nelle sessioni 30-31/07 (esclusione `/auth/callback` dal middleware + `flowType: 'pkce'` + `router.refresh()`), confermato dai log 06/08.
+
+**Conclusione**: nessuna azione richiesta in Google Cloud Console. Google OAuth è pienamente funzionante su entrambi i domini e per entrambi i flussi (login + Drive).
+
 ### TODO post-push
 1. **Push** del work-tree: `music-playlist.tsx` (fix 401) + migration `00055`. Commit atomico.
 2. Test 1A-1F in produzione da account sposo (invitations, add guest, toggle, sollecito, export PDF/Word/CSV, lista RSVP) — bloccato finché l'utente non fornisce l'accesso.
-3. Diagnosi Google OAuth (punto 4 cronoprogramma): verificare Authorized redirect URIs in Google Cloud Console (Client ID `846532943146-...`).
+3. ~~Diagnosi Google OAuth~~ — ✅ COMPLETATA (vedi sopra: login + Drive backup verificati OK in produzione).
 
 ---
 

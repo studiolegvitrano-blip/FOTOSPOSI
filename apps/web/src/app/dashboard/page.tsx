@@ -50,7 +50,6 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2">
           <LanguageSwitcher />
           <Button variant="outline" asChild><Link href="/marketplace">{n('marketplace')}</Link></Button>
-          <Button variant="ghost" asChild><Link href="/ceo">CEO</Link></Button>
           <Button variant="ghost" onClick={handleLogout}>{n('logout')}</Button>
         </div>
       </div>
