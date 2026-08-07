@@ -116,6 +116,14 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
   const loadSongs = useCallback(async () => {
     try {
       const res = await fetch(`/api/events/${eventId}/songs`);
+      // 401 = utente non autenticato: gli invitati che arrivano qui dal link email
+      // `/event/{token}/music` (o gli sposi da `/events/[id]/music`) non devono restare
+      // bloccati su "Non autenticato" — vanno al login e tornano QUI dopo l'auth (pattern
+      // identico a `events/[id]/*`, che passano già `?redirect=` al login).
+      if (res.status === 401) {
+        router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+        return;
+      }
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || c('error_generic'));
@@ -127,7 +135,7 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [eventId, c]);
+  }, [eventId, c, router]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -255,8 +263,8 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{track.name}</p>
-                    <p className="text-xs text-text-muted truncate">{track.artists.map((a) => a.name).join(', ')} · {formatDuration(track.duration_ms)}</p>
+                    <p className="font-medium truncate">{track.artists.map((a) => a.name).join(', ')}</p>
+                    <p className="text-xs text-text-muted truncate">{track.name} · {formatDuration(track.duration_ms)}</p>
                   </div>
                   {track.preview_url && (
                     <Button
@@ -317,9 +325,9 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{song.title}</p>
+                    <p className="font-medium truncate">{song.artist}</p>
                     <p className="text-xs text-text-muted truncate">
-                      {song.artist} · {formatDuration(song.duration_ms)}
+                      {song.title} · {formatDuration(song.duration_ms)}
                       {song.added_by_name ? ` · ${t('added_by', { name: song.added_by_name })}` : ''}
                     </p>
                   </div>

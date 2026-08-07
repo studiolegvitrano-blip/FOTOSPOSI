@@ -1,5 +1,40 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 07/08/2026 — Verifica produzione feature invitations + RSVP + countdown + fix redirect login Music
+
+### Contesto
+Esecuzione del cronoprogramma (PROMPT-PROSSIMA-CHAT.md) post-redeploy Vercel: verifica end-to-end in produzione delle feature invitations/RSVP/countdown, fix TODO redirect login, verifica cron `rsvp-reminders`, aggiornamento status. Lavoro svolto sia via curl sia con Playwright (browser reale).
+
+### Test produzione completati
+- **Rotte pubbliche OK**: `www.sposi.live` `/`, `/login`, `/faq`, `/collaboratori` → 200.
+- **TEST 1G (API RSVP pubblico) ✅**: `POST https://www.sposi.live/api/rsvp` con `{eventId: d88403f7-..., hostName:'Test Automazione RSVP', hostIntolerances:['lattosio'], dietType:'onnivoro', guests:[{name:'Accompagnatore Test', type:'adult', age:null, intolerances:['glutine']}], message:'Verifica automatica deploy'}` → **201** `{"id":"98bd2e71-..."}`. Riga persistita in `rsvp_responses` (brand `Sposi.live`, created_at 2026-08-07 00:59:20), poi eliminata dopo il test.
+  - `VALID_DIET_TYPES` (validation.ts): `onnivoro/vegetariano/vegano/pescatariano/altro` — `standard` → 400 "tipo dieta non valido".
+- **TEST 1H (pagina invitato + countdown post-evento) ✅**: `https://www.sposi.live/event/rsvp-1785932083943` → Countdown fase `ended` renderizza "Benvenuti al Matrimonio di Danila e Agostino" + ❤️ + "Grazie di aver reso questo giorno ancora più bello" + "Con affetto, i vostri Sposi" + logo Sposi.live (verificato in browser).
+- **Cron `rsvp-reminders` ✅**: `GET /api/cron/rsvp-reminders` (Bearer CRON_SECRET) → 200 `{"status":"ok","results":[],"totalAttempted":0,"totalSent":0}` e telemetry correttamente scritta in `system_health_log` (`job='rsvp-reminders'`, status ok, details `{"events":0,"attempted":0,"sent":0}`).
+- Test 1A-1F (invitations UI, add guest, toggle, sollecito, export, lista RSVP) richiedono sessione sposo autenticata → **da verificare dall'utente** (bloccato per credenziali).
+
+### Bug trovato e FIXATO: telemetry cron rsvp-reminders falliva silenziosamente
+- **Root cause**: `system_health_log.job` aveva CHECK (da migration 00043) che ammetteva solo `backup/maintenance/dlq-retry/upload_processing_failure` → la insert del cron `rsvp-reminders` falliva sempre (il codice non controlla `error`), quindi NESSUNA telemetry veniva registrata nonostante risposte 200.
+- **Fix**: migration **`00055_system_health_log_rsvp_reminders.sql`** (NUOVA, applicata live + scritta in `supabase/migrations/`): drop + re-add CHECK `job IN ('backup','maintenance','dlq-retry','upload_processing_failure','rsvp-reminders')` + `NOTIFY pgrst, 'reload schema'`. Post-fix il cron logga correttamente.
+
+### Bug trovato e FIXATO: pagina Music bloccava gli anonimi su "Non autenticato"
+- **Sintomo reale** (TODO punto 2 del cronoprogramma, verificato in browser con cookie cancellati): invitato anonimo che apre `/event/{token}/music` (link "Musica" dal link email) restava bloccato con messaggio "Non autenticato" + playlist vuota — NESSUN redirect al login. (Il TODO ipotizzava un redirect a `/login` senza contesto; in realtà la UX era peggiore: niente reindirizzamento affatto.)
+- **Root cause**: `MusicPlaylist` (`apps/web/src/components/music-playlist.tsx`) faceva GET `/api/events/[id]/songs` che risponde **401** per utenti non autenticati; il componente mostrava `setError('Non autenticato')` senza redirect. Le route songs/export sono auth-gated (`getUser()` + cookie), il middleware NON protegge `/event/[code]/*`.
+- **Fix**: in `loadSongs`, su `res.status === 401` → `router.push('/login?redirect=<pathname>')` (pattern identico alle pagine `/events/[id]/*`). Dopo il login l'utente torna esattamente alla pagina Music. Copre sia `/event/[code]/music` (invitati) sia `/events/[id]/music` (sposi).
+- Verifica: typecheck 0 errori, **472/472 test verdi**, `next build` OK.
+
+### Verifiche
+- `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- `npx vitest run` → **472/472 verdi** (39 file).
+- `npx next build` → OK.
+
+### TODO post-push
+1. **Push** del work-tree: `music-playlist.tsx` (fix 401) + migration `00055`. Commit atomico.
+2. Test 1A-1F in produzione da account sposo (invitations, add guest, toggle, sollecito, export PDF/Word/CSV, lista RSVP) — bloccato finché l'utente non fornisce l'accesso.
+3. Diagnosi Google OAuth (punto 4 cronoprogramma): verificare Authorized redirect URIs in Google Cloud Console (Client ID `846532943146-...`).
+
+---
+
 ## Sessione 05/08/2026 — Switch provider ricerca brani: Spotify (richiede Premium) → iTunes Search API (gratis, no token)
 
 ### Contesto
