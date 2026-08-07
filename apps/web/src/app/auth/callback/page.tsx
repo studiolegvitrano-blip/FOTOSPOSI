@@ -98,19 +98,26 @@ export default function AuthCallbackPage() {
     };
 
     /**
-     * Finalizza il login: router.refresh() per sincronizzare i cookie auth SSR (così il
-     * middleware riesce a leggere la sessione al prossimo render), poi router.push al
-     * redirect finale. Senza refresh, il middleware vede getUser() null sul primo render
-     * post-OAuth (cookie ancora non propagati al server) → redirect a /login → loop.
-     * `refresh` forza Next.js a rifetchare la route corrente lato server, e in quel
-     * frangente `getAll()` restituisce i cookie appena settati da `exchangeCodeForSession`.
+     * Finalizza il login con NAVIGAZIONE COMPLETA (window.location.href), non router.push.
+     *
+     * Perché: router.push è una navigazione client-side in cui Next.js può servire /dashboard
+     * dal prefetch RSC o dal client-router cache di PRIMA del login (quando eri anonimo e il
+     * middleware aveva risposto "redirect a /login"). Risultato: anche con i cookie auth appena
+     * scritti da `exchangeCodeForSession`, il redirect finale viene risolto con la risposta
+     * cached del middleware pre-login → rimbalzo a /login → loop OAuth (sintomo reale in
+     * produzione: 4 token 200 su 3 account Google, ma l'utente non atterrava mai su /dashboard).
+     *
+     * window.location.href forza un reload completo del documento: il browser manda i cookie
+     * freschi al server, il middleware gira di nuovo e vede getUser() != null. Il login EMAIL
+     * non è toccato (router.push lì funziona perché la navigazione parte dalla stessa SPA già
+     * autenticata), ma per il ritorno da OAuth (tab portata fuori/riportata da Google) la
+     * navigazione hard è l'unico percorso deterministico.
      */
     async function finalizeAndRedirect(target: string) {
       setState('redirecting');
-      router.refresh();
-      // Lascia un tick al browser per persistere i cookie auth prima di navigare.
+      // Un tick per dare al browser il tempo di persistere i cookie prima della navigazione hard.
       await new Promise((r) => setTimeout(r, 50));
-      router.push(target);
+      window.location.href = target;
     }
 
     handleHash();
@@ -118,16 +125,18 @@ export default function AuthCallbackPage() {
 
   // Form di onboarding per invitati via QR (solo primo login dopo OAuth Google/Facebook/Apple).
   // Si mostra QUANDO: 1) OAuth successo, 2) nessun core_users esistente, 3) redirect punta a
-  // /events/{id}/ (invitato via QR). Loスポso non vede questo form: lui registra il proprio evento.
+  // /events/{id}/ (invitato via QR). Lo sposo non vede questo form: lui registra il proprio evento.
   if (state === 'onboarding' && pendingUser) {
     return <OnboardingForm
       user={pendingUser}
       redirect={searchParams.get('redirect') || `/events/${pendingUser.eventId}`}
       onComplete={async () => {
         setState('redirecting');
-        router.refresh();
+        // Navigazione hard anche qui: stessa race router.push/prefetch del middleware del
+        // path principale. Dopo il setup, i cookie auth sono appena stati scritti → il
+        // browser ricarica la pagina di destinazione con la sessione fresca.
         await new Promise((r) => setTimeout(r, 50));
-        router.push(searchParams.get('redirect') || `/events/${pendingUser.eventId}`);
+        window.location.href = searchParams.get('redirect') || `/events/${pendingUser.eventId}`;
       }}
     />;
   }
