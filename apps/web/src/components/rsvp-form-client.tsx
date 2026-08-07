@@ -36,6 +36,8 @@ export default function RsvpFormClient(props: {
   dietAltro?: string;
   errorGeneric?: string;
   submittingLabel?: string;
+  hostRequiredLabel?: string;
+  guestLabel?: string;
 }) {
   return <RsvpForm {...props} />;
 }

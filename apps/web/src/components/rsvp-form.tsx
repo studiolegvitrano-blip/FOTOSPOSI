@@ -56,6 +56,8 @@ interface Props {
   dietAltro?: string;
   errorGeneric?: string;
   submittingLabel?: string;
+  hostRequiredLabel?: string;
+  guestLabel?: string;
 }
 
 function toggleValue(list: string[], value: string): string[] {
@@ -91,6 +93,8 @@ export default function RsvpForm({
   dietAltro = 'Altro',
   errorGeneric = 'Errore nell\'invio. Riprova.',
   submittingLabel = 'Invio in corso...',
+  hostRequiredLabel = ' è obbligatorio',
+  guestLabel = 'Accompagnatore',
 }: Props) {
   const [hostName, setHostName] = useState('');
   const [hostIntolerances, setHostIntolerances] = useState<string[]>([]);
@@ -114,7 +118,7 @@ export default function RsvpForm({
 
   const submit = async () => {
     if (!hostName.trim()) {
-      setError(hostLabel + ' è obbligatorio');
+      setError(hostLabel + hostRequiredLabel);
       return;
     }
     setSubmitting(true);
@@ -256,7 +260,7 @@ export default function RsvpForm({
       {guests.map((g, i) => (
         <div key={i} style={{ marginBottom: 16, padding: 14, borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>Accompagnatore {i + 1}</span>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>{guestLabel} {i + 1}</span>
             <button type="button" onClick={() => removeGuest(i)} style={{ fontSize: 12, color: '#b00020', background: 'none', border: 'none', cursor: 'pointer' }}>
               {removeLabel}
             </button>

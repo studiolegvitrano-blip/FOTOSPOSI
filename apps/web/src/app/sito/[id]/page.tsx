@@ -1,5 +1,6 @@
 ﻿import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { getTranslations } from 'next-intl/server';
 import { generateIcsLink } from '@fotosposi/site-builder';
 import type { SiteDraft } from '@fotosposi/site-builder';
 import WeddingFeedDemo from '@/components/wedding-feed-demo';
@@ -31,6 +32,7 @@ async function getDraft(draftId: string): Promise<{ draft: SiteDraft | null; tem
 export default async function PublicSitePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { draft, template } = await getDraft(id);
+  const t = await getTranslations('rsvp');
   if (!draft || !draft.published) {
     return (
       <html lang="it"><body style={{ margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', fontFamily: 'system-ui, sans-serif', background: '#f8f8f8', color: '#666' }}>
@@ -174,37 +176,46 @@ export default async function PublicSitePage({ params }: { params: Promise<{ id:
 
           {c.rsvpEnabled && (
             <div className="section" style={{ textAlign: 'center', background: p3, color: p2 }}>
-              <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>RSVP</h2>
-              <p style={{ fontSize: 14, lineHeight: 1.7, opacity: 0.8, marginBottom: 12 }}>{c.rsvpMessage || 'Conferma la tua presenza'}</p>
-              {c.rsvpDeadline && <p style={{ fontSize: 12, opacity: 0.5, marginBottom: 16 }}>Entro il {new Date(c.rsvpDeadline).toLocaleDateString('it-IT')}</p>}
+              <h2 style={{ fontSize: 20, color: p0, marginBottom: 16 }}>{t('section_title')}</h2>
+              <p style={{ fontSize: 14, lineHeight: 1.7, opacity: 0.8, marginBottom: 12 }}>{c.rsvpMessage || t('section_confirm')}</p>
+              {c.rsvpDeadline && <p style={{ fontSize: 12, opacity: 0.5, marginBottom: 16 }}>{t('deadline_prefix')} {new Date(c.rsvpDeadline).toLocaleDateString('it-IT')}</p>}
               <div style={{ maxWidth: 420, margin: '0 auto', textAlign: 'left' }}>
                 <RsvpFormClient
                   eventId={draft.event_id}
-                  submitLabel="Conferma presenza"
-                  successTitle="Grazie!"
-                  successMessage="Presenza confermata. A presto!"
-                  hostLabel="Il tuo nome"
-                  hostNamePlaceholder="Nome e cognome"
-                  addGuestLabel="Aggiungi accompagnatore"
-                  removeLabel="Rimuovi"
-                  guestNamePlaceholder="Nome e cognome"
-                  adultLabel="Adulto"
-                  minorLabel="Minore"
-                  ageLabel="Età"
-                  agePlaceholder="Es. 7"
-                  intolerancesLabel="Intolleranze alimentari"
-                  intolerancesHint="Seleziona tutte le intolleranze (per il menu)."
-                  otherLabel="Altro"
-                  otherPlaceholder="Scrivi la tua intolleranza"
-                  messageLabel="Messaggio (opzionale)"
-                  messagePlaceholder="Vuoi dire qualcosa agli sposi?"
-                  errorGeneric="Errore nell'invio. Riprova."
-                  submittingLabel="Invio in corso..."
+                  submitLabel={t('submit_label')}
+                  successTitle={t('success_title')}
+                  successMessage={t('success_message')}
+                  hostLabel={t('host_label')}
+                  hostNamePlaceholder={t('host_name_placeholder')}
+                  addGuestLabel={t('add_guest_label')}
+                  removeLabel={t('remove_label')}
+                  guestNamePlaceholder={t('guest_name_placeholder')}
+                  adultLabel={t('adult_label')}
+                  minorLabel={t('minor_label')}
+                  ageLabel={t('age_label')}
+                  agePlaceholder={t('age_placeholder')}
+                  intolerancesLabel={t('intolerances_label')}
+                  intolerancesHint={t('intolerances_hint')}
+                  otherLabel={t('other_label')}
+                  otherPlaceholder={t('other_placeholder')}
+                  messageLabel={t('message_label')}
+                  messagePlaceholder={t('message_placeholder')}
+                  dietLabel={t('diet_label')}
+                  dietHint={t('diet_hint')}
+                  dietOnnivoro={t('diet_onnivoro')}
+                  dietVegetariano={t('diet_vegetariano')}
+                  dietVegano={t('diet_vegano')}
+                  dietPescatariano={t('diet_pescatariano')}
+                  dietAltro={t('diet_altro')}
+                  errorGeneric={t('error_generic')}
+                  submittingLabel={t('submitting_label')}
+                  hostRequiredLabel={t('host_required')}
+                  guestLabel={t('guest_label')}
                 />
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 16 }}>
-                {c.rsvpEmail && <a href={`mailto:${c.rsvpEmail}`} style={{ padding: '12px 32px', borderRadius: 999, fontSize: 15, background: p0, color: p3, textDecoration: 'none', fontWeight: 600 }}>Contatta via email</a>}
-                {c.rsvpWhatsapp && <a href={`https://wa.me/${c.rsvpWhatsapp.replace(/[^0-9]/g, '')}`} target="_blank" style={{ padding: '12px 32px', borderRadius: 999, fontSize: 15, background: p0, color: p3, textDecoration: 'none', fontWeight: 600 }}>Scrivi su WhatsApp</a>}
+                {c.rsvpEmail && <a href={`mailto:${c.rsvpEmail}`} style={{ padding: '12px 32px', borderRadius: 999, fontSize: 15, background: p0, color: p3, textDecoration: 'none', fontWeight: 600 }}>{t('email_contact')}</a>}
+                {c.rsvpWhatsapp && <a href={`https://wa.me/${c.rsvpWhatsapp.replace(/[^0-9]/g, '')}`} target="_blank" style={{ padding: '12px 32px', borderRadius: 999, fontSize: 15, background: p0, color: p3, textDecoration: 'none', fontWeight: 600 }}>{t('whatsapp_contact')}</a>}
               </div>
             </div>
           )}
