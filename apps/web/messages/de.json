@@ -1020,5 +1020,40 @@
     "deadline_prefix": "Bis",
     "email_contact": "Per E-Mail kontaktieren",
     "whatsapp_contact": "Per WhatsApp schreiben"
+  },
+  "privacyPolicy": {
+    "title": "Datenschutzerklärung",
+    "subtitle": "Wie wir Ihre personenbezogenen Daten verarbeiten",
+    "updated": "Zuletzt aktualisiert: August 2026",
+    "sections": [
+      {
+        "h": "1. Verantwortlicher",
+        "p": "Verantwortlicher ist der Betreiber der Plattform Sposi.live / JustMarry.live, erreichbar unter info@sposi.live."
+      },
+      {
+        "h": "2. Erhobene Daten",
+        "p": "Wir erheben die Daten, die Sie uns direkt geben: Vor- und Nachname, E-Mail, Telefon, Veranstaltungsdaten (Ort, Datum, Gäste) sowie die Inhalte, die Sie hochladen (Fotos, Videos, Nachrichten). Wenn Sie sich mit Google oder Facebook anmelden, erhalten wir vom Anbieter Name, E-Mail und Profilbild."
+      },
+      {
+        "h": "3. Zwecke",
+        "p": "Die Daten werden verarbeitet, um Ihre Veranstaltung zu organisieren, die gemeinsame Galerie zu betreiben, Einladungen und Buchungen zu verwalten, Backups in der Cloud zu speichern und Ihnen Plattformmitteilungen zu senden."
+      },
+      {
+        "h": "4. Rechtsgrundlage",
+        "p": "Die Verarbeitung beruht auf Einwilligung (Art. 6.1.a DSGVO), auf der Erfüllung des Dienstleistungsvertrags (Art. 6.1.b) und auf geltenden gesetzlichen Pflichten."
+      },
+      {
+        "h": "5. Speicherdauer",
+        "p": "Die Daten werden für die Dauer des Dienstes und anschließend für den gesetzlich vorgeschriebenen Zeitraum gespeichert. Fotos und Videos der Veranstaltung bleiben verfügbar, solange die Veranstaltung aktiv ist."
+      },
+      {
+        "h": "6. Ihre Rechte",
+        "p": "Sie haben das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerspruch. Sie können diese Rechte per E-Mail an die oben genannte Adresse ausüben. Zudem können Sie sich bei der Datenschutzbehörde beschweren."
+      },
+      {
+        "h": "7. Kontakt",
+        "p": "Bei Fragen zur Datenverarbeitung schreiben Sie an info@sposi.live oder info@justmarry.live."
+      }
+    ]
   }
 }

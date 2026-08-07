@@ -1020,5 +1020,40 @@
     "deadline_prefix": "Antes del",
     "email_contact": "Contactar por correo",
     "whatsapp_contact": "Escribir por WhatsApp"
+  },
+  "privacyPolicy": {
+    "title": "Política de Privacidad",
+    "subtitle": "Cómo tratamos tus datos personales",
+    "updated": "Última actualización: agosto de 2026",
+    "sections": [
+      {
+        "h": "1. Responsable del tratamiento",
+        "p": "El responsable es el operador de la plataforma Sposi.live / JustMarry.live, al que puedes escribir en info@sposi.live."
+      },
+      {
+        "h": "2. Datos que recopilamos",
+        "p": "Recopilamos los datos que nos facilitas directamente: nombre, apellidos, correo electrónico, teléfono, datos del evento (lugar, fecha, invitados) y los contenidos que subes (fotos, vídeos, mensajes). Cuando inicias sesión con Google o Facebook, recibimos del proveedor tu nombre, correo y foto de perfil."
+      },
+      {
+        "h": "3. Finalidades",
+        "p": "Tratamos los datos para organizar tu evento, gestionar la galería compartida, gestionar invitaciones y reservas, guardar las copias de seguridad en servicios en la nube y enviarte comunicaciones de la plataforma."
+      },
+      {
+        "h": "4. Base jurídica",
+        "p": "El tratamiento se basa en el consentimiento (art. 6.1.a RGPD), en la ejecución del contrato de servicio (art. 6.1.b) y en las obligaciones legales aplicables."
+      },
+      {
+        "h": "5. Conservación de los datos",
+        "p": "Los datos se conservan durante la vigencia del servicio y, posteriormente, durante el tiempo exigido por las obligaciones fiscales y legales. Las fotos y vídeos del evento permanecen disponibles mientras el evento esté activo."
+      },
+      {
+        "h": "6. Tus derechos",
+        "p": "Tienes derecho de acceso, rectificación, supresión, limitación, portabilidad y oposición al tratamiento de tus datos. Puedes ejercerlos escribiendo a la dirección indicada. También tienes derecho a presentar una reclamación ante la autoridad de protección de datos."
+      },
+      {
+        "h": "7. Contacto",
+        "p": "Para cualquier duda sobre el tratamiento de datos, escribe a info@sposi.live o info@justmarry.live."
+      }
+    ]
   }
 }

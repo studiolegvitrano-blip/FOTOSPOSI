@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import { headers } from 'next/headers';
+import Link from 'next/link';
 
 /**
  * Footer globale: appare in tutte le pagine (montato in root layout).
@@ -28,7 +29,11 @@ export default async function SiteFooter() {
           {brand} — 2026 · {t('footer_tagline')} ·{' '}
           <a href={`mailto:${supportEmail}`} className="hover:text-brand transition-colors">
             {supportEmail}
-          </a>
+          </a>{' '}
+          ·{' '}
+          <Link href="/privacy" className="hover:text-brand transition-colors">
+            Privacy
+          </Link>
         </span>
       </div>
       {/* Loghi social: FB, Instagram, TikTok, X — handle IG = sposilive */}

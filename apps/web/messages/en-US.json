@@ -1020,5 +1020,40 @@
     "deadline_prefix": "By",
     "email_contact": "Email us",
     "whatsapp_contact": "Message us on WhatsApp"
+  },
+  "privacyPolicy": {
+    "title": "Privacy Policy",
+    "subtitle": "How we process your personal data",
+    "updated": "Last updated: August 2026",
+    "sections": [
+      {
+        "h": "1. Data controller",
+        "p": "The controller is the operator of the Sposi.live / JustMarry.live platform, reachable at info@sposi.live."
+      },
+      {
+        "h": "2. Data we collect",
+        "p": "We collect the data you give us directly: first and last name, email, phone, event details (venue, date, guests) and the content you upload (photos, videos, messages). When you sign in with Google or Facebook, we receive your name, email and profile picture from the provider."
+      },
+      {
+        "h": "3. Purposes",
+        "p": "We process data to organise your event, run the shared gallery, manage invitations and bookings, keep cloud backups and send you platform communications."
+      },
+      {
+        "h": "4. Legal basis",
+        "p": "Processing is based on consent (GDPR Art. 6.1.a), performance of the service contract (Art. 6.1.b) and applicable legal obligations."
+      },
+      {
+        "h": "5. Data retention",
+        "p": "Data is kept for the duration of the service and afterwards for the period required by tax and legal obligations. Event photos and videos remain available while the event is active."
+      },
+      {
+        "h": "6. Your rights",
+        "p": "You have the right to access, rectify, erase, restrict, port and object to the processing of your data. You can exercise these rights by writing to the email address above. You may also lodge a complaint with the data protection authority."
+      },
+      {
+        "h": "7. Contact",
+        "p": "For any question about data processing, write to info@sposi.live or info@justmarry.live."
+      }
+    ]
   }
 }
