@@ -5,7 +5,7 @@ import type { AuthToken } from './index';
 // arrivava prima di dover fare login) — senza questo, un ospite che clicca "Carica" da un QR
 // code, si registra/logga, e finisce sempre su /dashboard invece che sull'evento a cui era stato
 // invitato ("perde l'invito").
-export async function signInWithOAuth(provider: 'google' | 'facebook' | 'apple', redirectPath?: string) {
+export async function signInWithOAuth(provider: 'google' | 'facebook', redirectPath?: string) {
   const supabase = createClient();
   const callback = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirectPath || '/dashboard')}`;
   const { data, error } = await supabase.auth.signInWithOAuth({

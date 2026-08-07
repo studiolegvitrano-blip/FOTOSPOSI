@@ -1,4 +1,4 @@
-// Loghi ufficiali Google / Facebook / Apple per i bottoni "Continua con..." di login/signup.
+// Loghi ufficiali Google / Facebook per i bottoni "Continua con..." di login/signup.
 export function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
@@ -28,17 +28,6 @@ export function FacebookIcon({ className }: { className?: string }) {
       <path
         fill="#1877F2"
         d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07c0 6.02 4.39 11.01 10.13 11.93v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.7 4.53-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.95.93-1.95 1.89v2.26h3.32l-.53 3.49h-2.79v8.44C19.61 23.08 24 18.09 24 12.07z"
-      />
-    </svg>
-  );
-}
-
-export function AppleIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M16.36 1.5c.09 1.13-.32 2.24-1.02 3.06-.72.83-1.85 1.47-2.97 1.38-.12-1.1.34-2.25 1.03-3.03.76-.87 2.03-1.5 2.96-1.41zM20.5 17.34c-.55 1.27-.81 1.84-1.52 2.96-.99 1.56-2.38 3.51-4.11 3.53-1.53.02-1.92-1.01-4-1s-2.52.98-4.05.96C4.9 23.77 3.6 21.99 2.6 20.43.75 17.6-.4 12.24 1.5 8.63c.94-1.79 2.63-2.93 4.46-2.95 1.5-.03 2.9 1.01 3.82 1.01.91 0 2.62-1.25 4.41-1.07.75.03 2.86.31 4.21 2.31-.11.07-2.51 1.47-2.48 4.38.03 3.48 3.06 4.64 3.08 4.65-.03.08-.48 1.65-1.6 3.38z"
       />
     </svg>
   );
