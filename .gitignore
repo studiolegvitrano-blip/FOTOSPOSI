@@ -24,3 +24,11 @@ PROMPT-PROSSIMA-CHAT.md
 .vercel
 
 vitest-out.jpg
+
+# screenshot artefatti sessioni (Playwright, debugging locale)
+*-500.png
+ceo-login-after.png
+admin-system-*.png
+countdown-overlay-*.png
+guest-*.png
+vitest-out.*
