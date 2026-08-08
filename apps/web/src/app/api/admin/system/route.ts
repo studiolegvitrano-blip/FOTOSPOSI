@@ -28,14 +28,10 @@ export async function GET(_req: NextRequest) {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
     // 1) Stato code di processing
-    const [{ data: queueRows }, { data: dlqRows }, { data: watermarkMissing }, { data: dlqUnrecoverableRows }] = await Promise.all([
+    const [{ data: queueRows }, { data: dlqRows }, { data: watermarkMissing }] = await Promise.all([
       svc.from('upload_queue').select('status'),
       svc.from('upload_queue_dead_letter').select('id, event_id, file_name, r2_key, last_failure_class, dlq_retry_count, moved_to_dlq_at'),
       svc.from('media_uploads').select('id').eq('watermark_missing', true).limit(1000),
-      // DLQ items "impossibili": r2_key NULL (file mai arrivato su R2). Non recuperabili,
-      // il cron dlq-retry li skippa con il guard filter 'r2_key' not.is null. Restano in DLQ
-      // come storico ma non incrementano dlq_retry_count → metrica diagnostica separata.
-      svc.from('upload_queue_dead_letter').select('id').is('r2_key', null).limit(1000),
     ]);
 
     const queueByStatus: Record<string, number> = { pending: 0, processing: 0, failed: 0, synced: 0 };
@@ -105,12 +101,14 @@ export async function GET(_req: NextRequest) {
 
     // 5) DLQ: totali + per classe + recenti
     const dlqByClass: Record<string, number> = {};
-    for (const d of (dlqRows ?? []) as Array<{ last_failure_class: string | null }>) {
+    for (const d of (dlqRows ?? []) as Array<{ last_failure_class: string | null; r2_key?: string | null }>) {
       const cls = d.last_failure_class ?? 'unknown';
       dlqByClass[cls] = (dlqByClass[cls] ?? 0) + 1;
     }
     const dlqRecent = (dlqRows ?? []).slice(0, 20);
-    const dlqUnrecoverable = dlqUnrecoverableRows?.length ?? 0;
+    // DLQ items "impossibili": r2_key NULL (file mai arrivato su R2). Non recuperabili,
+    // il cron dlq-retry li skippa (guard .filter('r2_key','not.is',null)).
+    const dlqUnrecoverable = (dlqRows ?? []).filter((r) => r.r2_key == null).length;
 
     return NextResponse.json({
       queue: queueByStatus,
@@ -138,6 +136,8 @@ export async function GET(_req: NextRequest) {
       generatedAt: new Date().toISOString(),
     });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Errore interno' }, { status: 500 });
+    console.error('[/api/admin/system] crash:', e);
+    const err = e instanceof Error ? e : new Error(String(e));
+    return NextResponse.json({ error: err.message, stack: err.stack, name: err.name }, { status: 500 });
   }
 }
