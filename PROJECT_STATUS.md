@@ -39,9 +39,8 @@ apps/web/src/app/api/ceo/logout/route.ts       | redirect 303 a /ceo/login invec
 1. **Verifica in produzione**: navigare su `https://www.sposi.live/admin/system` con cookie CEO valido → deve renderizzare le 6 card KPI (67 pending, 0 processing, 4 failed, 153 synced, 0 DLQ, 1 watermark missing), tabella cron (3 job), tabella fallimenti per classe (invalid_image:39, drive_sync_failed:4, detect_watermark_missing:3), eventi top (Agostino Spera & Danila Villa 44, Marinella e Salvo 2), DLQ vuota (0 item post-cleanup), niente alert unrecoverable.
 2. **Verifica logout**: click "Esci" → cookie CEO cancellato → redirect a `/ceo/login` → navigando a `/admin/system` di nuovo → redirect al login (sessione invalidata).
 3. **(Opzionale) Estendere lo stesso pattern alle altre `/admin/*`**: 
-   - `apps/web/src/app/admin/page.tsx` — usa `createClient()` client-side (non CEO). Probabilmente rotto per CEO.
-   - `apps/web/src/app/admin/marketplace/page.tsx` —う.
-   - `apps/web/src/app/admin/affiliates/page.tsx`, `/admin/analytics/page.tsx`, `/admin/coupons/page.tsx`, `/admin/leads/page.tsx` — verificarle tutte. Le API routes corrispondenti vanno allineate a gate CEO (come già fatto per `/api/admin/system`).
+   - `apps/web/src/app/admin/page.tsx` ✅ convertito in Server Component + nuova route API `/api/admin/overview`.
+   - `apps/web/src/app/admin/affiliates/page.tsx` (~214 righe), `/admin/analytics/page.tsx` (~271 righe), `/admin/coupons/page.tsx` (~128 righe), `/admin/leads/page.tsx` (~111 righe), `/admin/marketplace/page.tsx` (~371 righe con azioni POST approveSupplier/deleteSupplier) — verificarle tutte. Le API routes corrispondenti vanno allineate a gate CEO (come già fatto per `/api/admin/system` e `/api/admin/overview`).
    - Sono tutte `'use client'` con `supabase.auth.getUser()` → likely rotte con gate CEO. Pattern da applicare: converti in Server Component + cookies() + ceoTokenFromCookies + verifyCeoSession + fetch interna.
 4. **Cleanup DB rimanente** (vedi PROJECT_STATUS TODO opzionali):
    - 4 item `upload_queue.status='failed'`: verificare retry_count.
