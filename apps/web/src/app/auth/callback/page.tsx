@@ -15,22 +15,23 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const handleHash = async () => {
       const { createClient } = await import('@fotosposi/core');
+      const { resolveOAuthSession } = await import('@/lib/oauth-callback');
       const supabase = createClient();
 
       const code = searchParams.get('code');
-      if (code) {
-        const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
-        if (exchangeErr) {
-          console.error('[auth/callback] exchangeCodeForSession fallito:', exchangeErr);
-          // Se lo scambio fallisce (es. code reuse, PKCE verifier perso), torniamo al login
-          // invece di restare bloccati a "reindirizzamento" in eterno — sintomo tipico
-          // dell'utente che chiuso/riaperto il tab durante l'OAuth (code_verifier è in
-          // sessionStorage e si perde). Dare feedback visibile è meglio di un loop morto.
-          router.replace('/login?error=oauth_failed');
-          return;
-        }
-      } else if (window.location.hash) {
-        await supabase.auth.getSession();
+      const { session, error: oauthErr } = await resolveOAuthSession(supabase.auth, {
+        code,
+        hash: typeof window !== 'undefined' ? window.location.hash : '',
+      });
+
+      if (oauthErr) {
+        console.error('[auth/callback] OAuth resolve fallito:', oauthErr);
+        // Se lo scambio fallisce (es. code reuse, PKCE verifier perso), torniamo al login
+        // invece di restare bloccati a "reindirizzamento" in eterno — sintomo tipico
+        // dell'utente che chiuso/riaperto il tab durante l'OAuth (code_verifier è in
+        // sessionStorage e si perde). Dare feedback visibile è meglio di un loop morto.
+        router.replace('/login?error=oauth_failed');
+        return;
       }
 
       const { data: { user } } = await supabase.auth.getUser();
