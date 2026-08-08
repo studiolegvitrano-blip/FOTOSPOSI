@@ -1,5 +1,117 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 08/08/2026 — Dashboard admin/system: cleanup DLQ + guard r2_key NULL + fix auth CEO (DA COMPLETARE prossima chat)
+
+### Contesto
+Verifica della dashboard admin/system in produzione. L'obiettivo era validare la telemetry `upload_processing_failure` dopo i fix precedenti (migration 00043, route system, dashboard) e accertarsi che le code di processing fossero pulite.
+
+### Lavoro fatto
+
+**1. Verifica stato reale DB produzione (prima del cleanup)**
+- `upload_queue`: 224 item (67 pending, 4 failed, 153 synced, 0 processing)
+- `upload_queue_dead_letter`: **39 item, tutti `last_failure_class='invalid_image'`** con `r2_key IS NULL` (file mai arrivato su R2)
+- `media_uploads.watermark_missing=true`: 1 (era 42 → quasi tutto risolto)
+- `system_health_log` telemetry `upload_processing_failure`: **46 righe ultimi 7gg** ✅ (telemetry FUNZIONA dopo migration 00043)
+- Cron: backup ✅ ok, maintenance ✅ ok, dlq-retry ✅ ok (25 item ripescati ogni 6h)
+- Bug critico identificato: il cron `dlq-retry` ripesca item DLQ ogni 6h, ma i 39 item hanno `r2_key=NULL` → tornano in DLQ in **loop infinito** → spreco cron run + DB che cresce. 7 item già a `dlq_retry_count=5` (maxed_out, non più ripescati).
+
+**2. Cleanup DB** (azione sicura)
+- `DELETE FROM upload_queue_dead_letter WHERE r2_key IS NULL` → rimosse tutte le 39 righe.
+- Eseguibile in autonomia: i file non sono mai esistiti su R2 (r2_key mancante = "invalid_image"), non c'è nulla da recuperare. Verranno re-inserite solo se un nuovo upload dello stesso file fallisce di nuovo (nuovo record).
+- Post-cleanup: DLQ = 0 item.
+
+**3. Guard nel cron dlq-retry** (`apps/web/src/app/api/cron/dlq-retry/route.ts`)
+- Aggiunto `.filter('r2_key', 'not.is', null)` alla query di lettura DLQ.
+- Rationale: skippa item con `r2_key NULL`. Sono "invalid_image" dove il file NON è mai arrivato su R2 (cliente ha chiuso il tab prima della PUT, MIME mismatch, ecc.). Non c'è nulla da recuperare: re-queue sarebbero solo re-DLQ in loop infinito. Restano in DLQ come storico, `dlq_retry_count` non incrementato (max_count ferma il cron).
+- **Bug sintassi**: `.not('r2_key', 'is', null)` NON funziona con supabase-js v2.110 → errore `b is not a function`. Sostituito con `.filter('r2_key', 'not.is', null)` (sintassi PostgREST nativa).
+
+**4. Dashboard admin/system: nuova metrica "unrecoverable"**
+- `apps/web/src/app/api/admin/system/route.ts`: aggiunta query `svc.from('upload_queue_dead_letter').select('id').is('r2_key', null).limit(1000)` → ritorna `deadLetter.unrecoverable` count.
+- `apps/web/src/app/admin/system/page.tsx`: alert ambra visivo quando `dlqUnrecoverable > 0` ("{N} item in DLQ non recuperabili — r2_key mancante, il file non è mai arrivato su R2").
+
+**5. Fix auth route /api/admin/system** (regresso dal commit `660700e` del 03/08)
+- Root cause: la route usava `supabase.auth.getUser()` (richiede sessione utente sposo Supabase), ma il middleware `660700e` ha spostato `/admin/*` sotto il gate CEO (cookie HMAC). L'utente CEO NON ha sessione utente sposo → `getUser()` ritornava null → 401 → error catch restituiva 500.
+- Fix: route ora usa `ceoTokenFromCookies(req.headers.get('cookie')) + verifyCeoSession(token)`, stesso pattern di `/api/ceo/overview`. Niente più `getUser()` nè `createServerSideClient`.
+- **Verifica API diretta**: `curl /api/admin/system` con cookie CEO → 200 con payload JSON completo (queue, deadLetter, watermarkMissing, failures, lastJobs) ✅
+
+### Stato attuale (DA FIXARE prossima chat)
+
+**Bug residuo**: la pagina `/admin/system` (page.tsx) continua a mostrare **500 INTERNAL_SERVER_ERROR** nonostante l'API sia 200 OK. Verificato empiricamente con Playwright:
+- `fetch('/api/admin/system')` from page context → **200** con payload reale (vedi sotto).
+- `page.goto('https://www.sposi.live/admin/system')` → **500 INTERNAL_SERVER_ERROR**.
+
+**Root cause ipotizzata (da confermare)**: la pagina `'use client'` `admin/system/page.tsx` riga 82 fa `supabase.auth.getUser()` → user null (CEO non ha sessione Supabase utente) → `router.push('/login?redirect=...')`. Ma il 500 (non il redirect) indica crash server-side durante SSR/prerender della `'use client'` page. Probabilmente legato a `createClient()` (client-side Supabase) che tenta `getUser()` server-side durante il render iniziale Next.js App Router. Da investigare:
+  1. Possibile fix: anche la pagina client deve rispettare il gate CEO (niente `supabase.auth.getUser()`, niente `setUser`, niente `handleLogout` tramite `signOut` Supabase — solo cookie CEO).
+  2. In alternativa: spostare la pagina sotto `apps/web/src/app/admin/system/page.tsx` come server component che fa il fetch direttamente lato server (no client-side auth) — ma `cookies()` server-side è OK per CEO token (vedi `ceoTokenFromCookies`).
+  3. O ancora: la pagina `/admin/system` potrebbe essere sostituita con una sezione dentro `/ceo` stesso (stesso auth CEO, già funzionante).
+
+**Payload API 200 reale** (vedi `.playwright-mcp/console-2026-08-08T14-43-25-510Z.log` per dump completo):
+- queue: { pending:67, processing:0, failed:4, synced:153 }
+- deadLetter: { total:0, unrecoverable:0 } ✅ (post-cleanup)
+- watermarkMissing: 1
+- failures: total 46 (invalid_image:39, drive_sync_failed:4, detect_watermark_missing:3)
+- topEvents: ee2cc954 (Agostino Spera & Danila Villa) 44 fallimenti, d88403f7 (Marinella e Salvo) 2
+- lastJobs: backup ok, maintenance ok, dlq-retry ok
+
+### File modificati (pushati)
+```
+apps/web/src/app/api/cron/dlq-retry/route.ts        | guard .filter('r2_key','not.is',null) skippa invalid_image
+apps/web/src/app/api/admin/system/route.ts          | auth via cookie CEO (non più getUser() Supabase) + query unrecoverable
+apps/web/src/app/admin/system/page.tsx              | metrica unrecoverable + alert ambra
+.gitignore                                          | +pattern screenshot artefatti (*-500.png, ceo-login-after.png, admin-system-*.png, countdown-overlay-*.png, guest-*.png, vitest-out.*)
+AGENTS.md                                           | regola OAuth callback double-exchange detectSessionInUrl (commit 07e5efb)
+```
+
+### Commit (7 pushati)
+- `07e5efb` docs(agents): regola OAuth callback double-exchange @supabase/ssr detectSessionInUrl
+- `41c67f0` fix(oauth): doppio exchange @supabase/ssr → AuthPKCECodeVerifierMissingError rimbalzava al login anche con sessione valida
+- `a96137a` fix(dlq): guard r2_key NULL + cleanup 39 item irrecuperabili + dashboard unrecoverable metric
+- `243c27d` fix(dashboard): syntax PostgREST filter .is/.filter syntax (.not() broken in supabase-js v2.110)
+- `1c55675` chore: cleanup accidental screenshot PNGs + gitignore pattern
+- `5d38cc4` chore: remove stray .gitignore.tmp
+- `1dade05` debug(admin/system): log stack trace sul 500 + rimuovi query .is() problematica (calcolo unrecoverable lato client)
+- `d566c25` fix(admin/system): auth via cookie CEO invece di getUser() Supabase — gate CEO non ha sessione utente sposo (regresso dal commit 660700e)
+
+### Verifiche
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori
+- Test: `npx vitest run` → **478/478 verdi** (40 file)
+- API `/api/admin/system` produzione: **200** ✅ con cookie CEO
+- Pagina `/admin/system` produzione: **500** ❌ (bug residuo da fixare)
+
+### TODO per la prossima chat (URGENTE)
+
+1. **Fixare il 500 di `/admin/system` page**:
+   - Verificare con Playwright hard reload + leggere il vercel log dell'errore 500 (azione `x-vercel-id` header).
+   - Possibile causa: la page `'use client'` `admin/system/page.tsx` riga 82 fa `supabase.auth.getUser()` (richiede sessione sposo Supabase, NON ce l'ha chi entra via CEO). Modificare la logica: droppare `supabase.auth.getUser()`, `setUser`, `handleLogout` (che usa `signOut()` Supabase) — la pagina è protetta da gate CEO, quindi l'auth check client è inutile. Sostituire con:
+     - Render condizionale: se `data === null && loading === true` mostra loading; se `error` mostra errore; else mostra dashboard.
+     - `handleLogout`: redirect a `/ceo/logout` (route esistente POST /api/ceo/logout che cancella cookie CEO) invece di `signOut()`.
+   - In alternativa più pulita: trasformare in **Server Component** che legge `ceoTokenFromCookies(cookies())` lato server, fa fetch diretta al DB con `createServiceClient()`, renderizza la dashboard server-side. Niente client-side auth del tutto.
+
+2. **Dopo il fix pagina**:
+   - Verificare in produzione `/admin/system` renderizzi correttamente le 6 card KPI (pending/processing/failed/synced/dlq/watermark).
+   - Verificare tabella "Ultime esecuzioni cron" (backup/maintenance/dlq-retry tutte badge verde "ok").
+   - Verificare tabella "Fallimenti processing" con byClass (invalid_image:39, drive_sync_failed:4, detect_watermark_missing:3).
+   - Verificare tabella "Eventi con più fallimenti" (Agostino Spera & Danila Villa 44, Marinella e Salvo 2).
+   - Verificare che la DLQ card mostri "Nessun item in dead letter" (post-cleanup).
+   - Senza alert ambra unrecoverable (DLQ vuota = 0 unrecoverable).
+
+3. **(Opzionale) Aggiornare le altre route admin/*`** se hanno lo stesso bug `supabase.auth.getUser` con gate CEO:
+   - `apps/web/src/app/api/admin/marketplace/route.ts` — verificare.
+   - `apps/web/src/app/api/marketplace/*` — verificare se richiedono auth sposo o CEO.
+   - Le pagine `/admin/*` (non API) sono protette dal middleware via CEO gate, ma se usano `signOut()` Supabase client-side (come faceva admin/system), vanno allineate allo stesso pattern (logout CEO, niente signOut Supabase).
+
+4. **(Opzionale) Cleanup DB rimanente**:
+   - 4 item `upload_queue.status='failed'` (in retry): verificare con `SELECT id, file_name, retry_count, error FROM upload_queue WHERE status='failed'`. Se retry_count >= 7 e irrecuperabili, spostare in DLQ con `moveToDeadLetter` virtuale via SQL o lasciare che il cron maintenance li riprenda.
+   - 67 item `upload_queue.status='pending'`: vecchi item non ancora processati? Verificare `created_at` — se risalgono a prima del fix 660700e possono essere stuck. In tal caso, INSERT in upload_queue_dead_letter + DELETE da upload_queue (cleanup manuale via SQL).
+   - 1 foto `watermark_missing=true`: verificare evento e lanciare `/api/r2/repair-watermark` con eventId.
+
+### Note tecniche
+- **Bug `.not('col','is',null)` in supabase-js v2.110**: la funzione `.not('col', 'is', null)` NON funziona → errore `b is not a function`. Workaround: `.filter('col', 'not.is', null)` (sintassi PostgREST nativa, supportata). Documentare in AGENTS.md se si usa ancora.
+- **Gate CEO vs gate sposo su /admin/***: dal commit `660700e` (03/08), `/admin/*` richiede cookie CEO (HMAC, password `CEO_PASSWORD` env). PRIMA di quel commit, `/admin/*` era auth-gated da sessione sposo Supabase (`protectedPaths`) + gate client-side `admin-protected.tsx`. La dashboard admin/system è stata creata il 02/08 (commit FIX 7) quando ancora usava auth sposo. Con la migrazione a CEO gate, la route API è stata allineata ma la pagina client NO → bug latente da 5 giorni. Pattern da applicare a tutte le pagine /admin/* vecchie.
+- **DLQ loop infinito**: cron `dlq-retry` ogni 6h ripescava 25 item DLQ, ma tutti avevano `r2_key=NULL` → re-queue → re-DLQ in loop. Con il guard `.filter('r2_key','not.is',null)` il cron ora skippa questi item. Restano in DLQ come storico, ma il `dlq_retry_count` non incrementa → `lt('dlq_retry_count', 5)` è sempre true → il filtro r2_key è l'unica via di uscita. Se in futuro si vuole proprio DELETE degli item unrecoverable, aggiungere un cron `dlq-cleanup` che fa `DELETE FROM upload_queue_dead_letter WHERE r2_key IS NULL AND dlq_retry_count >= 5`. Per ora il guard blocca il loop, sufficiente.
+
+---
+
 ## Sessione 07/08/2026 (continua 2) — FIX double-exchange OAuth (Facebook login rimbalzava a /login NONOSTANTE sessione nei cookie) — DA COMPLETARE
 
 ### Contesto
