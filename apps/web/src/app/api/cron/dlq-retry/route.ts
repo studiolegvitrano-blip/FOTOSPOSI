@@ -41,6 +41,11 @@ export async function GET(req: NextRequest) {
       .select('*')
       .or(`dlq_next_retry_at.is.null,dlq_next_retry_at.lte.${nowIso}`)
       .lt('dlq_retry_count', DLQ_MAX_RETRY)
+      // GUARD: skippa item con r2_key NULL. Sono "invalid_image" dove il file NON è mai
+      // arrivato su R2 (cliente ha chiuso il tab prima della PUT, MIME mismatch, ecc.).
+      // Non c'è nulla da recuperare: re-queue sarebbero solo re-DLQ in loop infinito.
+      // Restano in DLQ come storico, dlq_retry_count non incrementato (max_count ferma il cron).
+      .not('r2_key', 'is', null)
       .order('moved_to_dlq_at', { ascending: true })
       .limit(DLQ_BATCH_LIMIT);
 

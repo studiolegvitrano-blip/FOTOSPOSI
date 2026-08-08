@@ -16,6 +16,7 @@ interface SystemPayload {
     total: number;
     byClass: Record<string, number>;
     recent: Array<{ id: string; file_name?: string | null; last_failure_class?: string | null; dlq_retry_count?: number; moved_to_dlq_at?: string }>;
+    unrecoverable: number;
   };
   watermarkMissing: number;
   failures: {
@@ -116,6 +117,8 @@ export default function AdminSystemPage() {
   const failed = data?.queue?.failed ?? 0;
   const synced = data?.queue?.synced ?? 0;
   const dlqTotal = data?.deadLetter?.total ?? 0;
+  const dlqUnrecoverable = data?.deadLetter?.unrecoverable ?? 0;
+  const dlqRecoverable = dlqTotal - dlqUnrecoverable;
   const watermarkMissing = data?.watermarkMissing ?? 0;
   const failureTotal = data?.failures?.total ?? 0;
 
@@ -143,6 +146,15 @@ export default function AdminSystemPage() {
         <Card><CardHeader><CardTitle className={`text-3xl text-center ${dlqTotal > 0 ? 'text-red-600' : 'text-brand'}`}>{dlqTotal}</CardTitle></CardHeader><CardContent className="text-center text-text-muted">Dead letter</CardContent></Card>
         <Card><CardHeader><CardTitle className={`text-3xl text-center ${watermarkMissing > 0 ? 'text-amber-500' : 'text-brand'}`}>{watermarkMissing}</CardTitle></CardHeader><CardContent className="text-center text-text-muted">Foto no watermark</CardContent></Card>
       </div>
+
+      {dlqUnrecoverable > 0 && (
+        <Card className="border-amber-500/50 bg-amber-50/30">
+          <CardContent className="py-3 text-sm">
+            <strong className="text-amber-700">{dlqUnrecoverable} item in DLQ non recuperabili</strong>
+            <span className="text-text-muted"> (r2_key mancante: il file non è mai arrivato su R2). Il cron dlq-retry li skippa automaticamente. Su {dlqTotal} totali DLQ, {dlqRecoverable} sono ancora in retry.</span>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
