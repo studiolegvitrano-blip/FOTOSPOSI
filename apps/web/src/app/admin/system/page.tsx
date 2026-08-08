@@ -1,13 +1,13 @@
-'use client';
-
-import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { createClient, signOut } from '@fotosposi/core';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { ceoTokenFromCookies, verifyCeoSession } from '@/lib/ceo-auth';
+
+export const dynamic = 'force-dynamic';
 
 interface SystemPayload {
   queue: Record<string, number>;
@@ -57,42 +57,36 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant={variant as any}>{status}</Badge>;
 }
 
-export default function AdminSystemPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [data, setData] = useState<SystemPayload | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-
-  const load = useCallback(async () => {
-    const res = await fetch('/api/admin/system', { cache: 'no-store' });
+async function loadSystemData(cookieHeader: string): Promise<{ data?: SystemPayload; error?: string }> {
+  const base = process.env.NEXT_PUBLIC_VERCEL_URL
+    ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+    : 'http://localhost:3000';
+  try {
+    const res = await fetch(`${base}/api/admin/system`, {
+      headers: { cookie: cookieHeader },
+      cache: 'no-store',
+    });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body?.error ?? `Errore ${res.status}`);
-      return;
+      return { error: body?.error ?? `Errore ${res.status}` };
     }
-    const json = await res.json();
-    setData(json);
-    setError(null);
-    setLastRefresh(new Date());
-  }, []);
+    const json = (await res.json()) as SystemPayload;
+    return { data: json };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Errore rete' };
+  }
+}
 
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user: u } }) => {
-      if (!u) { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
-      setUser(u);
-      load().then(() => setLoading(false));
-    });
-  }, [router, load]);
+export default async function AdminSystemPage() {
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+  const token = ceoTokenFromCookies(cookieHeader);
 
-  const handleLogout = async () => {
-    await signOut();
-    router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
-  };
+  if (!verifyCeoSession(token)) {
+    redirect('/ceo/login?redirect=/admin/system');
+  }
 
-  if (loading) return <p className="text-center mt-8">Caricamento...</p>;
+  const { data, error } = await loadSystemData(cookieHeader);
 
   if (error) {
     return (
@@ -104,14 +98,13 @@ export default function AdminSystemPage() {
         <Card>
           <CardContent className="py-8 text-center">
             <p className="text-destructive font-medium">{error}</p>
-            <Button className="mt-4" variant="outline" onClick={() => load()}>Riprova</Button>
+            <Button className="mt-4" variant="outline" asChild><Link href="/admin/system">Riprova</Link></Button>
           </CardContent>
         </Card>
       </main>
     );
   }
 
-  const queueTotal = data?.queueTotal ?? 0;
   const pending = data?.queue?.pending ?? 0;
   const processing = data?.queue?.processing ?? 0;
   const failed = data?.queue?.failed ?? 0;
@@ -121,6 +114,7 @@ export default function AdminSystemPage() {
   const dlqRecoverable = dlqTotal - dlqUnrecoverable;
   const watermarkMissing = data?.watermarkMissing ?? 0;
   const failureTotal = data?.failures?.total ?? 0;
+  const generatedAt = data?.generatedAt ? formatDate(data.generatedAt) : '—';
 
   return (
     <main className="max-w-6xl mx-auto p-4 space-y-6">
@@ -128,13 +122,15 @@ export default function AdminSystemPage() {
         <div>
           <h1 className="text-2xl font-bold">Stato di sistema</h1>
           <p className="text-text-muted text-sm">
-            Telemetry, code di processing e cron. {lastRefresh && <>Aggiornato: {lastRefresh.toLocaleTimeString('it-IT')}</>}
+            Telemetry, code di processing e cron. Generato: {generatedAt}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => load()}>Aggiorna</Button>
+          <Button variant="outline" asChild><Link href="/admin/system">Aggiorna</Link></Button>
           <Button variant="outline" asChild><Link href="/admin">Admin</Link></Button>
-          <Button variant="ghost" onClick={handleLogout}>Esci</Button>
+          <form action="/api/ceo/logout" method="POST" style={{ display: 'inline' }}>
+            <Button type="submit" variant="ghost">Esci</Button>
+          </form>
         </div>
       </div>
 

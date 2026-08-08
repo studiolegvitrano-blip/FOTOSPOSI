@@ -1,5 +1,60 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 08/08/2026 (continua) — FIX 500 /admin/system: Server Component + CEO auth client-side → server-side
+
+### Root cause confermata e fixata
+La pagina `/admin/system` (`apps/web/src/app/admin/system/page.tsx`) era `'use client'` con `supabase.auth.getUser()`:
+- `/admin/*` dal commit `660700e` (03/08/2026) è protetto da gate CEO (cookie HMAC `CEO_PASSWORD`)
+- L'utente CEO NON ha sessione sposo Supabase → `getUser()` ritornava null → `router.push('/login?redirect=...')`
+- Peggio: a seconda del timing del client-hydration vs middleware, la pagina crashava durante il render iniziale → 500 INTERNAL_SERVER_ERROR (non solo redirect al login)
+
+### Fix applicato — pattern Server Component + CEO gate
+- `apps/web/src/app/admin/system/page.tsx` convertito da `'use client'` a **Server Component**.
+- Auth: legge `cookies()` via `next/headers`, estrae il token CEO con `ceoTokenFromCookies`, verifica con `verifyCeoSession`. Se invalido/assente → `redirect('/ceo/login?redirect=/admin/system')` (hard redirect server-side, niente flash client).
+- Fetch: la pagina chiama la route API `/api/admin/system` internamente passando il cookie header della request. La route usa lo stesso `ceoTokenFromCookies` + `verifyCeoSession` → auth allineato API + pagina.
+- UI: tutti i pezzi visuali invariati (6 card KPI, alert unrecoverable, tabella cron, tabella fallimenti per classe, top eventi, DLQ, recenti dettaglio). "Aggiorna" = `<Link href="/admin/system">` (hard navigation → server-side refresh).
+- Logout: form POST `<form action="/api/ceo/logout" method="POST">` invece di `signOut()` Supabase. Niente più `createClient()` nè `useRouter` nè `signOut` → niente auth sponsor client rotta.
+
+### Fix collaterale — `/api/ceo/logout` ora fa redirect
+- `apps/web/src/app/api/ceo/logout/route.ts`: prima rispondeva solo `{ok: true}` JSON (la pagina client doveva gestire il redirect). Ora fa `NextResponse.redirect('/ceo/login', 303)` dopo aver cancellato il cookie. Compatibile con il form POST HTML nativo (303 See Other → GET al login).
+- Pattern coerente con `/api/ceo/login` (POST → redirect a `/ceo`).
+
+### Verifiche
+- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
+- Test: `npx vitest run` → **478/478 verdi** (40 file, invariati).
+- Build: `npx next build` → OK. `/admin/system` ora pesa **164 B** con **107 kB** First Load (prima: 3.65 kB / 204 kB) — puro server component, bundle client ridotto a shared/React only.
+
+### Build route
+- `/admin/system` 164 B 107 kB
+- `/api/admin/system` 278 B 103 kB
+- `/admin`, `/admin/affiliates`, `/admin/analytics`, `/admin/coupons`, `/admin/leads`, `/admin/marketplace` → tutti compilati OK
+
+### File modificati
+```
+apps/web/src/app/admin/system/page.tsx        | Server Component + CEO gate via cookies() + fetch interna + 164B client bundle
+apps/web/src/app/api/ceo/logout/route.ts       | redirect 303 a /ceo/login invece di JSON response
+```
+
+### TODO post-push (prossima chat)
+1. **Verifica in produzione**: navigare su `https://www.sposi.live/admin/system` con cookie CEO valido → deve renderizzare le 6 card KPI (67 pending, 0 processing, 4 failed, 153 synced, 0 DLQ, 1 watermark missing), tabella cron (3 job), tabella fallimenti per classe (invalid_image:39, drive_sync_failed:4, detect_watermark_missing:3), eventi top (Agostino Spera & Danila Villa 44, Marinella e Salvo 2), DLQ vuota (0 item post-cleanup), niente alert unrecoverable.
+2. **Verifica logout**: click "Esci" → cookie CEO cancellato → redirect a `/ceo/login` → navigando a `/admin/system` di nuovo → redirect al login (sessione invalidata).
+3. **(Opzionale) Estendere lo stesso pattern alle altre `/admin/*`**: 
+   - `apps/web/src/app/admin/page.tsx` — usa `createClient()` client-side (non CEO). Probabilmente rotto per CEO.
+   - `apps/web/src/app/admin/marketplace/page.tsx` —う.
+   - `apps/web/src/app/admin/affiliates/page.tsx`, `/admin/analytics/page.tsx`, `/admin/coupons/page.tsx`, `/admin/leads/page.tsx` — verificarle tutte. Le API routes corrispondenti vanno allineate a gate CEO (come già fatto per `/api/admin/system`).
+   - Sono tutte `'use client'` con `supabase.auth.getUser()` → likely rotte con gate CEO. Pattern da applicare: converti in Server Component + cookies() + ceoTokenFromCookies + verifyCeoSession + fetch interna.
+4. **Cleanup DB rimanente** (vedi PROJECT_STATUS TODO opzionali):
+   - 4 item `upload_queue.status='failed'`: verificare retry_count.
+   - 67 item `upload_queue.status='pending'`: vecchi item non ancora processati? Verificare `created_at`.
+   - 1 foto `watermark_missing=true`: lanciare `/api/r2/repair-watermark` con eventId.
+
+### Note tecniche
+- **Pattern Server Component per /admin/***: su Next.js App Router, il Server Component viene renderizzato lato server con accesso a `cookies()` (async in v15/next 15). Il middleware ha già verificato il cookie CEO PRIMA di arrivare alla pagina → se il middleware autorizza, la pagina può fiduciosamente leggere lo stesso cookie e procedere. Se l'utente naviga manualmente alla pagina senza passare dal middleware (es. diretta RSC fetch POST), il `cookies()` check nella pagina stessa lo rimbalza comunque al login.
+- **`NEXT_PUBLIC_VERCEL_URL` per la fetch interna**: il componente server fa fetch HTTP a `https://${NEXT_PUBLIC_VERCEL_URL}/api/admin/system` passando il cookie header. In dev locale fallback a `http://localhost:3000`. Si potrebbe anche usare il ` NextRequest` della route stessa, ma il pattern fetch interna è più compatibile con il codice route esistente.
+- **Form POST HTML nativo per logout**: pattern semplice, funziona anche senza JS. `303 See Other` è lo status idoneo per redirect dopo POST.
+
+---
+
 ## Sessione 08/08/2026 — Dashboard admin/system: cleanup DLQ + guard r2_key NULL + fix auth CEO (DA COMPLETARE prossima chat)
 
 ### Contesto
