@@ -33,7 +33,7 @@ export async function GET(_req: NextRequest) {
       svc.from('upload_queue_dead_letter').select('id, event_id, file_name, r2_key, last_failure_class, dlq_retry_count, moved_to_dlq_at'),
       svc.from('media_uploads').select('id').eq('watermark_missing', true).limit(1000),
       // DLQ items "impossibili": r2_key NULL (file mai arrivato su R2). Non recuperabili,
-      // il cron dlq-retry li skippa con il guard .not('r2_key', 'is', null). Restano in DLQ
+      // il cron dlq-retry li skippa con il guard filter 'r2_key' not.is null. Restano in DLQ
       // come storico ma non incrementano dlq_retry_count → metrica diagnostica separata.
       svc.from('upload_queue_dead_letter').select('id').is('r2_key', null).limit(1000),
     ]);

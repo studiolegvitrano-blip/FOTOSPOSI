@@ -45,7 +45,8 @@ export async function GET(req: NextRequest) {
       // arrivato su R2 (cliente ha chiuso il tab prima della PUT, MIME mismatch, ecc.).
       // Non c'è nulla da recuperare: re-queue sarebbero solo re-DLQ in loop infinito.
       // Restano in DLQ come storico, dlq_retry_count non incrementato (max_count ferma il cron).
-      .not('r2_key', 'is', null)
+      // Sintassi PostgREST nativa via `.filter()` (la sintassi .not() ha un bug in supabase-js v2.110).
+      .filter('r2_key', 'not.is', null)
       .order('moved_to_dlq_at', { ascending: true })
       .limit(DLQ_BATCH_LIMIT);
 
