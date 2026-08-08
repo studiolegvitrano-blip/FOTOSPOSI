@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createServiceClient, createServerSideClient } from '@fotosposi/core';
+import { createServiceClient } from '@fotosposi/core';
+import { ceoTokenFromCookies, verifyCeoSession } from '@/lib/ceo-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -12,26 +12,33 @@ export const dynamic = 'force-dynamic';
  * (system_health_log), stato code di processing (upload_queue + DLQ), ultime
  * esecuzioni cron. Usa il service role per bypassare RLS (i dati sono
  * operativi interni, non esposti via chiave anonima).
+ *
+ * AUTH: cookie CEO (HMAC firmato con CEO_PASSWORD), stesso pattern di
+ * /api/ceo/overview. PRIMA del gate CEO (commit 660700e del 03/08/2026) questa
+ * route usava `supabase.auth.getUser()` — ma con il gate CEO in middleware,
+ * l'utente CEO NON ha sessione utente sposo → getUser ritornava null → 401.
+ * Allineato a /api/ceo/overview.
  */
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
+  const token = ceoTokenFromCookies(req.headers.get('cookie'));
+  if (!verifyCeoSession(token)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const svc = createServiceClient();
-
-    // Auth: richiede sessione utente (stessa policy delle altre pagine admin).
-    const cookieStore = await cookies();
-    const supabaseAuth = createServerSideClient(() => cookieStore.getAll());
-    const { data: { user }, error: authErr } = await supabaseAuth.auth.getUser();
-    if (authErr || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
     // 1) Stato code di processing
-    const [{ data: queueRows }, { data: dlqRows }, { data: watermarkMissing }] = await Promise.all([
+    const [{ data: queueRows }, { data: dlqRows }, { data: watermarkMissing }, { data: dlqUnrecoverableRows }] = await Promise.all([
       svc.from('upload_queue').select('status'),
       svc.from('upload_queue_dead_letter').select('id, event_id, file_name, r2_key, last_failure_class, dlq_retry_count, moved_to_dlq_at'),
       svc.from('media_uploads').select('id').eq('watermark_missing', true).limit(1000),
+      // DLQ items "impossibili": r2_key NULL (file mai arrivato su R2). Non recuperabili,
+      // il cron dlq-retry li skippa con il guard filter 'r2_key' not.is null. Restano in DLQ
+      // come storico ma non incrementano dlq_retry_count → metrica diagnostica separata.
+      svc.from('upload_queue_dead_letter').select('id').is('r2_key', null).limit(1000),
     ]);
 
     const queueByStatus: Record<string, number> = { pending: 0, processing: 0, failed: 0, synced: 0 };
@@ -101,14 +108,12 @@ export async function GET(_req: NextRequest) {
 
     // 5) DLQ: totali + per classe + recenti
     const dlqByClass: Record<string, number> = {};
-    for (const d of (dlqRows ?? []) as Array<{ last_failure_class: string | null; r2_key?: string | null }>) {
+    for (const d of (dlqRows ?? []) as Array<{ last_failure_class: string | null }>) {
       const cls = d.last_failure_class ?? 'unknown';
       dlqByClass[cls] = (dlqByClass[cls] ?? 0) + 1;
     }
     const dlqRecent = (dlqRows ?? []).slice(0, 20);
-    // DLQ items "impossibili": r2_key NULL (file mai arrivato su R2). Non recuperabili,
-    // il cron dlq-retry li skippa (guard .filter('r2_key','not.is',null)).
-    const dlqUnrecoverable = (dlqRows ?? []).filter((r) => r.r2_key == null).length;
+    const dlqUnrecoverable = dlqUnrecoverableRows?.length ?? 0;
 
     return NextResponse.json({
       queue: queueByStatus,
@@ -136,8 +141,6 @@ export async function GET(_req: NextRequest) {
       generatedAt: new Date().toISOString(),
     });
   } catch (e) {
-    console.error('[/api/admin/system] crash:', e);
-    const err = e instanceof Error ? e : new Error(String(e));
-    return NextResponse.json({ error: err.message, stack: err.stack, name: err.name }, { status: 500 });
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'Errore interno' }, { status: 500 });
   }
 }
