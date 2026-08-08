@@ -58,6 +58,19 @@ Pattern completo sicuro:
 2. `execute_sql` con `NOTIFY pgrst, 'reload schema'`
 3. Verifica con una upsert di test che il client veda la nuova colonna
 
+## OAuth callback: detectSessionInUrl già scambia il code
+
+`@supabase/ssr` v0.6.1+ `createBrowserClient` ha `detectSessionInUrl: true` di default → **all'init della pagina `/auth/callback` scambia AUTOMATICAMENTE il `?code=...` OAuth** (POST /token), scrive la sessione nei cookie e rimuove il PKCE verifier dalla sessionStorage. **Non chiamare `exchangeCodeForSession(code)` di nuovo** — il verifier è già stato consumato → `AuthPKCECodeVerifierMissingError: PKCE code verifier not found in storage` → se l'utente viene rimbalzato al login con `?error=oauth_failed` nonostante la sessione sia valida nei cookie, è esattamente questo pattern.
+
+**Regola (pattern obbligatorio in `apps/web/src/lib/oauth-callback.ts` → `resolveOAuthSession`)**:
+
+1. `getSession()` PRIMA — se la sessione esiste, ritorna subito (detect automatico riuscito).
+2. Solo se `getSession()` è null E c'è un code → `exchangeCodeForSession(code)` come fallback.
+3. Se l'exchange fallisce → retry `getSession()` (caso difensivo race con detect async).
+4. Su errore finale → redirect a `/login?error=oauth_failed` (caso reale "code reuse / tab chiuso durante OAuth", NON un bug).
+
+Inoltre: la navigazione finale al target (`/dashboard` o `/events/{id}/...`) DEVE essere **hard** (`window.location.href = target`), non `router.push`. `router.push` può risolvere `/dashboard` dal prefetch RSC del client-router PRIMA del login (quando il middleware aveva risposto "redirect a /login") → la sessione nei cookie è fresca ma il middleware gira sul vecchio prefetch → rimbalzo al login → loop OAuth. Hard reload forza il middleware a rileggere i cookie auth appena scritti.
+
 ## Sharp in monorepo: range identici obbligatori
 
 `sharp` ha dipendenze native (`@img/sharp-libvips-*`, `@img/sharp-*-*`) che **cambiano formato tra minor versions**. Se due package nello stesso monorepo dichiarano range sharp non sovrapposti (es. `^0.33.0` in `packages/photo-overlay` vs `^0.34.5` in `apps/web`), npm installa **due copie**: una hoisted root e una annidata in `packages/photo-overlay/node_modules/sharp`. webpack (Next.js `transpilePackages`) risolve `import('sharp')` dalla copia annidata locale → build fallisce con `Module not found '@img/sharp-libvips-dev/include'` perché la versione annidata ha un set di binding nativi diverso da quello che il bundler si aspetta.
