@@ -38,7 +38,7 @@ Costruzione del portale partner B2B: un professionista (ristoratore, fotografo, 
 - Test 485/485 (41 file). Typecheck clean.
 
 ### TODO post-push
-1. **Valorizzare `platform_settings` con coordinate reali** (iban/iban_holder/iban_bank) via SQL o console — senza questo `getIbanDetails` rifiuta gli ordini IBAN.
+1. **`platform_settings` valorizzato con placeholder temporaneo** (`IT60 X054 2811...`, `iban_status='placeholder'`). `getIbanDetails` ora non rifiuta più le richieste. **Da sostituire con coordinate reali** appena disponibili: UPDATE platform_settings SET value='...' WHERE key='iban' (e 'iban_holder', 'iban_bank'), poi UPDATE ... SET value='live' WHERE key='iban_status'.
 2. **Deploy VPS**: `vps-scripts/overlay.js` + `vps-scripts/video-watermark-server.js` hanno il doppio logo ma vanno ricopiati sul VPS (scp + restart service).
 3. **Namespace `partner` in en-GB/de/es/fr**: solo it + en-US completi.
 4. **Rotazione `CEO_PASSWORD`** (TODO preesistente): `542070Ab@` usato per verifica, da cambiare.
