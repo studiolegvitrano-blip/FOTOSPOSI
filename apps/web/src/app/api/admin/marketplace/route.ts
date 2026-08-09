@@ -20,7 +20,7 @@ async function ceoGate(req: NextRequest): Promise<NextResponse | undefined> {
  * @fotosposi/marketplace). Auth: cookie CEO.
  */
 export async function GET(req: NextRequest) {
-  const blocked = ceoGate(req);
+  const blocked = await ceoGate(req);
   if (blocked) return blocked;
 
   try {
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
  * Body: { id, approved: boolean }
  */
 export async function PATCH(req: NextRequest) {
-  const blocked = ceoGate(req);
+  const blocked = await ceoGate(req);
   if (blocked) return blocked;
 
   try {
@@ -64,7 +64,7 @@ export async function PATCH(req: NextRequest) {
  * DELETE /api/admin/marketplace?id=...
  */
 export async function DELETE(req: NextRequest) {
-  const blocked = ceoGate(req);
+  const blocked = await ceoGate(req);
   if (blocked) return blocked;
 
   try {

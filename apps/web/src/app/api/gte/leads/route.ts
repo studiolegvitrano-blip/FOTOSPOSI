@@ -20,7 +20,7 @@ async function ceoGate(req: NextRequest): Promise<NextResponse | undefined> {
 }
 
 export async function GET(request: NextRequest) {
-  const blocked = ceoGate(request);
+  const blocked = await ceoGate(request);
   if (blocked) return blocked;
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status') || undefined;
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const blocked = ceoGate(request);
+  const blocked = await ceoGate(request);
   if (blocked) return blocked;
   const body = await request.json();
   if (!body.id || !body.status) {

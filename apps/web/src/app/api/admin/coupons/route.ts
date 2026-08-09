@@ -14,7 +14,7 @@ async function ceoGate(req: NextRequest): Promise<NextResponse | undefined> {
 }
 
 export async function GET(req: NextRequest) {
-  const blocked = ceoGate(req);
+  const blocked = await ceoGate(req);
   if (blocked) return blocked;
 
   try {
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const blocked = ceoGate(req);
+  const blocked = await ceoGate(req);
   if (blocked) return blocked;
 
   try {
