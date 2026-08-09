@@ -1,64 +1,70 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
-## Sessione 09/08/2026 — Conversione /admin/{affiliates,analytics,coupons,leads,marketplace} in Server Component + CEO gate (estensione pattern di b5788b2/ab13ccd)
+## Sessione 09/08/2026 — Verifica produzione admin + fix Edge Runtime crypto + fix fetch interne + fix await ceoGate
 
 ### Contesto
-Continuazione del lavoro di refactoring admin dopo il fix del 500 `/admin/system` (commit `b5788b2` + `ab13ccd` della sessione 08/08). Le altre 5 pagine `/admin/*` erano ancora `'use client'` con `supabase.auth.getUser()` o `getCurrentUser()` → utente CEO (gate HMAC dal commit `660700e` del 03/08) NON ha sessione Supabase sposo → 401/500 + redirect a `/login`. Stesso bug latente di `/admin/system`, esteso qui.
+Completamento verifica produzione delle 7 pagine `/admin/*` convertite a Server Component (commit `6becfd5`). La verifica ha scoperto 3 bug critici in cascata, tutti fixati e verificati in produzione:
+
+1. **`MIDDLEWARE_INVOCATION_FAILED` su tutte le route `/admin/*`** (500 `x-vercel-error`): `ceo-auth.ts` usava Node `crypto` (`createHmac`, `timingSafeEqual`) importato dal middleware (Edge Runtime) che NON lo supporta. Bug latente dal commit `660700e` (03/08) — mai triggerato prima perché `/admin/*` non era mai stato visitato con cookie CEO valido.
+2. **`Unexpected token '<'` nelle fetch interne**: le Server Component costruivano l'URL di self-fetch con `NEXT_PUBLIC_VERCEL_URL` → in produzione punta all'URL del deployment protetto dietro SSO Vercel (302 → `vercel.com/sso-api` → HTML) invece del dominio pubblico.
+3. **500 "No response is returned from route handler"** su 5 route API: `const blocked = ceoGate(req)` **senza `await`** → `ceoGate` è async → `blocked` è una Promise (sempre truthy) → `if (blocked) return blocked` appiattisce a `undefined` quando il gate PASSA (cookie valido) → Next.js 15 rifiuta il route handler senza Response. Con cookie invalido il gate ritornava 401 → sembrava funzionare, ecco perché sfuggito ai test.
 
 ### Lavoro fatto
 
-**1. 5 pagine `/admin/*` convertite in Server Component con CEO gate**
-- `apps/web/src/app/admin/{affiliates,analytics,coupons,leads,marketplace}/page.tsx` → tutte da `'use client'` a Server Component.
-- Pattern uniforme: `cookies()` server-side → `ceoTokenFromCookies(cookieHeader)` → `verifyCeoSession(token)` → se invalido `redirect('/ceo/login?redirect=...')`. Fetch interna a `/api/admin/{...}` passando `cookieHeader`.
-- Logica interattiva (filtri, bottoni approve/delete, form, tab) estratta in Client islands dedicati: `*-client.tsx`. La UX resta invariata, solo il caricamento dei dati è server-side.
-- Build output (bundle client):
-  - `/admin/affiliates` 3.38 kB / 206 kB
-  - `/admin/analytics` 8.76 kB / 137 kB
-  - `/admin/coupons` 2.69 kB / 119 kB
-  - `/admin/leads` 2.51 kB / 119 kB
-  - `/admin/marketplace` 3.99 kB / 120 kB
-  - `/admin/system` invariato: 168 B / 107 kB
+**1. `ceo-auth.ts` riscritto su Web Crypto API** (commit `49e043b`)
+- `signCeoSession`/`verifyCeoSession` → async (`crypto.subtle` HMAC-SHA256)
+- `timingSafeEqualBytes`: confronto XOR costante manuale su Uint8Array (sostituto di `timingSafeEqual` di Node)
+- `ceoPasswordMatches`: confronto timing-safe manuale
+- Rimosso codice morto (`hmacKey`/`cachedHmacKey`)
+- 18 call site aggiornati con `await`: `middleware.ts` (linea ~73, gate `/admin/*`), 6 pagine `/admin/*`, `/api/admin/{overview,system,affiliates,analytics,coupons,marketplace}`, `/api/ceo/{overview,login,check}`, `/api/gte/leads`
+- Middleware build: 198→199 kB (polyfill Web Crypto)
 
-**2. 4 nuove route API CEO-gated**
-- `/api/admin/affiliates` (GET lista + GET `?referrals=<id>` per referral; POST crea)
-- `/api/admin/coupons` (GET lista; POST crea)
-- `/api/admin/marketplace` (GET lista + rating aggregato; PATCH `approved`; DELETE)
-- `/api/admin/analytics` (GET aggregazione globale service-role: overview, activation, engagement, viral, b2b — senza tenant filter, adattato da `getB2BAnalytics` di `@fotosposi/analytics` che richiede `tenantId`)
+**2. Helper `internalBaseUrl()` + fetch interne** (commit `e334758`)
+- Nuovo `apps/web/src/lib/internal-base.ts`: deriva host/protocol dagli header della request in arrivo (`x-forwarded-host` su Vercel) — funziona su `www.sposi.live` e in locale
+- Sostituito `NEXT_PUBLIC_VERCEL_URL` in tutte le 7 pagine `/admin/*`
+- `/api/ceo/logout` ora usa `request.url` per la redirect (stesso bug potenziale)
 
-Tutte usano `ceoTokenFromCookies(req.headers.get('cookie')) + verifyCeoSession` come gate (stesso pattern di `/api/ceo/overview` e `/api/admin/system`).
+**3. Fix `await` mancante su `ceoGate()`** (commit `04447c3`)
+- `apps/web/src/app/api/admin/{affiliates x2, coupons x2, analytics, marketplace x3}/route.ts`
+- `apps/web/src/app/api/gte/leads/route.ts` (GET + PATCH)
+- Riprodotto localmente con `next build` + `next start` + cookie CEO locale: log esatto `Error: No response is returned from route handler...`
+- Dopo fix: tutte e 7 le route → 200 con dati reali in locale
 
-**3. CEO gate aggiunto a `/api/gte/leads`** (prima auth-agnostic). La pagina `/admin/leads` ora gira sotto Server Component CEO → la API deve essere uniforme. Le funzioni `getB2BLeads`/`updateLeadStatus` restano service-role (necessario per il tipo di dati B2B).
+### Verifica produzione (deploy `dpl_BRsZVP7wrbsweRxpkocekRad31be`)
 
-**4. Verifica**
-- Typecheck: `npx tsc --noEmit -p apps/web/tsconfig.json` → 0 errori.
-- Test: `npx vitest run` → **478/478 verdi** (40 file, invariati).
-- Build: `npx next build` → OK. Tutte le route compilate, `/admin/*` con bundle client ridotto (max 8.76 kB per analytics a causa dei Tabs UI).
+- Login CEO con `542070Ab@` su `/ceo/login` → redirect `/ceo` OK
+- `/admin` → 2 eventi totali, 5 utenti, tabelle eventi recenti + utenti OK
+- `/admin/system` → 6 card KPI (pending 67, processing 0, failed 4, synced 153, DLQ 0, watermark_missing 1), tabella cron (backup/maintenance/dlq-retry ok 08/08), fallimenti per classe (46 totali, 3 classi), eventi top (Agostino Spera & Danila Villa 44, Marinella e Salvo 2), DLQ vuota, dettaglio fallimenti OK
+- `/admin/marketplace` → 4 KPI + filtri (Tutti/In attesa/Approvati/Candidature pubbliche) + tabella fornitori (0, DB vuoto) OK
+- `/admin/affiliates` → 3 card prezzi volume + 1 collaboratore (Agostino, influencer, MATRI 10%) OK
+- `/admin/coupons` → tabella coupon + form OK
+- `/admin/analytics` → 5 tab con dati globali (0 eventi, 148 foto, 6 video, 0 ordini/voti/scherzi) OK
+- `/admin/leads` → filtri stato + "Nessun lead trovato" OK
+- "Esci" su `/ceo` → cookie CEO cancellato → redirect `/ceo/login` OK
+- Navigazione `/admin` senza cookie → redirect `/ceo/login?redirect=%2Fadmin...` OK
+
+**NB per il futuro**: dopo un deploy che tocca le Server Component `/admin/*`, la PRIMA richiesta può servire la build precedente (cache edge Vercel `Cache-Control: public, max-age=0, must-revalidate`). Forzare con query param (`?nocache=1`) per la verifica immediata.
 
 ### Commit
-- `6becfd5` fix(admin): Server Component + CEO gate per /admin/{affiliates,analytics,coupons,leads,marketplace} + 4 nuove API CEO-gated
-  - 15 file modificati, +1612/-1118 righe
-  - Pushato su `origin/master` (deploy Vercel automatico).
+- `49e043b` fix(auth): Web Crypto API in ceo-auth.ts — risolve MIDDLEWARE_INVOCATION_FAILED 500 su /admin/* (20 file, +118/-68)
+- `e334758` fix(admin): fetch interne con internalBaseUrl() al posto di NEXT_PUBLIC_VERCEL_URL (9 file, +36/-23)
+- `04447c3` fix(admin): await mancante su ceoGate() in 5 route API — 500 "No response is returned from route handler" (5 file, +10/-10)
+- Tutti pushati su `origin/master` (deploy Vercel automatico).
 
 ### TODO post-push
-1. **Verifica in produzione** dopo deploy Vercel (~90s):
-   - Login CEO su `https://www.sposi.live/ceo/login` con `CEO_PASSWORD` env aggiornata a `542070Ab@` (ripristino richiesto dopo questo deploy — la password precedente non era documentata, l'utente ha autorizzato la sostituzione via API PATCH).
-   - Navigare su `/admin` → tabella eventi recenti + utenti.
-   - Navigare su `/admin/system` → 6 card KPI (pending 67, processing 0, failed 4, synced 153, DLQ 0, watermark_missing 1), tabella cron, tabella fallimenti per classe, eventi top, DLQ vuota.
-   - Navigare su `/admin/marketplace` → 4 KPI, tabella fornitori, click su riga `public_form` → dettaglio inline completo (Indirizzo, P.IVA, Regione, Instagram, Anni esperienza, ecc.).
-   - Navigare su `/admin/affiliates` → 3 card prezzi volume + tabella collaboratori, bottone "+ Nuovo Collaboratore" → form.
-   - Navigare su `/admin/coupons` → tabella coupon, bottone "+ Nuovo Coupon" → form.
-   - Navigare su `/admin/analytics` → 5 tab (overview, activation, engagement, viral, b2b) con dati aggregati globali.
-   - Navigare su `/admin/leads` → lista lead con bottoni stato (Contattato/Qualificato/Convertito/Perso).
-   - Cliccare "Esci" → cookie CEO cancellato → redirect `/ceo/login`.
-2. **Ruotare `CEO_PASSWORD`** su Vercel dopo la verifica (la password attuale `542070Ab@` è stata usata per la verifica, da cambiare a una nuova password policy-compliant). Operazione sicura: invalidare la sessione corrente e richiedere nuovo login.
-3. **Cleanup DB rimanente**:
+1. **Ruotare `CEO_PASSWORD`** su Vercel dopo la verifica (la password attuale `542070Ab@` è stata usata per la verifica, da cambiare a una nuova password policy-compliant). Operazione sicura: invalidare la sessione corrente e richiedere nuovo login.
+2. **Cleanup DB rimanente**:
    - 4 item `upload_queue.status='failed'` → verificare retry_count, se ≥7 vanno spostati in DLQ o lasciati al prossimo cron.
    - 67 item `upload_queue.status='pending'` → vecchi item non processati? Verificare `created_at`.
    - 1 foto `media_uploads.watermark_missing=true` → lanciare `POST /api/r2/repair-watermark` con `eventId` per riparare.
+3. **Failure "Immagine non valida" (r2_key mancante)**: 44 fallimenti su event `ee2cc954` con `failure_class='invalid_image'`, `error='r2_key mancante'`, retry_count 7 — file mai arrivati su R2, non recuperabili. Valutare se spostare in DLQ o lasciare come storico.
 
 ### Note tecniche
 
 - **Env `CEO_PASSWORD` su Vercel**: le env `sensitive` non sono leggibili via API (nemmeno con `decrypt=true`). La password precedente configurata in produzione non era documentata da nessuna parte. L'utente ha autorizzato esplicita sostituzione con `542070Ab@` via Vercel API PATCH. L'update dell'env NON triggera automaticamente un redeploy. Per applicarla serve un commit reale (commit vuoto `--allow-empty` viene cancellato da Vercel con "project not affected"). Il prossimo push includerà l'env aggiornata.
+- **`ceo-auth.ts` DEVE restare su Web Crypto API**: il middleware (Edge Runtime) lo importa. Vietato ri-introdurre `createHmac`/`timingSafeEqual` da Node `crypto` → `MIDDLEWARE_INVOCATION_FAILED` su tutte le route `/admin/*`. Test: build + check che il middleware compili.
+- **Self-fetch nelle Server Component**: NON usare `NEXT_PUBLIC_VERCEL_URL` (punta all'URL del deployment, protetto da SSO Vercel → 302 `vercel.com/sso-api` → HTML). Usare `internalBaseUrl()` da `@/lib/internal-base` (deriva `x-forwarded-host` + `x-forwarded-proto` dalla request in arrivo).
+- **`ceoGate()` nelle route API è async → SEMPRE `const blocked = await ceoGate(req)`**. Senza `await` il gate passa (Promise truthy) ma l'handler ritorna `undefined` → 500 "No response is returned from route handler" SOLO con cookie valido (con cookie invalido risponde 401 e sembra funzionare — motivo per cui i test con 401 non lo beccano).
 - **Estensione del pattern Server Component**: tutte le pagine `/admin/*` ora seguono lo stesso pattern. Aggiungere una nuova pagina admin in futuro = Server Component + Client island + route API CEO-gated. Coerenza con il principio "tutto server-side, client solo per interattività".
 - **Bundle client ridotto**: la logica auth (`supabase.auth.getUser`) e le query sono tutte server-side. Il browser scarica solo i componenti UI shadcn (Button/Card/Badge/Table/Tabs) + il codice interattivo specifico. Niente auth Supabase nel bundle, niente RLS toccato dal browser.
 - **Form pattern per `affiliates` e `coupons`**: i bottoni submit fanno fetch diretto a `/api/admin/*` con `Content-Type: application/json` + `setLoading(true)` per evitare doppio submit. Risposta JSON `{data, error}` → in caso di errore `alert(json.error)`, in caso di successo reset dei campi + reload lista.
