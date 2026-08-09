@@ -67,7 +67,7 @@ Completamento verifica produzione delle 7 pagine `/admin/*` convertite a Server 
 
 ### TODO post-push
 1. **Ruotare `CEO_PASSWORD`** su Vercel dopo la verifica (la password attuale `542070Ab@` è stata usata per la verifica, da cambiare a una nuova password policy-compliant). Operazione sicura: invalidare la sessione corrente e richiedere nuovo login.
-2. **Item Drive 401 residuo** (`63af9867`, `1000177432.png`): verificare credenziali Google Drive (401 = token/scope non validi). Se il Drive sync continua a fallire arriverà in DLQ al 7° retry; se il 401 persiste, l'evento `ee2cc954` non ha sync Drive — valutare se è un problema di configurazione account Drive del cliente.
+2. **Item Drive 401 residuo** (`63af9867`, `1000177432.png`): **risolto per diagnosi** — il refresh token OAuth dell'evento `ee2cc954` è stato REVOCATO da Google (`invalid_grant: Token has been expired or revoked`, verificato chiamando direttamente `oauth2.googleapis.com/token` con il refresh_token salvato). Il flusso di refresh in `refreshDriveTokenIfExpired` è corretto; non può funzionare con un token revocato. **Azione richiesta (utente)**: ricollegare Google Drive dalla pagina `/events/ee2cc954-98d7-4e11-828b-668a52e738e2/drive` (bottone "Connetti Google Drive"). Dopo la riconnessione il cron `maintenance` riproverà l'item (retry 5 < 7) e il sync andrà a buon fine. Causa probabile della revoca: app OAuth Google in modalità "testing" → Google revoca i refresh token inattivi dopo ~7 giorni (ultimo refresh ok 04/08). Se ricapita, valutare di pubblicare l'app OAuth (Google Console → Publishing status) o passare a un service account condiviso (già supportato da `GOOGLE_DRIVE_CLIENT_EMAIL`/`GOOGLE_DRIVE_PRIVATE_KEY`, attualmente vuoti in `.env.local`).
 
 ### Note tecniche
 
