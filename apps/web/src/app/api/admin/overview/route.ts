@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(req: NextRequest) {
   const token = ceoTokenFromCookies(req.headers.get('cookie'));
-  if (!verifyCeoSession(token)) {
+  if (!(await verifyCeoSession(token))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

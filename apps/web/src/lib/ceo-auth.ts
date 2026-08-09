@@ -1,5 +1,3 @@
-import { createHmac, timingSafeEqual } from 'crypto';
-
 /**
  * Autenticazione della console CEO (/ceo).
  *
@@ -15,6 +13,13 @@ import { createHmac, timingSafeEqual } from 'crypto';
  *
  * Il cookie contiene solo una timestamp di scadenza (exp) + firma HMAC; nessun
  * dato identificativo. La sessione dura 12 ore (CEO_SESSION_HOURS).
+ *
+ * NOTA 09/08/2026: edge runtime compatibility. Questo file è importato sia da
+ * route Node (`/api/ceo/*`) sia dal middleware Edge (`/admin/*` gate). Node
+ * `crypto` (createHmac, timingSafeEqual) NON è disponibile in Edge Runtime
+ * → bug scoperto navigando su /admin/* in produzione (deploy 6becfd5).
+ * Fix: Web Crypto API (`globalThis.crypto.subtle`) + Uint8Array comparison.
+ * Disponibile in Node 16+, Edge Runtime, browser moderni.
  */
 
 export const CEO_COOKIE = 'ceo_session';
@@ -40,30 +45,75 @@ function ceoPassword(): string {
   return process.env.CEO_PASSWORD || '';
 }
 
-/** HMAC key derivata dalla password stessa: se la password cambia, le sessioni si invalidano. */
-function hmacKey(): string {
-  return createHmac('sha256', 'fotosposi-ceo-session').update(ceoPassword()).digest('hex');
+/** Converte una stringa in Uint8Array (compatibile Edge + Node 16+). */
+function toBytes(s: string): Uint8Array<ArrayBuffer> {
+  return new TextEncoder().encode(s);
 }
 
-export function signCeoSession(now = Date.now()): string {
+/** Converte Uint8Array in stringa base64url (no padding). */
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+  const b64 = (typeof btoa !== 'undefined' ? btoa : (b: string) => Buffer.from(b, 'binary').toString('base64'))(binary);
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** Confronto timing-safe di due Uint8Array (libreria standard non c'è in Web Crypto). */
+function timingSafeEqualBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) result |= (a[i]! ^ b[i]!);
+  return result === 0;
+}
+
+/**
+ * HMAC-SHA256 cross-runtime (Edge + Node 16+). Restituisce Uint8Array.
+ * Usa Web Crypto API (globalThis.crypto.subtle) disponibile ovunque.
+ */
+async function hmacSha256(key: string, data: string): Promise<Uint8Array> {
+  const cryptoKey = await globalThis.crypto.subtle.importKey(
+    'raw',
+    toBytes(key),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify'],
+  );
+  const sig = await globalThis.crypto.subtle.sign('HMAC', cryptoKey, toBytes(data));
+  return new Uint8Array(sig);
+}
+
+/**
+ * Firma sincrona del cookie CEO (usata da /api/ceo/login in Node runtime).
+ * Versione async per supportare Web Crypto (necessaria in Edge).
+ *
+ * Workaround: in Node 16+ globalThis.crypto.subtle ESISTE, ed è async.
+ * Quindi sign/verify sono async ovunque. I call site già async (fetch, ecc.)
+ * non notano differenza. In /api/ceo/login: basta await signCeoSession().
+ */
+export async function signCeoSession(now = Date.now()): Promise<string> {
+  const pwd = ceoPassword();
+  if (!pwd) return '';
   const exp = now + CEO_SESSION_HOURS * 60 * 60 * 1000;
   const payload = `fotosposi-ceo.${exp}`;
-  const sig = createHmac('sha256', hmacKey()).update(payload).digest('base64url');
+  const sigBytes = await hmacSha256(pwd, payload);
+  const sig = bytesToBase64Url(sigBytes);
   return `${payload}.${sig}`;
 }
 
-/** Verifica il cookie sessione: ritorna true se la firma è valida e non scaduta. */
-export function verifyCeoSession(token: string | undefined | null, now = Date.now()): boolean {
+/** Verifica il cookie sessione (async per Web Crypto). Ritorna true se firma valida e non scaduta. */
+export async function verifyCeoSession(token: string | undefined | null, now = Date.now()): Promise<boolean> {
   if (!token) return false;
   const parts = token.split('.');
   if (parts.length !== 3) return false;
-  const [head, expStr, sig] = parts;
+  const [head, expStr, sigStr] = parts;
   const payload = `${head}.${expStr}`;
-  const expected = createHmac('sha256', hmacKey()).update(payload).digest('base64url');
-  const a = Buffer.from(sig as string);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  if (!timingSafeEqual(a, b)) return false;
+  const pwd = ceoPassword();
+  if (!pwd) return false;
+  const expectedBytes = await hmacSha256(pwd, payload);
+  const expected = bytesToBase64Url(expectedBytes);
+  const a = toBytes(sigStr as string);
+  const b = toBytes(expected);
+  if (!timingSafeEqualBytes(a, b)) return false;
   const exp = Number(expStr);
   if (!Number.isFinite(exp) || exp <= now) return false;
   return true;
@@ -73,10 +123,10 @@ export function verifyCeoSession(token: string | undefined | null, now = Date.no
 export function ceoPasswordMatches(input: string): boolean {
   const configured = ceoPassword();
   if (!configured) return false;
-  const a = Buffer.from(input);
-  const b = Buffer.from(configured);
+  const a = toBytes(input);
+  const b = toBytes(configured);
   if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  return timingSafeEqualBytes(a, b);
 }
 
 /** True se la env CEO_PASSWORD è configurata e rispetta la policy. */

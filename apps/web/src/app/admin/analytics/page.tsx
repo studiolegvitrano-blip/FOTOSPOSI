@@ -38,7 +38,7 @@ export default async function AdminAnalyticsPage() {
   const cookieHeader = cookieStore.toString();
   const token = ceoTokenFromCookies(cookieHeader);
 
-  if (!verifyCeoSession(token)) {
+  if (!(await verifyCeoSession(token))) {
     redirect('/ceo/login?redirect=/admin/analytics');
   }
 

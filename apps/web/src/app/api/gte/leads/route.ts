@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { getB2BLeads, updateLeadStatus } from '@fotosposi/gte';
 import { ceoTokenFromCookies, verifyCeoSession } from '@/lib/ceo-auth';
 
@@ -11,12 +11,12 @@ export const dynamic = 'force-dynamic';
  * sposo Supabase. La pagina /admin/leads ora gira sotto Server Component CEO
  * → aggiungiamo anche qui il check per coerenza (auth uniforme).
  */
-function ceoGate(req: NextRequest): NextResponse | null {
+async function ceoGate(req: NextRequest): Promise<NextResponse | undefined> {
   const token = ceoTokenFromCookies(req.headers.get('cookie'));
-  if (!verifyCeoSession(token)) {
+  if (!(await verifyCeoSession(token))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  return null;
+  return undefined;
 }
 
 export async function GET(request: NextRequest) {

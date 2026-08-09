@@ -1,16 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { listAffiliates, createAffiliate, getReferrals } from '@fotosposi/commerce';
 import { ceoTokenFromCookies, verifyCeoSession } from '@/lib/ceo-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function ceoGate(req: NextRequest): NextResponse | null {
+async function ceoGate(req: NextRequest): Promise<NextResponse | undefined> {
   const token = ceoTokenFromCookies(req.headers.get('cookie'));
-  if (!verifyCeoSession(token)) {
+  if (!(await verifyCeoSession(token))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  return null;
+  return undefined;
 }
 
 export async function GET(req: NextRequest) {

@@ -54,35 +54,35 @@ describe('validateCeoPasswordPolicy', () => {
 });
 
 describe('signCeoSession / verifyCeoSession', () => {
-  it('firma e verifica una sessione valida', () => {
+  it('firma e verifica una sessione valida', async () => {
     process.env.CEO_PASSWORD = 'Ceo!2026x';
-    const token = signCeoSession();
-    expect(verifyCeoSession(token)).toBe(true);
+    const token = await signCeoSession();
+    expect(await verifyCeoSession(token)).toBe(true);
   });
 
-  it('rifiuta token con firma manomessa', () => {
+  it('rifiuta token con firma manomessa', async () => {
     process.env.CEO_PASSWORD = 'Ceo!2026x';
-    const token = signCeoSession();
+    const token = await signCeoSession();
     const tampered = token.slice(0, -3) + (token.endsWith('abc') ? 'xyz' : 'abc');
-    expect(verifyCeoSession(tampered)).toBe(false);
+    expect(await verifyCeoSession(tampered)).toBe(false);
   });
 
-  it('rifiuta token scaduto (exp nel passato)', () => {
+  it('rifiuta token scaduto (exp nel passato)', async () => {
     process.env.CEO_PASSWORD = 'Ceo!2026x';
-    const token = signCeoSession();
-    expect(verifyCeoSession(token, Date.now() + 1000 * 60 * 60 * 13)).toBe(false);
+    const token = await signCeoSession();
+    expect(await verifyCeoSession(token, Date.now() + 1000 * 60 * 60 * 13)).toBe(false);
   });
 
-  it('rifiuta token con formato non valido', () => {
-    expect(verifyCeoSession('nope')).toBe(false);
-    expect(verifyCeoSession(undefined)).toBe(false);
+  it('rifiuta token con formato non valido', async () => {
+    expect(await verifyCeoSession('nope')).toBe(false);
+    expect(await verifyCeoSession(undefined)).toBe(false);
   });
 
-  it('invalida le sessioni se la password cambia', () => {
+  it('invalida le sessioni se la password cambia', async () => {
     process.env.CEO_PASSWORD = 'Ceo!2026x';
-    const token = signCeoSession();
+    const token = await signCeoSession();
     process.env.CEO_PASSWORD = 'Altro!2026x';
-    expect(verifyCeoSession(token)).toBe(false);
+    expect(await verifyCeoSession(token)).toBe(false);
   });
 });
 
@@ -119,9 +119,9 @@ describe('isCeoPasswordConfigured', () => {
 });
 
 describe('ceoTokenFromCookies', () => {
-  it('estrae il token dal cookie header', () => {
+  it('estrae il token dal cookie header', async () => {
     process.env.CEO_PASSWORD = 'Ceo!2026x';
-    const token = signCeoSession();
+    const token = await signCeoSession();
     const header = `other=1; ${CEO_COOKIE}=${token}; foo=2`;
     expect(ceoTokenFromCookies(header)).toBe(token);
   });

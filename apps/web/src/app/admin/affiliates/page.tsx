@@ -31,7 +31,7 @@ export default async function AdminAffiliatesPage() {
   const cookieHeader = cookieStore.toString();
   const token = ceoTokenFromCookies(cookieHeader);
 
-  if (!verifyCeoSession(token)) {
+  if (!(await verifyCeoSession(token))) {
     redirect('/ceo/login?redirect=/admin/affiliates');
   }
 

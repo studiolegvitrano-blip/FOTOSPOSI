@@ -70,7 +70,7 @@ export async function middleware(request: NextRequest) {
   // Pattern unico per `/ceo/*` e `/admin/*` — cambia solo la rotta login in fallback.
   if (request.nextUrl.pathname.startsWith('/admin')) {
     const token = ceoTokenFromCookies(request.headers.get('cookie'));
-    if (!verifyCeoSession(token)) {
+    if (!(await verifyCeoSession(token))) {
       const loginUrl = new URL('/ceo/login', request.url);
       loginUrl.searchParams.set('redirect', request.nextUrl.pathname + request.nextUrl.search);
       return NextResponse.redirect(loginUrl);
