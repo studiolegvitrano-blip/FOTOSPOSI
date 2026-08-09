@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { signOut, getCurrentUser } from '@fotosposi/core';
 import { getPartnerPackagePrice } from '@fotosposi/partner';
+import { getIbanDetails } from '@fotosposi/commerce';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,6 +60,7 @@ export default function PartnerDashboardPage() {
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [eventMsg, setEventMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [newEvent, setNewEvent] = useState({ coupleName: '', date: '', location: '', church: '', venue: '' });
+  const [ibanInfo, setIbanInfo] = useState<{ iban: string; holder: string; bank: string; reference: string; total: number } | null>(null);
 
   const load = useCallback(async () => {
     const me = await fetch('/api/partner/me').then((r) => r.json());
@@ -90,18 +92,33 @@ export default function PartnerDashboardPage() {
   const handleBuy = async (tier: 'premium' | 'deluxe') => {
     setBuying(tier);
     try {
-      const res = await fetch('/api/partner/packages', {
+      const p = getPartnerPackagePrice(tier, 10);
+      // Pagamento con bonifico: l'ordine nasce pending, i codici vengono
+      // generati dall'admin dopo la conferma del bonifico (vedi
+      // /api/admin/orders/iban). Gli ordini pacchetto partner non sono
+      // legati a un matrimonio: event_id = null.
+      const res = await fetch('/api/orders/iban', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier, quantity: 10 }),
+        body: JSON.stringify({
+          eventId: null,
+          total: p.total,
+          currency: 'EUR',
+          metadata: { kind: 'partner_package', tier, quantity: 10 },
+        }),
       });
       const json = await res.json();
       if (!res.ok) {
         alert(json.error || 'Errore');
         return;
       }
-      await load();
-      alert(`Pacchetto ${tier} creato: ${(json.codes ?? []).length} codici generati`);
+      setIbanInfo({
+        iban: json.iban?.iban ?? '',
+        holder: json.iban?.holder ?? '',
+        bank: json.iban?.bank ?? '',
+        reference: json.reference ?? '',
+        total: p.total,
+      });
     } finally {
       setBuying(null);
     }
@@ -227,6 +244,24 @@ export default function PartnerDashboardPage() {
               );
             })}
             <p className="text-xs text-text-muted">12+ licenze: -50% + 1 licenza gratis</p>
+            {ibanInfo && (
+              <div className="border border-brand/40 rounded-lg p-4 bg-brand/5 space-y-2">
+                <p className="text-sm font-semibold">{t('iban_title')}</p>
+                <div className="text-sm space-y-1">
+                  <p className="font-mono text-xs break-all">{ibanInfo.iban}</p>
+                  <p className="text-xs text-text-muted">
+                    {ibanInfo.holder}{ibanInfo.bank ? ` · ${ibanInfo.bank}` : ''}
+                  </p>
+                  <p className="text-xs text-text-muted">
+                    {t('iban_amount')}: <strong>{(ibanInfo.total / 100).toFixed(2)} €</strong>
+                  </p>
+                  <p className="text-xs text-text-muted">
+                    {t('iban_reference')}: <code className="font-mono">{ibanInfo.reference}</code>
+                  </p>
+                  <p className="text-xs text-text-muted">{t('iban_note')}</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

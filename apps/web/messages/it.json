@@ -1103,6 +1103,10 @@
     "dashboard_event_venue": "Ricevimento (nome venue, opzionale)",
     "dashboard_event_whitelabel_ok": "Evento creato e marchiato col tuo logo",
     "dashboard_event_whitelabel_fallback": "Evento creato senza white label: acquista un pacchetto o usa un codice",
-    "dashboard_event_open": "Apri"
+    "dashboard_event_open": "Apri",
+    "iban_title": "Pagamento con bonifico",
+    "iban_amount": "Importo",
+    "iban_reference": "Causale da indicare",
+    "iban_note": "I codici verranno generati appena confermiamo il bonifico (di solito entro 1-2 giorni lavorativi)."
   }
 }

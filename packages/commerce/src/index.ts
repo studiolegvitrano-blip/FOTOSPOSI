@@ -14,13 +14,23 @@ export interface Product {
 
 export interface Order {
   id: string;
-  event_id: string;
+  event_id: string | null;
   user_id: string;
   total: number;
   currency: string;
   status: 'pending' | 'paid' | 'fulfilled' | 'cancelled';
+  payment_method: 'stripe' | 'iban';
+  payment_reference: string | null;
+  metadata: Record<string, unknown> | null;
   stripe_payment_intent: string | null;
   created_at: string;
+}
+
+/** Coordinate bonifico lette da platform_settings (chiavi iban_*). */
+export interface IbanDetails {
+  iban: string;
+  holder: string;
+  bank: string;
 }
 
 export interface GiftRegistryTransaction {
@@ -41,6 +51,9 @@ export {
   getOrdersByEvent,
   updateOrderStatus,
   createCheckoutSession,
+  getIbanDetails,
+  createIbanOrder,
+  listPendingIbanOrders,
   createGiftTransaction,
   getGiftTransactions,
   createGiftCheckoutSession,

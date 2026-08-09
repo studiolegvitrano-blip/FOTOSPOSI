@@ -1101,6 +1101,10 @@
     "dashboard_event_venue": "Reception (venue name, optional)",
     "dashboard_event_whitelabel_ok": "Event created and branded with your logo",
     "dashboard_event_whitelabel_fallback": "Event created without white label: buy a package or use a code",
-    "dashboard_event_open": "Open"
+    "dashboard_event_open": "Open",
+    "iban_title": "Bank transfer payment",
+    "iban_amount": "Amount",
+    "iban_reference": "Reference to include",
+    "iban_note": "Codes will be generated as soon as we confirm the transfer (usually within 1-2 business days)."
   }
 }
