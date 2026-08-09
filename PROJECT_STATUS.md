@@ -1,6 +1,64 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
-## Sessione 09/08/2026 — Verifica produzione admin + fix Edge Runtime crypto + fix fetch interne + fix await ceoGate
+## Sessione 09/08/2026 (pomeriggio) — White label B2B per partner (ristoratori/fotografi)
+
+### Contesto
+Costruzione del portale partner B2B: un professionista (ristoratore, fotografo, wedding planner) può registrarsi, acquistare pacchetti di licenze (con sconto volume: ≥6 -50%, ≥12 -50% + 1 gratis) e creare eventi marchiati con il proprio logo. Logo partner doppiato sul watermark di foto E video (alto-sinistra). Countdown evento mostra "offerto da [partner]". Pagamenti: Stripe (esistente) o **bonifico IBAN** con conferma manuale admin e side-effect generazione codici.
+
+### Lavoro fatto (4 fasi, 4 commit)
+
+**Fase 1 — Portale partner** (commit `86b8d9f`)
+- Migration `00057_partner_white_label.sql` (applicata in produzione): tabelle `partners`, `partner_codes`, RLS legata a `core_users.id = auth.uid()` e ruolo `partner` nel CHECK.
+- Package `@fotosposi/partner`: `getEventPartner`, `getPartnerByUserId`, `redeemFirstAvailableCode`, `listPartnerEvents`, `getPartnerPackagePrice`, `generatePartnerCodes`.
+- 8 route API `/api/partner/*`: `setup`, `me`, `codes` (GET+POST), `redeem`, `logo` (upload), `packages` (GET), `profile` (PATCH), `events` (GET+POST con white label automatico).
+- Pagine `/partner/{login,signup,dashboard}`; link footer; namespace `partner` in it.json + en-US.json; `transpilePackages` configurato.
+
+**Fase 2 — Doppio watermark foto+video** (commit `2023e8a`)
+- `packages/photo-overlay`: `partnerLogoBuffer` opzionale (alto-sinistra, margini 2%, width clamp 135-680). Test integrazione pixel-per-pixel (checker blu/bianco 0→120→200/220 per `detectWatermark`).
+- `packages/video-overlay`: `partnerLogoPng` + ffmpeg overlay `24:24`; `remote.ts` con `partnerLogoBase64/partnerLogoMimeType`.
+- `vps-scripts/overlay.js` `renderPartnerLogo` + server terzo input ffmpeg.
+- `watermark-fonts.server.ts` `loadPartnerLogo` (fetch 8s timeout, mai lancia).
+- `process-queue.ts`: `partnerLogo` in `sharedCtx` + repair batch; share + guestbook passano `getEventPartner` + `loadPartnerLogo`.
+
+**Fase 3 — Countdown "offerto da" + creazione eventi diretta** (commit `02e68d5`)
+- `packages/ui/countdown.tsx`: blocco partner (logo/claim/indirizzo/sito, fallback `partnerClaimText ?? labels.countdown_intro`).
+- `/api/events/[id]/details` e `/api/guest/event` rispondono `partner`; countdown passa props.
+- `partner/codes.ts` `redeemFirstAvailableCode` + `listPartnerEvents`.
+- Dashboard con lista eventi + form creazione (modello ibrido codici riscattabili + creazione diretta).
+
+**Fase 4 — Pagamenti IBAN con conferma admin** (commit `7116a4b`)
+- Migration `00058_orders_iban.sql` (applicata in produzione): `orders.payment_method` ('stripe'|'iban'), `payment_reference`, `metadata` (jsonb); `orders.event_id` **NULLABLE** (pacchetti partner non legati a matrimonio); tabella `platform_settings` (seed placeholder `IT00 0000...`).
+- `packages/commerce`: `Order` estesa, `createOrder(paymentMethod...)` con `event_id: string|null`, `getIbanDetails` (legge platform_settings, rifiuta placeholder), `createIbanOrder` (causale `SP-<id8>`), `listPendingIbanOrders`. Fix import `IbanDetails` latente.
+- `POST /api/orders/iban`: auth sposo/partner, body `{eventId?, total, currency?, metadata?}` (eventId opzionale per pacchetti), ritorna `{order, reference, iban}`.
+- `GET/PATCH /api/admin/orders/iban`: ceoGate locale (pattern marketplace); PATCH `{orderId, action:'confirm'|'cancel'}` → confirm=paid e genera codici se `metadata.kind='partner_package'`, cancel=cancelled.
+- Console `/admin/orders` (Server Component + Client island `OrdersClient`): tabella causale/evento/dettaglio/importo, bottoni Conferma/Annulla, feedback codici generati.
+- Dashboard partner `handleBuy`: POST /api/orders/iban con `event_id=null`, `metadata.kind='partner_package'`; blocco coordinate IBAN.
+- Shop prodotto: bottone "Paga con bonifico" affiancato a Stripe; box coordinate post-acquisto.
+- i18n: namespace `partner` + `commerce` con `iban_title/amount/reference/note`, `buy_iban` (it + en-US).
+- Test 485/485 (41 file). Typecheck clean.
+
+### TODO post-push
+1. **Valorizzare `platform_settings` con coordinate reali** (iban/iban_holder/iban_bank) via SQL o console — senza questo `getIbanDetails` rifiuta gli ordini IBAN.
+2. **Deploy VPS**: `vps-scripts/overlay.js` + `vps-scripts/video-watermark-server.js` hanno il doppio logo ma vanno ricopiati sul VPS (scp + restart service).
+3. **Namespace `partner` in en-GB/de/es/fr**: solo it + en-US completi.
+4. **Rotazione `CEO_PASSWORD`** (TODO preesistente): `542070Ab@` usato per verifica, da cambiare.
+5. **Riconnettere Google Drive** evento `ee2cc954` (TODO preesistente): refresh token revocato da Google.
+
+### Commit
+- `86b8d9f` feat(partner): Fase 1 portale B2B (tabelle, package, route, pagine, i18n)
+- `2023e8a` feat(media): Fase 2 doppio watermark partner su foto e video (alto-sinistra)
+- `02e68d5` feat(partner): Fase 3 countdown "offerto da" + creazione eventi diretta dashboard
+- `7116a4b` feat(commerce): Fase 4 pagamenti IBAN con conferma admin + side-effect codici (11 file, +555/-24)
+- Tutti pushati su `origin/master` (deploy Vercel automatico).
+
+### Note tecniche
+- `orders.event_id` nullable: cambio deliberato per supportare ordini non legati a matrimonio (pacchetti partner). Le route esistenti passano ancora `event_id` obbligatorio per gli ordini prodotto (shop).
+- `ceoGate` è locale in ogni route `/api/admin/*` (non importato da `ceo-auth.ts`): pattern consolidato marketplace/affiliates/coupons/analytics. Mantenuto coerente in orders/iban.
+- `getIbanDetails` rifiuta placeholder `IT00 0000...`: senza coordinate reali, la route orders/iban risponde errore 500 `Coordinate bonifico non configurate`. Safe-by-default.
+- IBAN esposto al cliente solo nella response POST (mai in una API pubblica GET): le coordinate sono nella `platform_settings` (service role only), non hanno RLS pubblica.
+- `metadata.kind='partner_package'` è il contratto tra orders/iban (client) e admin/orders/iban (PATCH): chiave testuale, non enum nel DB (jsonb). Aggiungere un nuovo kind (es. `product`) non rompe la PATCH.
+
+## Sessione 09/08/2026 (mattina) — Verifica produzione admin + fix Edge Runtime crypto + fix fetch interne + fix await ceoGate
 
 ### Contesto
 Completamento verifica produzione delle 7 pagine `/admin/*` convertite a Server Component (commit `6becfd5`). La verifica ha scoperto 3 bug critici in cascata, tutti fixati e verificati in produzione:
