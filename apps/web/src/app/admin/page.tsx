@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { ceoTokenFromCookies, verifyCeoSession } from '@/lib/ceo-auth';
+import { internalBaseUrl } from '@/lib/internal-base';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,9 +39,7 @@ interface AdminOverview {
 }
 
 async function loadOverview(cookieHeader: string): Promise<{ data?: AdminOverview; error?: string }> {
-  const base = process.env.NEXT_PUBLIC_VERCEL_URL
-    ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-    : 'http://localhost:3000';
+  const base = await internalBaseUrl();
   try {
     const res = await fetch(`${base}/api/admin/overview`, {
       headers: { cookie: cookieHeader },

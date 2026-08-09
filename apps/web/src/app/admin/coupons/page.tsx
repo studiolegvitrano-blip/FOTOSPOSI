@@ -2,14 +2,13 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { Coupon } from '@fotosposi/commerce';
 import { ceoTokenFromCookies, verifyCeoSession } from '@/lib/ceo-auth';
+import { internalBaseUrl } from '@/lib/internal-base';
 import CouponsClient from './coupons-client';
 
 export const dynamic = 'force-dynamic';
 
 async function loadData(cookieHeader: string): Promise<{ data?: Coupon[]; error?: string }> {
-  const base = process.env.NEXT_PUBLIC_VERCEL_URL
-    ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-    : 'http://localhost:3000';
+  const base = await internalBaseUrl();
   try {
     const res = await fetch(`${base}/api/admin/coupons`, {
       headers: { cookie: cookieHeader },

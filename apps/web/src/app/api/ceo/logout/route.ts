@@ -5,8 +5,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /** POST /api/ceo/logout — cancella il cookie di sessione CEO, redirect al login. */
-export async function POST() {
-  const res = NextResponse.redirect(new URL('/ceo/login', process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3000'), 303);
+export async function POST(request: Request) {
+  const res = NextResponse.redirect(new URL('/ceo/login', request.url), 303);
   res.cookies.set(CEO_COOKIE, '', { httpOnly: true, path: '/', maxAge: 0 });
   return res;
 }

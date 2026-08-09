@@ -2,14 +2,13 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { Affiliate } from '@fotosposi/commerce';
 import { ceoTokenFromCookies, verifyCeoSession } from '@/lib/ceo-auth';
+import { internalBaseUrl } from '@/lib/internal-base';
 import AffiliatesClient from './affiliates-client';
 
 export const dynamic = 'force-dynamic';
 
 async function loadData(cookieHeader: string): Promise<{ data?: Affiliate[]; error?: string }> {
-  const base = process.env.NEXT_PUBLIC_VERCEL_URL
-    ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-    : 'http://localhost:3000';
+  const base = await internalBaseUrl();
   try {
     const res = await fetch(`${base}/api/admin/affiliates`, {
       headers: { cookie: cookieHeader },

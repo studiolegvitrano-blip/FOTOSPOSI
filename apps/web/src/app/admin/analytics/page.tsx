@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { ceoTokenFromCookies, verifyCeoSession } from '@/lib/ceo-auth';
+import { internalBaseUrl } from '@/lib/internal-base';
 import AnalyticsClient from './analytics-client';
 
 export const dynamic = 'force-dynamic';
@@ -14,9 +15,7 @@ interface AnalyticsPayload {
 }
 
 async function loadData(cookieHeader: string): Promise<{ data?: AnalyticsPayload; error?: string }> {
-  const base = process.env.NEXT_PUBLIC_VERCEL_URL
-    ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-    : 'http://localhost:3000';
+  const base = await internalBaseUrl();
   try {
     const res = await fetch(`${base}/api/admin/analytics`, {
       headers: { cookie: cookieHeader },

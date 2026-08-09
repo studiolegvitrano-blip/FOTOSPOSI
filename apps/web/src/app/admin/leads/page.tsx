@@ -2,14 +2,13 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getB2BLeads } from '@fotosposi/gte';
 import { ceoTokenFromCookies, verifyCeoSession } from '@/lib/ceo-auth';
+import { internalBaseUrl } from '@/lib/internal-base';
 import LeadsClient from './leads-client';
 
 export const dynamic = 'force-dynamic';
 
 async function loadData(cookieHeader: string): Promise<{ data?: unknown[]; error?: string }> {
-  const base = process.env.NEXT_PUBLIC_VERCEL_URL
-    ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-    : 'http://localhost:3000';
+  const base = await internalBaseUrl();
   try {
     const res = await fetch(`${base}/api/gte/leads`, {
       headers: { cookie: cookieHeader },

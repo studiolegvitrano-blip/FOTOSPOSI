@@ -1,14 +1,13 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { ceoTokenFromCookies, verifyCeoSession } from '@/lib/ceo-auth';
+import { internalBaseUrl } from '@/lib/internal-base';
 import MarketplaceClient from './marketplace-client';
 
 export const dynamic = 'force-dynamic';
 
 async function loadData(cookieHeader: string): Promise<{ data?: any[]; error?: string }> {
-  const base = process.env.NEXT_PUBLIC_VERCEL_URL
-    ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-    : 'http://localhost:3000';
+  const base = await internalBaseUrl();
   try {
     const res = await fetch(`${base}/api/admin/marketplace`, {
       headers: { cookie: cookieHeader },
