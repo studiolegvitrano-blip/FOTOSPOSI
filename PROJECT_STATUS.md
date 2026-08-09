@@ -51,13 +51,23 @@ Completamento verifica produzione delle 7 pagine `/admin/*` convertite a Server 
 - `04447c3` fix(admin): await mancante su ceoGate() in 5 route API — 500 "No response is returned from route handler" (5 file, +10/-10)
 - Tutti pushati su `origin/master` (deploy Vercel automatico).
 
+### Cleanup DB (09/08/2026) — loop DLQ→coda chiuso, 67 item irrecuperabili in DLQ
+
+**Investigazione**: la sorgente dei 67 item `pending` non processati era un **loop quotidiano**:
+1. Il cron `dlq-retry` (04:45/05:17) ripescava dalla DLQ gli item con `r2_key NULL` (file mai arrivati su R2, `failure_class='invalid_image'`) e li re-inseriva in `upload_queue` come `pending` (25 per notte: 06/08 04:56, 07/08 04:46, 08/08 05:17 — confermato dalle `requeuedIds` in `system_health_log`).
+2. Il cron `maintenance` del giorno dopo li processava → `moveToDeadLetter` → di nuovo in DLQ → loop.
+3. Il guard `r2_key not.is null` (commits `a96137a` 08/08 + fix sintassi PostgREST `243c27d`) chiude il loop: il `dlq-retry` del 09/08 04:45 ha considerato 0 item.
+
+**Cleanup eseguito via SQL** (insert in `upload_queue_dead_letter` + delete da `upload_queue`):
+- 63 item `pending` + 3 item `failed` (retry_count 99, `r2_key NULL`, irrecuperabili) → spostati in DLQ come storico con `last_failure_class='invalid_image'`, reason "cleanup manuale 09/08: file mai arrivato su R2 (r2_key NULL), irrecuperabile". Drenaggio cron (limit 5/run) avrebbe richiesto ~13 giorni.
+- RIMASTO in coda: 1 item `failed` id `63af9867-0d5b-422a-8c10-fae20e126601` (`1000177432.png`, event `ee2cc954`, retry 5, `r2_key` PRESENTE, errore `Drive sync fallito: HTTP 401`) — recuperabile, il prossimo cron lo riprova (retry 5 < 7). Il 401 indica credenziali Drive da verificare.
+- Watermark: `POST /api/r2/repair-watermark` con `eventId` `d88403f7-b4b7-4b81-9ec3-cff0d4d229de` → `{"repaired":1,"skipped":0,"errors":[]}` — unica foto con `watermark_missing` riparata (verificata `watermark_missing: false`).
+
+**Stato coda finale**: `upload_queue` = 153 synced, 0 pending, 1 failed (Drive 401), 0 processing. DLQ = 63+3+4 item di storico.
+
 ### TODO post-push
 1. **Ruotare `CEO_PASSWORD`** su Vercel dopo la verifica (la password attuale `542070Ab@` è stata usata per la verifica, da cambiare a una nuova password policy-compliant). Operazione sicura: invalidare la sessione corrente e richiedere nuovo login.
-2. **Cleanup DB rimanente**:
-   - 4 item `upload_queue.status='failed'` → verificare retry_count, se ≥7 vanno spostati in DLQ o lasciati al prossimo cron.
-   - 67 item `upload_queue.status='pending'` → vecchi item non processati? Verificare `created_at`.
-   - 1 foto `media_uploads.watermark_missing=true` → lanciare `POST /api/r2/repair-watermark` con `eventId` per riparare.
-3. **Failure "Immagine non valida" (r2_key mancante)**: 44 fallimenti su event `ee2cc954` con `failure_class='invalid_image'`, `error='r2_key mancante'`, retry_count 7 — file mai arrivati su R2, non recuperabili. Valutare se spostare in DLQ o lasciare come storico.
+2. **Item Drive 401 residuo** (`63af9867`, `1000177432.png`): verificare credenziali Google Drive (401 = token/scope non validi). Se il Drive sync continua a fallire arriverà in DLQ al 7° retry; se il 401 persiste, l'evento `ee2cc954` non ha sync Drive — valutare se è un problema di configurazione account Drive del cliente.
 
 ### Note tecniche
 
