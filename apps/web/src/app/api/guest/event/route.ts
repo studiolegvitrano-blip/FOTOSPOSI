@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient, rateLimit } from '@fotosposi/core';
+import { getEventPartner } from '@fotosposi/partner';
 
 /**
  * Server-side resolver for the guest QR/link flow (`/event/[code]`).
@@ -96,11 +97,15 @@ export async function POST(req: NextRequest) {
   if (typeof content.ceremonyTime === 'string') siteTimes.ceremonyTime = content.ceremonyTime;
   if (typeof content.receptionTime === 'string') siteTimes.receptionTime = content.receptionTime;
 
+  // B2B white label: partner sponsor per il blocco "offerto da" nel countdown.
+  const { partner: guestPartner } = await getEventPartner(eventId);
+
   return NextResponse.json({
     event,
     subEvents: subEvents ?? [],
     media: enrichedMedia,
     window: eventWindow ?? null,
+    partner: guestPartner ?? null,
     ...siteTimes,
   });
 }

@@ -16,6 +16,8 @@ export {
 export {
   generatePartnerCodes,
   redeemPartnerCode,
+  redeemFirstAvailableCode,
   listPartnerCodes,
+  listPartnerEvents,
   revokePartnerCode,
 } from './codes';

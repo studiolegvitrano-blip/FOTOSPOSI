@@ -38,6 +38,7 @@ export default function GuestEventPage() {
   const [showCountdown, setShowCountdown] = useState(false);
   const [ceremonyTime, setCeremonyTime] = useState<string | undefined>();
   const [receptionTime, setReceptionTime] = useState<string | undefined>();
+  const [partner, setPartner] = useState<{ name: string; logo_url?: string | null; claim_text?: string | null; address?: string | null; website?: string | null } | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -82,6 +83,8 @@ export default function GuestEventPage() {
     setSubEvents(data.subEvents ?? []);
     setMedia(data.media ?? []);
     setEventWindow(data.window ?? null);
+    // B2B white label: partner sponsor (blocco "offerto da" nel countdown).
+    if (data.partner) setPartner(data.partner);
     // Orari cerimonia/ricevimento dal SiteContent (site-builder), come su /events/[id].
     // Fallback 11:00/13:00 nel Countdown se assenti — fase countdown → cerimonia → ricevimento.
     if (typeof data.ceremonyTime === 'string') setCeremonyTime(data.ceremonyTime);
@@ -192,6 +195,11 @@ export default function GuestEventPage() {
           receptionAddress={receptionAddress}
           brandLogoDataUri={brandLogoUrl}
           brandLogoAlt={event.brand === 'weddingmoments' ? 'JustMarry.live' : 'Sposi.live'}
+          partnerLogoUrl={partner?.logo_url ?? null}
+          partnerName={partner?.name ?? null}
+          partnerClaimText={partner?.claim_text ?? null}
+          partnerAddress={partner?.address ?? null}
+          partnerWebsite={partner?.website ?? null}
           labels={countdownLabels}
           backgroundImageMobile="/countdown-bg-mobile.webp"
           backgroundImageDesktop="/countdown-bg-desktop.webp"

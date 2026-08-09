@@ -40,6 +40,7 @@ export default function EventDetailPage() {
   const [canManage, setCanManage] = useState(false);
   const [ceremonyTime, setCeremonyTime] = useState<string | undefined>();
   const [receptionTime, setReceptionTime] = useState<string | undefined>();
+  const [partner, setPartner] = useState<{ name: string; logo_url?: string | null; claim_text?: string | null; address?: string | null; website?: string | null } | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Il countdown appare al max 1 volta al giorno per evento: il timestamp dell'ultima
@@ -85,6 +86,7 @@ export default function EventDetailPage() {
       if (typeof d.receptionTime === 'string') setReceptionTime(d.receptionTime);
       if (d.subEvents) setSubEvents(d.subEvents);
       if (d.window) setEvtWindow(d.window);
+      if (d.partner) setPartner(d.partner);
       if (m.media) setMedia(m.media);
       if (m.videoMessages) setVideos(m.videoMessages);
       setLoading(false);
@@ -164,6 +166,11 @@ export default function EventDetailPage() {
           receptionAddress={receptionAddress}
           brandLogoDataUri={brandLogoUrl}
           brandLogoAlt={event.brand === 'weddingmoments' ? 'JustMarry.live' : 'Sposi.live'}
+          partnerLogoUrl={partner?.logo_url ?? null}
+          partnerName={partner?.name ?? null}
+          partnerClaimText={partner?.claim_text ?? null}
+          partnerAddress={partner?.address ?? null}
+          partnerWebsite={partner?.website ?? null}
           labels={countdownLabels}
           backgroundImageMobile="/countdown-bg-mobile.webp"
           backgroundImageDesktop="/countdown-bg-desktop.webp"

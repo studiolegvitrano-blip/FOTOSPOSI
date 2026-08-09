@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServiceClient, createServerSideClient } from '@fotosposi/core';
+import { getEventPartner } from '@fotosposi/partner';
 
 /**
  * Server-side event detail resolver for `/events/[id]`.
@@ -79,6 +80,10 @@ export async function GET(
     if (typeof content.ceremonyTime === 'string') siteTimes.ceremonyTime = content.ceremonyTime;
     if (typeof content.receptionTime === 'string') siteTimes.receptionTime = content.receptionTime;
 
+    // B2B white label: partner sponsor dell'evento (logo, claim, indirizzo, sito)
+    // per il blocco "questo servizio è offerto da" nel countdown.
+    const { partner: eventPartner } = await getEventPartner(eventId);
+
     return NextResponse.json({
       event,
       subEvents: subEvents ?? [],
@@ -87,6 +92,7 @@ export async function GET(
       isGuest,
       isManager,
       canManage,
+      partner: eventPartner ?? null,
       ...siteTimes,
     });
   } catch (e) {

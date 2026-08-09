@@ -18,6 +18,16 @@ interface CountdownProps {
   brandLogoDataUri?: string | null;
   /** Alt (testo del logo) per accessibilità. */
   brandLogoAlt?: string;
+  /** B2B white label: logo del partner sponsor (URL pubblico) mostrato nel blocco "offerto da". */
+  partnerLogoUrl?: string | null;
+  /** Nome del partner sponsor. */
+  partnerName?: string | null;
+  /** Testo claim (es. "Questo servizio è offerto da..."). Default: "offerto da <nome>". */
+  partnerClaimText?: string | null;
+  /** Indirizzo del partner (riga secondaria del blocco). */
+  partnerAddress?: string | null;
+  /** Sito del partner (link del blocco). */
+  partnerWebsite?: string | null;
   /** Etichette i18n passate dal caller (per evitare dipendenze next-intl in packages/ui). */
   labels?: {
     countdown_intro: string;
@@ -78,6 +88,11 @@ export function Countdown({
   receptionAddress,
   brandLogoDataUri,
   brandLogoAlt,
+  partnerLogoUrl,
+  partnerName,
+  partnerClaimText,
+  partnerAddress,
+  partnerWebsite,
   labels: userLabels,
   children,
   backgroundImageMobile,
@@ -218,6 +233,39 @@ export function Countdown({
               />
             </svg>
           </button>
+        )}
+
+        {partnerName && (
+          <div className={`pt-6 ${hasBgImage ? 'border-t border-white/20' : 'border-t border-border'}`}>
+            <p className={`text-xs uppercase tracking-widest ${mutedClass}`}>
+              {partnerClaimText ?? labels.countdown_intro}
+            </p>
+            <div className="flex items-center justify-center gap-3 mt-2">
+              {partnerLogoUrl && (
+                <img
+                  src={partnerLogoUrl}
+                  alt={partnerName}
+                  className="h-10 w-auto max-w-[140px] object-contain"
+                />
+              )}
+              <div className="text-left">
+                <p className={`text-sm font-semibold ${brandTextClass}`}>{partnerName}</p>
+                {partnerAddress && (
+                  <p className={`text-xs ${mutedClass}`}>{partnerAddress}</p>
+                )}
+                {partnerWebsite && (
+                  <a
+                    href={partnerWebsite.startsWith('http') ? partnerWebsite : `https://${partnerWebsite}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`text-xs ${hasBgImage ? 'text-white/80 underline' : 'text-brand underline'} hover:opacity-80`}
+                  >
+                    {partnerWebsite.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

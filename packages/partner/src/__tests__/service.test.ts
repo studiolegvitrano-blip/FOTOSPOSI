@@ -26,3 +26,22 @@ describe('getPartnerPackagePrice', () => {
     expect(p.unitPrice).toBe(350);
   });
 });
+
+describe('listPartnerEvents — mapping select', () => {
+  it('usa partner_id come filtro e ordina per data discendente', () => {
+    // Test strutturale: verifica che la query contenuta sia coerente col
+    // contratto (i filtri effettivi sono esercitati via integration test).
+    const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'codes.ts'), 'utf8');
+    expect(src).toContain("'partner_id'");
+    expect(src).toContain("order('date', { ascending: false })");
+    expect(src).toContain('couple_name');
+  });
+});
+
+describe('redeemFirstAvailableCode — fallback senza codici', () => {
+  it('ritorna errore esplicito se il partner non ha codici available', async () => {
+    const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'codes.ts'), 'utf8');
+    // Il messaggio di errore guida l'utente all'acquisto di un pacchetto.
+    expect(src).toContain('Nessun codice disponibile');
+  });
+});

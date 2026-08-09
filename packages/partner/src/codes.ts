@@ -101,3 +101,57 @@ export async function revokePartnerCode(partnerId: string, codeId: string): Prom
   if (error) return { error: error.message };
   return { ok: true };
 }
+
+/**
+ * Modello ibrido B2B: il partner crea direttamente un evento e il white label
+ * viene attivato subito con il PRIMO codice disponibile del suo pacchetto
+ * (senza chiedere allo sposo di inserire il codice a mano).
+ * Best-effort: se il partner non ha codici available (pacchetto esaurito)
+ * l'evento resta normale (nessun white label) — l'utente vede l'avviso.
+ */
+export async function redeemFirstAvailableCode(params: {
+  eventId: string;
+  userId: string;
+}): Promise<{ ok?: boolean; usedCode?: string; error?: string }> {
+  const supabase = createServiceClient();
+
+  const { data: partner, error: pErr } = await supabase
+    .from('partners')
+    .select('id')
+    .eq('user_id', params.userId)
+    .maybeSingle();
+  if (pErr) return { error: pErr.message };
+  if (!partner) return { error: 'Profilo partner non trovato' };
+
+  const { data: codeRow, error: cErr } = await supabase
+    .from('partner_codes')
+    .select('id, code')
+    .eq('partner_id', partner.id as string)
+    .eq('status', 'available')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (cErr) return { error: cErr.message };
+  if (!codeRow) return { error: 'Nessun codice disponibile (acquista un pacchetto)' };
+
+  const res = await redeemPartnerCode({
+    code: codeRow.code as string,
+    eventId: params.eventId,
+    userId: params.userId,
+  });
+  if (res.error) return res;
+  return { ok: true, usedCode: codeRow.code as string };
+}
+
+/** Eventi white label del partner (per il dashboard: link diretti ai matrimoni). */
+export async function listPartnerEvents(partnerId: string): Promise<{ events?: Array<{ id: string; couple_name: string; date: string; location: string | null; code: string | null }>; error?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('events')
+    .select('id, couple_name, date, location, code')
+    .eq('partner_id', partnerId)
+    .order('date', { ascending: false })
+    .limit(100);
+  if (error) return { error: error.message };
+  return { events: (data ?? []) as Array<{ id: string; couple_name: string; date: string; location: string | null; code: string | null }> };
+}

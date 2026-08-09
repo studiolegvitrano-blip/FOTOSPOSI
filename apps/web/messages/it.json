@@ -1091,6 +1091,18 @@
     "code_ready": "Pronto da usare",
     "code_used": "Usato",
     "code_revoked": "Revocato",
-    "error_unauthorized": "Devi accedere come partner"
+    "error_unauthorized": "Devi accedere come partner",
+    "dashboard_events": "I tuoi matrimoni white label",
+    "dashboard_events_empty": "Nessun evento ancora. Crea un evento per un cliente o condividi un codice con gli sposi.",
+    "dashboard_create_event": "Crea evento per un cliente",
+    "dashboard_event_create_btn": "Crea",
+    "dashboard_event_name": "Nome degli sposi",
+    "dashboard_event_date": "Data del matrimonio",
+    "dashboard_event_location": "Luogo (città)",
+    "dashboard_event_church": "Cerimonia (nome chiesa, opzionale)",
+    "dashboard_event_venue": "Ricevimento (nome venue, opzionale)",
+    "dashboard_event_whitelabel_ok": "Evento creato e marchiato col tuo logo",
+    "dashboard_event_whitelabel_fallback": "Evento creato senza white label: acquista un pacchetto o usa un codice",
+    "dashboard_event_open": "Apri"
   }
 }

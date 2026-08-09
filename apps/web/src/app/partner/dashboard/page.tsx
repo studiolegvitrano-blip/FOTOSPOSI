@@ -32,6 +32,14 @@ interface PartnerCode {
   created_at: string;
 }
 
+interface PartnerEvent {
+  id: string;
+  couple_name: string;
+  date: string;
+  location: string | null;
+  code: string | null;
+}
+
 const PACKAGE_TIERS = ['premium', 'deluxe'] as const;
 
 export default function PartnerDashboardPage() {
@@ -40,6 +48,7 @@ export default function PartnerDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [partner, setPartner] = useState<PartnerProfile | null>(null);
   const [codes, setCodes] = useState<PartnerCode[]>([]);
+  const [events, setEvents] = useState<PartnerEvent[]>([]);
   const [buying, setBuying] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const [savingClaim, setSavingClaim] = useState(false);
@@ -47,6 +56,9 @@ export default function PartnerDashboardPage() {
   const [claimText, setClaimText] = useState('');
   const [website, setWebsite] = useState('');
   const [address, setAddress] = useState('');
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const [eventMsg, setEventMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [newEvent, setNewEvent] = useState({ coupleName: '', date: '', location: '', church: '', venue: '' });
 
   const load = useCallback(async () => {
     const me = await fetch('/api/partner/me').then((r) => r.json());
@@ -60,6 +72,8 @@ export default function PartnerDashboardPage() {
     setAddress(me.partner.address ?? '');
     const codesRes = await fetch('/api/partner/codes').then((r) => r.json());
     if (!codesRes.error) setCodes(codesRes.codes ?? []);
+    const eventsRes = await fetch('/api/partner/events').then((r) => r.json());
+    if (!eventsRes.error) setEvents(eventsRes.events ?? []);
     setLoading(false);
   }, [router]);
 
@@ -133,6 +147,36 @@ export default function PartnerDashboardPage() {
     }
   };
 
+  // Modello ibrido: il partner crea direttamente l'evento per il cliente e il
+  // white label viene attivato subito col primo codice available del pacchetto.
+  const handleCreateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreatingEvent(true);
+    setEventMsg(null);
+    try {
+      const res = await fetch('/api/partner/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newEvent),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setEventMsg({ ok: false, text: json.error || 'Errore' });
+        return;
+      }
+      setEventMsg({
+        ok: json.whiteLabel,
+        text: json.whiteLabel ? t('dashboard_event_whitelabel_ok') : t('dashboard_event_whitelabel_fallback'),
+      });
+      setNewEvent({ coupleName: '', date: '', location: '', church: '', venue: '' });
+      const eventsRes = await fetch('/api/partner/events').then((r) => r.json());
+      if (!eventsRes.error) setEvents(eventsRes.events ?? []);
+      if (json.whiteLabel && json.event?.id) router.push(`/events/${json.event.id}`);
+    } finally {
+      setCreatingEvent(false);
+    }
+  };
+
   const handleLogout = async () => {
     await signOut();
     router.push('/partner/login');
@@ -202,6 +246,92 @@ export default function PartnerDashboardPage() {
                 </Badge>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('dashboard_events')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 max-h-64 overflow-y-auto">
+            {events.length === 0 && (
+              <p className="text-sm text-text-muted">{t('dashboard_events_empty')}</p>
+            )}
+            {events.map((ev) => (
+              <div key={ev.id} className="flex items-center justify-between border rounded px-3 py-2 text-sm">
+                <div>
+                  <p className="font-medium">{ev.couple_name}</p>
+                  <p className="text-xs text-text-muted">
+                    {new Date(ev.date).toLocaleDateString('it-IT')}{ev.location ? ` — ${ev.location}` : ''}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" asChild>
+                  <a href={`/events/${ev.id}`}>{t('dashboard_event_open')}</a>
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('dashboard_create_event')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCreateEvent} className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="ev-name">{t('dashboard_event_name')}</Label>
+                <Input
+                  id="ev-name"
+                  value={newEvent.coupleName}
+                  onChange={(e) => setNewEvent({ ...newEvent, coupleName: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ev-date">{t('dashboard_event_date')}</Label>
+                <Input
+                  id="ev-date"
+                  type="date"
+                  value={newEvent.date}
+                  onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ev-location">{t('dashboard_event_location')}</Label>
+                <Input
+                  id="ev-location"
+                  value={newEvent.location}
+                  onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ev-church">{t('dashboard_event_church')}</Label>
+                <Input
+                  id="ev-church"
+                  value={newEvent.church}
+                  onChange={(e) => setNewEvent({ ...newEvent, church: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ev-venue">{t('dashboard_event_venue')}</Label>
+                <Input
+                  id="ev-venue"
+                  value={newEvent.venue}
+                  onChange={(e) => setNewEvent({ ...newEvent, venue: e.target.value })}
+                />
+              </div>
+              {eventMsg && (
+                <p className={`text-sm ${eventMsg.ok ? 'text-success' : 'text-destructive'}`}>{eventMsg.text}</p>
+              )}
+              <Button type="submit" disabled={creatingEvent}>
+                {creatingEvent ? '...' : t('dashboard_event_create_btn')}
+              </Button>
+            </form>
           </CardContent>
         </Card>
       </div>
