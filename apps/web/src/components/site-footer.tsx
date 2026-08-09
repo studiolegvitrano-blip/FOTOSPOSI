@@ -33,6 +33,10 @@ export default async function SiteFooter() {
           ·{' '}
           <Link href="/privacy" className="hover:text-brand transition-colors">
             Privacy
+          </Link>{' '}
+          ·{' '}
+          <Link href="/partner/login" className="hover:text-brand transition-colors font-medium">
+            {isIt ? 'Partner' : 'Partners'}
           </Link>
         </span>
       </div>

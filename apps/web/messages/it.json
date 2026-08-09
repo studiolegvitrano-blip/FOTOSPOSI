@@ -10,7 +10,7 @@
     "create": "Crea",
     "search": "Cerca",
     "loading": "Caricamento...",
-    "error_generic": "Qualcosa è andato storto. Riprova.",
+    "error_generic": "Qualcosa Ã¨ andato storto. Riprova.",
     "or_continue_with": "o continua con",
     "error_network": "Errore di connessione. Controlla la tua rete.",
     "back": "Indietro",
@@ -29,7 +29,7 @@
     "gallery": "Galleria",
     "content": "Contenuto",
     "media": "Media (opzionale)",
-    "back_to_event": "← Torna all'evento",
+    "back_to_event": "â† Torna all'evento",
     "manage": "Gestisci",
     "list": "Elenco",
     "options": "Opzioni",
@@ -72,7 +72,7 @@
     "address_label": "Indirizzo",
     "address_placeholder": "Via Roma 1",
     "vat_label": "Partita IVA",
-    "city_label": "Città",
+    "city_label": "CittÃ ",
     "region_label": "Regione / Provincia",
     "country_label": "Paese",
     "website_label": "Sito web (facoltativo)",
@@ -80,15 +80,15 @@
     "description_label": "Presentati in breve",
     "description_placeholder": "Racconta il tuo stile, i tuoi servizi e cosa ti distingue. Max 2000 caratteri.",
     "years_experience_label": "Anni di esperienza",
-    "pricing_from_label": "Prezzo a partire da (€)",
+    "pricing_from_label": "Prezzo a partire da (â‚¬)",
     "agreed_terms": "Accetto i termini di servizio e l'informativa sulla privacy di Sposi.live.",
-    "marketing_consent": "Desidero ricevere aggiornamenti e novità dal marketplace di Sposi.live.",
+    "marketing_consent": "Desidero ricevere aggiornamenti e novitÃ  dal marketplace di Sposi.live.",
     "submit": "Invia richiesta",
     "submitting": "Invio in corso...",
     "success_title": "Richiesta inviata con successo!",
-    "success_message": "Grazie per esserti candidato. Il nostro team la esaminerà entro 48 ore e ti contatterà via email.",
+    "success_message": "Grazie per esserti candidato. Il nostro team la esaminerÃ  entro 48 ore e ti contatterÃ  via email.",
     "submit_another": "Invia un'altra richiesta",
-    "error_generic": "Errore durante l'invio. Riprova più tardi.",
+    "error_generic": "Errore durante l'invio. Riprova piÃ¹ tardi.",
     "required_field": "Campo obbligatorio"
   },
   "home": {
@@ -163,7 +163,7 @@
     "drive_kicker": "Backup automatico",
     "drive_title": "Le vostre foto al sicuro su Google Drive",
     "drive_desc": "Ogni contenuto caricato viene copiato automaticamente sul vostro Google Drive: niente da fare, niente da perdere.",
-    "drive_caption": "Backup continuo, in qualità originale",
+    "drive_caption": "Backup continuo, in qualitÃ  originale",
     "pricing_title": "Un piano per ogni matrimonio",
     "pricing_subtitle": "Si parte gratis. Si cresce solo se serve.",
     "plan_free_name": "Free",
@@ -171,12 +171,12 @@
     "plan_deluxe_name": "Deluxe",
     "plan_free_features": [
       "Sito invito e QR code",
-      "Fino a 100 foto (qualità standard)",
+      "Fino a 100 foto (qualitÃ  standard)",
       "Wall e giochi base",
       "1 evento per account"
     ],
     "plan_premium_features": [
-      "Foto e video illimitati in qualità originale",
+      "Foto e video illimitati in qualitÃ  originale",
       "Tutti i giochi inclusi",
       "Backup su Google Drive",
       "Time Capsule",
@@ -190,7 +190,7 @@
       "Assistenza prioritaria"
     ],
     "plan_games_badge": "Giochi inclusi",
-    "plan_popular": "Più scelto",
+    "plan_popular": "PiÃ¹ scelto",
     "plan_cta": "Inizia gratis",
     "stats": [
       {
@@ -214,10 +214,10 @@
     "final_cta_subtitle": "Pronto in pochi minuti. Nessuna carta di credito richiesta.",
     "footer_tagline": "Contatti",
     "showcase_title": "Gli invitati hanno catturato il nostro giorno VERO.",
-    "showcase_subtitle": "Dalla cerimonia al brindisi, ogni scatto dei vostri invitati vive già dentro l'app. Aprite il vostro ricordo con un QR.",
+    "showcase_subtitle": "Dalla cerimonia al brindisi, ogni scatto dei vostri invitati vive giÃ  dentro l'app. Aprite il vostro ricordo con un QR.",
     "showcase_cta": "Crea il tuo sito invito gratis",
     "showcase_phone1_badge": "La cerimonia",
-    "showcase_phone1_caption": "Il momento del sì, tra lacrime e sorrisi.",
+    "showcase_phone1_caption": "Il momento del sÃ¬, tra lacrime e sorrisi.",
     "showcase_phone1_author": "Giulia, testimone",
     "showcase_phone2_badge": "L'arrivo",
     "showcase_phone2_caption": "L'ingresso degli sposi: la festa comincia.",
@@ -227,7 +227,7 @@
     "showcase_phone3_author": "Sofia, cugina della sposa",
     "fb_feed_demo_title": "Una giornata, raccontata dai tuoi ospiti",
     "fb_feed_demo_subtitle": "Ecco come appariranno foto e video nella vostra app matrimonio",
-    "fb_feed_demo_caption_1": "La cerimonia è stata bellissima! Auguri agli sposi ❤️",
+    "fb_feed_demo_caption_1": "La cerimonia Ã¨ stata bellissima! Auguri agli sposi â¤ï¸",
     "fb_feed_demo_caption_2": "Il primo ballo: tutti emozionati!",
     "fb_feed_demo_caption_3": "Brindisi infinito al tavolo degli sposi",
     "fb_feed_demo_caption_4": "Il taglio della torta, infine",
@@ -246,7 +246,7 @@
     "login_email_label": "Email",
     "login_email_placeholder": "la.tua@email.com",
     "login_password_label": "Password",
-    "login_password_placeholder": "••••••••",
+    "login_password_placeholder": "â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢",
     "login_submit": "Accedi",
     "login_no_account": "Non hai un account?",
     "login_signup_link": "Registrati",
@@ -264,16 +264,16 @@
     "signup_phone_label": "Cellulare",
     "signup_gdpr_label": "Ho letto e accetto il trattamento dei dati personali (GDPR).",
     "signup_privacy_link": "Leggi l'informativa privacy",
-    "signup_marketing_label": "Acconsento facoltativamente alla condivisione dei miei dati con partner e fornitori per finalità di marketing.",
+    "signup_marketing_label": "Acconsento facoltativamente alla condivisione dei miei dati con partner e fornitori per finalitÃ  di marketing.",
     "signup_gdpr_required": "Devi accettare il trattamento dei dati personali per registrarti.",
     "signup_submit": "Registrati",
-    "signup_has_account": "Hai già un account?",
+    "signup_has_account": "Hai giÃ  un account?",
     "signup_login_link": "Accedi",
     "signup_terms": "Accetto i termini e condizioni",
     "confirm_title": "Conferma email",
     "confirm_message": "Controlla la tua email per confermare l'account.",
     "error_invalid_credentials": "Email o password non validi",
-    "error_email_taken": "Email già registrata",
+    "error_email_taken": "Email giÃ  registrata",
     "error_weak_password": "Password troppo debole (min 6 caratteri)"
   },
   "dashboard": {
@@ -330,10 +330,10 @@
     "cd_seconds": "Secondi",
     "cd_enter_app": "Entra nell'app",
     "cd_ceremony_title": "Benvenuti alla cerimonia!",
-    "cd_ceremony_subtitle": "Stiamo per dire il nostro Sì",
+    "cd_ceremony_subtitle": "Stiamo per dire il nostro SÃ¬",
     "cd_reception_title": "Benvenuti al ricevimento!",
     "cd_reception_subtitle": "Che la festa abbia inizio",
-    "cd_ended_title": "Grazie di aver reso questo giorno ancora più bello",
+    "cd_ended_title": "Grazie di aver reso questo giorno ancora piÃ¹ bello",
     "cd_ended_subtitle": "Con affetto, i vostri Sposi",
     "music": "Colonna Sonora"
   },
@@ -363,7 +363,7 @@
     "story_body": "Racconta come vi siete conosciuti",
     "gallery_section": "Galleria",
     "registry_section": "Lista Nozze",
-    "registry_text": "Il vostro regalo più grande è la vostra presenza, ma se desiderate contribuire...",
+    "registry_text": "Il vostro regalo piÃ¹ grande Ã¨ la vostra presenza, ma se desiderate contribuire...",
     "rsvp_section": "RSVP",
     "rsvp_cta": "Conferma la tua presenza",
     "rsvp_email": "Email per RSVP",
@@ -386,7 +386,7 @@
     "navetta_contatti": "Contatti tassisti",
     "navetta_matchmaking": "Passaggio in auto",
     "template_preview": "Anteprima template",
-    "back_to_event": "← Evento",
+    "back_to_event": "â† Evento",
     "select_template_first": "Seleziona prima un template per iniziare.",
     "font_label": "Font:",
     "main_invitation": "Invito principale",
@@ -409,14 +409,14 @@
     "playlist_desc": "Link Spotify o richieste",
     "hashtag_desc": "Hashtag social dell'evento",
     "countdown_desc": "Quanto manca al grande giorno",
-    "navetta_desc": "Orari, parcheggi, passaggio in auto per chi cerca/dà un passaggio",
+    "navetta_desc": "Orari, parcheggi, passaggio in auto per chi cerca/dÃ  un passaggio",
     "ceremony_title_ph": "Titolo (es. Chiesa SS Mediatrice)",
     "ceremony_address_ph": "Indirizzo completo (via, civico, comune)",
     "ceremony_note_ph": "Note sulla cerimonia...",
     "reception_title_ph": "Nome location",
     "reception_address_ph": "Indirizzo completo (via, civico, comune)",
     "reception_note_ph": "Note ricevimento...",
-    "story_title_ph": "Titolo (es. Come tutto è iniziato)",
+    "story_title_ph": "Titolo (es. Come tutto Ã¨ iniziato)",
     "story_body_ph": "Scrivi la vostra storia...",
     "registry_text_ph": "Testo di ringraziamento...",
     "registry_iban_ph": "IBAN (opzionale)",
@@ -436,14 +436,14 @@
     "navetta_mappa_ph": "Link Google Maps parcheggio",
     "navetta_note_ph": "Info parcheggio e note...",
     "navetta_contatti_ph": "Contatti tassisti / NCC (opzionale)",
-    "navetta_matchmaking_label": "Attiva matchmaking: chi cerca/dà passaggio",
+    "navetta_matchmaking_label": "Attiva matchmaking: chi cerca/dÃ  passaggio",
     "save_content": "Salva contenuti",
     "saving": "Salvataggio...",
     "republish": "Ripubblica",
     "publish_site": "Pubblica sito",
     "preview_heading": "Anteprima sito invito",
     "follow_us_hashtag": "Seguici con l'hashtag",
-    "powered_by": "Sposi.live · Sito invito digitale",
+    "powered_by": "Sposi.live Â· Sito invito digitale",
     "site_published": "Sito pubblicato:"
   },
   "wall": {
@@ -472,7 +472,7 @@
     "vote_title": "Vota",
     "vote_your_vote": "Il tuo voto",
     "vote_cast": "Vota!",
-    "vote_already_cast": "Hai già votato",
+    "vote_already_cast": "Hai giÃ  votato",
     "dress_vote_sposo": "Vestito dello Sposo",
     "dress_vote_sposa": "Vestito della Sposa",
     "dress_vote_rate": "Vota da 1 a 5",
@@ -489,7 +489,7 @@
     "quiz": "Quiz sugli Sposi",
     "quiz_play": "Gioca",
     "manage_title": "Gestione Giochi",
-    "manage_subtitle": "Attiva i giochi che vuoi offrire ai tuoi invitati. Ogni gioco può essere configurato singolarmente.",
+    "manage_subtitle": "Attiva i giochi che vuoi offrire ai tuoi invitati. Ogni gioco puÃ² essere configurato singolarmente.",
     "manage_games": "Gestisci giochi",
     "load_suggestions": "Carica domande suggerite"
   },
@@ -550,7 +550,7 @@
   },
   "video_challenges": {
     "title": "Sfide Addio al Celibato/Nubilato",
-    "subtitle": "Prima = all'addio al celibato/nubilato con gli amici · Dopo = durante la cerimonia",
+    "subtitle": "Prima = all'addio al celibato/nubilato con gli amici Â· Dopo = durante la cerimonia",
     "gallery": "Sfide",
     "viewer": "Dettaglio",
     "before": "Prima",
@@ -573,14 +573,14 @@
     "games_played": "giochi fatti",
     "share_card": "Condividi la tua card",
     "download_card": "Scarica card",
-    "coming_soon": "La tua card Wrapped è in preparazione..."
+    "coming_soon": "La tua card Wrapped Ã¨ in preparazione..."
   },
   "commerce": {
     "shop": "Shop",
     "no_products": "Nessun prodotto disponibile",
     "type": "Tipo:",
     "redirecting": "Reindirizzamento...",
-    "back_to_shop": "← Torna allo shop",
+    "back_to_shop": "â† Torna allo shop",
     "payment_success_title": "Pagamento riuscito!",
     "payment_success_message": "Grazie per il tuo ordine. Riceverai una conferma via email.",
     "your_orders": "I tuoi ordini",
@@ -716,17 +716,17 @@
     "contacted": "Contattati",
     "approved": "Approvati",
     "active": "Attivi",
-    "b2b_conversion": "Conversione B2B (contattati → attivi)",
+    "b2b_conversion": "Conversione B2B (contattati â†’ attivi)",
     "no_suppliers": "Nessun fornitore nel marketplace. Aggiungi fornitori dalla sezione Marketplace per vedere le metriche di conversione B2B."
   },
   "errors": {
     "not_found": "Pagina non trovata",
-    "not_found_description": "La pagina che cerchi non esiste o è stata spostata.",
+    "not_found_description": "La pagina che cerchi non esiste o Ã¨ stata spostata.",
     "unauthorized": "Accesso negato",
     "unauthorized_description": "Devi accedere per vedere questa pagina.",
     "forbidden": "Non hai i permessi necessari",
     "server_error": "Errore del server",
-    "server_error_description": "Riprova più tardi."
+    "server_error_description": "Riprova piÃ¹ tardi."
   },
   "brand": {
     "fotosposi": "Sposi.live",
@@ -823,35 +823,35 @@
     },
     "q": {
       "generale": {
-        "g1": "Cos’è Sposi.live?",
+        "g1": "Cosâ€™Ã¨ Sposi.live?",
         "g2": "Quanto costa?",
         "g3": "Serve una carta di credito per iniziare?",
         "g4": "Posso provarlo prima di decidere?",
-        "g5": "Funziona anche all’estero?",
-        "g6": "Il mio matrimonio è in un altro paese, posso usare JustMarry.live?"
+        "g5": "Funziona anche allâ€™estero?",
+        "g6": "Il mio matrimonio Ã¨ in un altro paese, posso usare JustMarry.live?"
       },
       "piattaforma": {
         "p1": "Come funziona la creazione di un evento?",
         "p2": "Cosa possono fare gli invitati?",
         "p3": "Posso invitare le persone con un QR code?",
         "p4": "Quanto dura la finestra di upload?",
-        "p5": "Posso gestire più eventi insieme?",
+        "p5": "Posso gestire piÃ¹ eventi insieme?",
         "p6": "Cosa succede se cambia la data del matrimonio?"
       },
       "foto": {
         "f1": "Dove vengono salvate le foto?",
         "f2": "Le foto vengono compresse?",
-        "f3": "Posso scaricare le foto in alta qualità?",
-        "f4": "C’è un backup su Google Drive?",
-        "f5": "Il watermark è obbligatorio?",
-        "f6": "Chi può cancellare le foto dalla galleria?"
+        "f3": "Posso scaricare le foto in alta qualitÃ ?",
+        "f4": "Câ€™Ã¨ un backup su Google Drive?",
+        "f5": "Il watermark Ã¨ obbligatorio?",
+        "f6": "Chi puÃ² cancellare le foto dalla galleria?"
       },
       "giochi": {
         "j1": "Quali giochi sono inclusi?",
-        "j2": "Cos’è il Video Guestbook?",
-        "j3": "Cos’è la Capsula del Tempo?",
+        "j2": "Cosâ€™Ã¨ il Video Guestbook?",
+        "j3": "Cosâ€™Ã¨ la Capsula del Tempo?",
         "j4": "Come funziona la Caccia alla Foto?",
-        "j5": "Cos’è il Wall?",
+        "j5": "Cosâ€™Ã¨ il Wall?",
         "j6": "Posso attivare i giochi solo per alcuni invitati?"
       },
       "commerce": {
@@ -867,75 +867,75 @@
         "pr2": "Siamo conformi al GDPR?",
         "pr3": "Posso cancellare i dati del mio matrimonio?",
         "pr4": "Le foto sono visibili a tutti?",
-        "pr5": "Il riconoscimento facciale è obbligatorio?",
+        "pr5": "Il riconoscimento facciale Ã¨ obbligatorio?",
         "pr6": "Come posso esercitare i miei diritti?"
       },
       "tecnico": {
         "t1": "Quali browser sono supportati?",
         "t2": "Funziona da cellulare?",
         "t3": "Posso usare la PWA anche offline?",
-        "t4": "Come faccio se un invitato ha problemi con l’upload?",
-        "t5": "Cosa succede se la connessione cade durante l’upload?",
+        "t4": "Come faccio se un invitato ha problemi con lâ€™upload?",
+        "t5": "Cosa succede se la connessione cade durante lâ€™upload?",
         "t6": "Come contatto il supporto?",
         "t7": "Quali provider di pagamento usate?"
       }
     },
     "a": {
       "generale": {
-        "g1": "Sposi.live è una piattaforma completa per la gestione del matrimonio: sito evento, raccolta foto e video, giochi interattivi, lista nozze, shop e molto altro.",
-        "g2": "Il piano Free è gratuito per sempre. Premium e Deluxe sono a pagamento una tantum e includono funzioni avanzate come video illimitati, qualità originale e giochi completi.",
+        "g1": "Sposi.live Ã¨ una piattaforma completa per la gestione del matrimonio: sito evento, raccolta foto e video, giochi interattivi, lista nozze, shop e molto altro.",
+        "g2": "Il piano Free Ã¨ gratuito per sempre. Premium e Deluxe sono a pagamento una tantum e includono funzioni avanzate come video illimitati, qualitÃ  originale e giochi completi.",
         "g3": "No. Puoi creare un evento Free senza carta di credito e decidere in seguito se passare a un piano a pagamento.",
-        "g4": "Sì, il piano Free ti permette di provare tutte le funzioni principali senza costi.",
-        "g5": "Sì, JustMarry.live è la versione internazionale della piattaforma con traduzioni in inglese, tedesco, francese e spagnolo.",
+        "g4": "SÃ¬, il piano Free ti permette di provare tutte le funzioni principali senza costi.",
+        "g5": "SÃ¬, JustMarry.live Ã¨ la versione internazionale della piattaforma con traduzioni in inglese, tedesco, francese e spagnolo.",
         "g6": "Certo. JustMarry.live supporta matrimoni internazionali con contenuti localizzati per paese."
       },
       "piattaforma": {
         "p1": "Inserisci la data, i nomi degli sposi e le sedi di cerimonia e ricevimento. In pochi minuti la piattaforma genera il sito evento e attiva le funzioni disponibili.",
         "p2": "Gli invitati possono caricare foto e video, partecipare ai giochi, firmare il guestbook, votare e contribuire alla playlist condivisa.",
-        "p3": "Sì, ogni evento ha un QR code che gli invitati scansionano con il telefono per accedere direttamente alle funzioni dell’evento.",
-        "p4": "La finestra di upload parte 18 giorni prima dell’evento e si chiude 2 giorni dopo, così tutti hanno il tempo di caricare senza stress.",
-        "p5": "Sì, puoi creare e gestire più eventi dallo stesso account, ciascuno con le proprie impostazioni e invitati.",
-        "p6": "Puoi aggiornare la data e la posizione in qualsiasi momento dalle impostazioni dell’evento."
+        "p3": "SÃ¬, ogni evento ha un QR code che gli invitati scansionano con il telefono per accedere direttamente alle funzioni dellâ€™evento.",
+        "p4": "La finestra di upload parte 18 giorni prima dellâ€™evento e si chiude 2 giorni dopo, cosÃ¬ tutti hanno il tempo di caricare senza stress.",
+        "p5": "SÃ¬, puoi creare e gestire piÃ¹ eventi dallo stesso account, ciascuno con le proprie impostazioni e invitati.",
+        "p6": "Puoi aggiornare la data e la posizione in qualsiasi momento dalle impostazioni dellâ€™evento."
       },
       "foto": {
         "f1": "Le foto vengono salvate su Cloudflare R2 per la visualizzazione immediata e in modo permanente sul Google Drive dello sposo come backup.",
-        "f2": "Sì, le foto oltre 2 MB vengono compresse per garantire caricamenti veloci. Le foto originali restano comunque disponibili per gli sposi sui piani a pagamento.",
-        "f3": "Sì, gli sposi possono scaricare le foto in alta qualità, sia dalla galleria sia dal backup su Google Drive.",
-        "f4": "Sì, se colleghi Google Drive, tutte le foto e i video vengono sincronizzati automaticamente in cartelle organizzate.",
-        "f5": "Il watermark con i nomi degli sposi e il logo è applicato automaticamente sulle foto visibili in galleria, mentre l’originale resta pulito su Drive.",
-        "f6": "Solo gli sposi, i delegati e l’uploader della foto possono eliminarla dalla galleria."
+        "f2": "SÃ¬, le foto oltre 2 MB vengono compresse per garantire caricamenti veloci. Le foto originali restano comunque disponibili per gli sposi sui piani a pagamento.",
+        "f3": "SÃ¬, gli sposi possono scaricare le foto in alta qualitÃ , sia dalla galleria sia dal backup su Google Drive.",
+        "f4": "SÃ¬, se colleghi Google Drive, tutte le foto e i video vengono sincronizzati automaticamente in cartelle organizzate.",
+        "f5": "Il watermark con i nomi degli sposi e il logo Ã¨ applicato automaticamente sulle foto visibili in galleria, mentre lâ€™originale resta pulito su Drive.",
+        "f6": "Solo gli sposi, i delegati e lâ€™uploader della foto possono eliminarla dalla galleria."
       },
       "giochi": {
         "j1": "Sono inclusi Wall, Vota il Vestito, Caccia alla Foto, Quiz sugli Sposi, Tavolo Selfie, Primo Alcolico, Wow Walk e Sfide Video. I giochi avanzati richiedono il piano Premium o Deluxe.",
         "j2": "Il Video Guestbook permette agli invitati di registrare un messaggio video di auguri che gli sposi potranno conservare per sempre.",
         "j3": "La Capsula del Tempo permette di sigillare messaggi e foto da riaprire in una data futura, per esempio al decimo anniversario.",
-        "j4": "Gli invitati si registrano, ricevono dei compiti fotografici e guadagnano punti caricando le foto richieste. Vince chi ottiene più punti.",
-        "j5": "Il Wall è un flusso live di foto e video dell’evento che viene proiettato o mostrato in tempo reale durante la festa.",
-        "j6": "Sì, puoi attivare o disattivare ogni gioco dalle impostazioni, in base al piano e alle preferenze."
+        "j4": "Gli invitati si registrano, ricevono dei compiti fotografici e guadagnano punti caricando le foto richieste. Vince chi ottiene piÃ¹ punti.",
+        "j5": "Il Wall Ã¨ un flusso live di foto e video dellâ€™evento che viene proiettato o mostrato in tempo reale durante la festa.",
+        "j6": "SÃ¬, puoi attivare o disattivare ogni gioco dalle impostazioni, in base al piano e alle preferenze."
       },
       "commerce": {
         "c1": "Lo Shop permette agli sposi di creare un catalogo di prodotti legati al matrimonio che gli invitati possono acquistare.",
         "c2": "La Lista Nozze permette agli invitati di contribuire con un regalo in denaro o un oggetto scelto dalla lista, con pagamento sicuro.",
-        "c3": "Sì, tutti i pagamenti sono processati tramite Stripe con crittografia e conformità PCI.",
+        "c3": "SÃ¬, tutti i pagamenti sono processati tramite Stripe con crittografia e conformitÃ  PCI.",
         "c4": "I pagamenti sono gestiti da Stripe, il leader mondiale dei pagamenti online. Non gestiamo mai direttamente i dati della carta.",
-        "c5": "Sì, tramite Gelato puoi vendere prodotti personalizzati stampati su richiesta senza gestire magazzino.",
+        "c5": "SÃ¬, tramite Gelato puoi vendere prodotti personalizzati stampati su richiesta senza gestire magazzino.",
         "c6": "Le commissioni di elaborazione pagamento sono quelle standard di Stripe. Le commissioni di piattaforma variano in base al piano."
       },
       "privacy": {
-        "pr1": "Trattiamo i dati degli invitati solo per il funzionamento del matrimonio: foto, partecipazione ai giochi e comunicazioni relative all’evento.",
-        "pr2": "Sì, siamo conformi al GDPR. Puoi esportare o cancellare tutti i dati in qualsiasi momento.",
-        "pr3": "Sì, puoi cancellare l’evento e tutti i dati associati dalle impostazioni.",
-        "pr4": "No, le foto sono visibili solo agli invitati dell’evento attraverso il QR code o l’invito.",
-        "pr5": "No, il riconoscimento facciale è una funzione opzionale che richiede il consenso esplicito di ogni invitato.",
-        "pr6": "Puoi contattarci scrivendo all’indirizzo email indicato nel footer per richiedere l’accesso, la rettifica o la cancellazione dei tuoi dati."
+        "pr1": "Trattiamo i dati degli invitati solo per il funzionamento del matrimonio: foto, partecipazione ai giochi e comunicazioni relative allâ€™evento.",
+        "pr2": "SÃ¬, siamo conformi al GDPR. Puoi esportare o cancellare tutti i dati in qualsiasi momento.",
+        "pr3": "SÃ¬, puoi cancellare lâ€™evento e tutti i dati associati dalle impostazioni.",
+        "pr4": "No, le foto sono visibili solo agli invitati dellâ€™evento attraverso il QR code o lâ€™invito.",
+        "pr5": "No, il riconoscimento facciale Ã¨ una funzione opzionale che richiede il consenso esplicito di ogni invitato.",
+        "pr6": "Puoi contattarci scrivendo allâ€™indirizzo email indicato nel footer per richiedere lâ€™accesso, la rettifica o la cancellazione dei tuoi dati."
       },
       "tecnico": {
         "t1": "Supportiamo Chrome, Safari, Firefox ed Edge nelle versioni recenti, su desktop e mobile.",
-        "t2": "Sì, l’intera piattaforma è responsive e funziona perfettamente da telefono, anche come app installabile (PWA).",
-        "t3": "La PWA supporta la modalità offline per le funzioni principali, mentre l’upload viene messo in coda e completato quando torni online.",
+        "t2": "SÃ¬, lâ€™intera piattaforma Ã¨ responsive e funziona perfettamente da telefono, anche come app installabile (PWA).",
+        "t3": "La PWA supporta la modalitÃ  offline per le funzioni principali, mentre lâ€™upload viene messo in coda e completato quando torni online.",
         "t4": "Puoi contattarci dal supporto. La maggior parte dei problemi si risolve aggiornando il browser e riprovando.",
-        "t5": "L’upload viene messo in pausa e ripreso automaticamente appena la connessione torna disponibile, grazie alla coda offline.",
-        "t6": "Scrivici all’email di supporto indicata nel footer, ti rispondiamo entro 24 ore lavorative.",
+        "t5": "Lâ€™upload viene messo in pausa e ripreso automaticamente appena la connessione torna disponibile, grazie alla coda offline.",
+        "t6": "Scrivici allâ€™email di supporto indicata nel footer, ti rispondiamo entro 24 ore lavorative.",
         "t7": "Usiamo Stripe per i pagamenti online, Resend per le email e Spotify per la playlist condivisa."
       }
     }
@@ -974,7 +974,7 @@
     "reminded": "Sollecito inviato",
     "reminded_all": "Solleciti inviati: {n}",
     "remind_failed": "Sollecito non inviato",
-    "name_required": "Il nome è obbligatorio",
+    "name_required": "Il nome Ã¨ obbligatorio",
     "contact_required": "Inserisci almeno email o WhatsApp",
     "export_pdf": "PDF",
     "export_word": "Word",
@@ -998,7 +998,7 @@
     "guest_name_placeholder": "Nome e cognome",
     "adult_label": "Adulto",
     "minor_label": "Minore",
-    "age_label": "Età",
+    "age_label": "EtÃ ",
     "age_placeholder": "Es. 7",
     "intolerances_label": "Intolleranze alimentari",
     "intolerances_hint": "Seleziona tutte le intolleranze (per il menu).",
@@ -1015,7 +1015,7 @@
     "diet_altro": "Altro",
     "error_generic": "Errore nell'invio. Riprova.",
     "submitting_label": "Invio in corso...",
-    "host_required": "è obbligatorio",
+    "host_required": "Ã¨ obbligatorio",
     "guest_label": "Accompagnatore",
     "section_title": "RSVP",
     "section_confirm": "Conferma la tua presenza",
@@ -1030,14 +1030,14 @@
     "sections": [
       {
         "h": "1. Titolare del trattamento",
-        "p": "Il titolare del trattamento è il gestore della piattaforma Sposi.live / JustMarry.live, raggiungibile all'indirizzo info@sposi.live (Italia)."
+        "p": "Il titolare del trattamento Ã¨ il gestore della piattaforma Sposi.live / JustMarry.live, raggiungibile all'indirizzo info@sposi.live (Italia)."
       },
       {
         "h": "2. Dati che raccogliamo",
         "p": "Raccogliamo i dati che ci fornisci direttamente: nome, cognome, email, telefono, dati dell'evento (luogo, data, ospiti) e i contenuti che carichi (foto, video, messaggi). Quando accedi tramite Google o Facebook riceviamo dal provider nome, email e immagine del profilo."
       },
       {
-        "h": "3. Finalità del trattamento",
+        "h": "3. FinalitÃ  del trattamento",
         "p": "I dati sono trattati per organizzare il tuo evento, creare la galleria condivisa, gestire inviti e prenotazioni, salvare i backup su servizi cloud e inviarti comunicazioni relative alla piattaforma."
       },
       {
@@ -1046,16 +1046,51 @@
       },
       {
         "h": "5. Conservazione dei dati",
-        "p": "I dati vengono conservati per la durata del servizio e, successivamente, per il tempo richiesto dagli obblighi fiscali e legali. Le foto e i video dell'evento restano disponibili finché l'evento è attivo."
+        "p": "I dati vengono conservati per la durata del servizio e, successivamente, per il tempo richiesto dagli obblighi fiscali e legali. Le foto e i video dell'evento restano disponibili finchÃ© l'evento Ã¨ attivo."
       },
       {
         "h": "6. I tuoi diritti",
-        "p": "Hai diritto di accesso, rettifica, cancellazione, limitazione, portabilità e opposizione al trattamento dei tuoi dati. Puoi esercitarli scrivendo all'indirizzo email indicato. Hai inoltre il diritto di proporre reclamo all'autorità di protezione dei dati personali."
+        "p": "Hai diritto di accesso, rettifica, cancellazione, limitazione, portabilitÃ  e opposizione al trattamento dei tuoi dati. Puoi esercitarli scrivendo all'indirizzo email indicato. Hai inoltre il diritto di proporre reclamo all'autoritÃ  di protezione dei dati personali."
       },
       {
         "h": "7. Contatti",
         "p": "Per qualsiasi domanda sul trattamento dei dati scrivi a info@sposi.live o info@justmarry.live."
       }
     ]
+  },
+  "partner": {
+    "login_title": "Area Partner",
+    "login_submit": "Accedi",
+    "forgot_password": "Password dimenticata?",
+    "no_account": "Non hai un account?",
+    "signup_link": "Registrati come nuovo partner",
+    "sposi_login_link": "Sei uno sposo? Vai al login per gli sposi",
+    "signup_title": "Registrati come Partner",
+    "signup_submit": "Crea account partner",
+    "name_label": "Nome e cognome",
+    "company_label": "Nome attività / ristorante",
+    "company_placeholder": "Es. Villa dei Fiori",
+    "has_account": "Hai già un account?",
+    "login_link": "Accedi",
+    "login_link_after_signup": "Vai al login",
+    "confirm_message": "Controlla la tua email per confermare la registrazione. Se sei già tra i nostri collaboratori, potrai accedere con lo stesso account.",
+    "dashboard_title": "Portale Partner",
+    "dashboard_offerta": "Offerta bianca per i tuoi clienti",
+    "dashboard_packages": "Pacchetti licenze",
+    "dashboard_codes": "I tuoi codici",
+    "dashboard_codes_empty": "Nessun codice ancora. Acquista un pacchetto per ricevere i tuoi codici da regalare ai clienti.",
+    "dashboard_logo": "Il tuo logo",
+    "dashboard_claim": "Testo 'offerto da'",
+    "dashboard_save": "Salva",
+    "dashboard_saved": "Salvato",
+    "dashboard_logout": "Esci",
+    "package_premium": "Premium",
+    "package_deluxe": "Deluxe",
+    "package_buy": "Acquista",
+    "package_unit_price": "€{price} per evento",
+    "code_ready": "Pronto da usare",
+    "code_used": "Usato",
+    "code_revoked": "Revocato",
+    "error_unauthorized": "Devi accedere come partner"
   }
 }

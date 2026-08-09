@@ -39,6 +39,7 @@ const nextConfig: NextConfig = {
     '@fotosposi/notifications',
     '@fotosposi/ui',
     '@fotosposi/video-overlay',
+    '@fotosposi/partner',
   ],
   // Make sure Vercel's function tracer bundles the ffmpeg-static binary (it's invoked via
   // child_process.spawn, which the tracer can't follow like a normal `require`).

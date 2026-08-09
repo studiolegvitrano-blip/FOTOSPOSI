@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "@fotosposi/web",
   "version": "0.1.0",
   "private": true,
@@ -22,6 +22,7 @@
     "@fotosposi/media": "*",
     "@fotosposi/music": "*",
     "@fotosposi/notifications": "*",
+    "@fotosposi/partner": "*",
     "@fotosposi/photo-overlay": "*",
     "@fotosposi/r2-storage": "*",
     "@fotosposi/site-builder": "*",
