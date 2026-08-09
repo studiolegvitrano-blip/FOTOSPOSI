@@ -6,7 +6,8 @@ import { applyVideoOverlay } from '@fotosposi/video-overlay';
 import { applyOverlay, detectWatermark, type WatermarkPresence } from '@fotosposi/photo-overlay';
 import sharp from 'sharp';
 import { watermarkFontFamily } from '@/lib/watermark-fonts';
-import { ensureWatermarkFonts, loadBrandLogo, loadWatermarkFontBuffer } from '@/lib/watermark-fonts.server';
+import { ensureWatermarkFonts, loadBrandLogo, loadPartnerLogo, loadWatermarkFontBuffer } from '@/lib/watermark-fonts.server';
+import { getEventPartner } from '@fotosposi/partner';
 
 // I glifi dei watermark richiedono font presenti nella lambda (vedi watermark-fonts.ts).
 ensureWatermarkFonts();
@@ -230,6 +231,7 @@ async function applyWatermark(
   fontFamily = 'Playfair Display',
   logoPng?: Buffer | null,
   fontBuffer?: Buffer | null,
+  partnerLogoPng?: Buffer | null,
 ): Promise<Buffer> {
   return await applyOverlay(buffer, {
     format: 'square',
@@ -241,6 +243,7 @@ async function applyWatermark(
       fontFamily,
       fontBuffer,
       brandLogoBuffer: logoPng,
+      partnerLogoBuffer: partnerLogoPng,
     },
   });
 }
@@ -313,6 +316,14 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
   // FIX 28/07/2026: bytes del TTF reale, per l'embedding @font-face che bypassa
   // fontconfig di sistema (vedi packages/photo-overlay/src/index.ts).
   const wmFontBuffer = loadWatermarkFontBuffer(event?.watermark_font);
+  // B2B white label (09/08/2026): logo del partner sponsor dell'evento da
+  // compositare in ALTO A SINISTRA, speculare al logo brand (alto a destra).
+  // Caricato UNA volta per evento (non per item) — mai lancia, null se assente.
+  const { partner: eventPartner } = await getEventPartner(eventId);
+  const partnerLogo = eventPartner?.logo_url ? await loadPartnerLogo(eventPartner.logo_url) : null;
+  if (eventPartner && !partnerLogo) {
+    console.warn(`[process-queue] evento ${eventId} è white label (partner ${eventPartner.name}) ma logo non caricabile`);
+  }
 
   const tokenResp = await getDriveToken(eventId);
   let token = tokenResp.token;
@@ -358,6 +369,7 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
     wmLine2,
     wmFont,
     brandLogo,
+    partnerLogo,
     wmFontBuffer,
     uploaderMap,
     hasDrive,
@@ -408,6 +420,7 @@ async function processSingleItem(
     wmLine2: string;
     wmFont: string;
     brandLogo: Buffer | null;
+    partnerLogo: Buffer | null;
     wmFontBuffer: Buffer | null;
     uploaderMap: Record<string, { first_name?: string; last_name?: string; email?: string }>;
     hasDrive: boolean;
@@ -417,7 +430,7 @@ async function processSingleItem(
     r2Bucket: string;
   },
 ): Promise<boolean> {
-  const { supabase, eventId, event, wmLine1, wmLine2, wmFont, brandLogo, wmFontBuffer, hasDrive, token, folders, r2Client, r2Bucket } = ctx;
+  const { supabase, eventId, event, wmLine1, wmLine2, wmFont, brandLogo, partnerLogo, wmFontBuffer, hasDrive, token, folders, r2Client, r2Bucket } = ctx;
   try {
     await supabase.from('upload_queue').update({ status: 'processing' }).eq('id', item.id);
 
@@ -511,7 +524,7 @@ async function processSingleItem(
     let watermarkFailed = false;
     if (!isVideo) {
       try {
-        buffer = await applyWatermark(buffer as Buffer, wmLine1, wmLine2, event?.brand, wmFont, brandLogo, wmFontBuffer);
+        buffer = await applyWatermark(buffer as Buffer, wmLine1, wmLine2, event?.brand, wmFont, brandLogo, wmFontBuffer, partnerLogo);
       } catch (watermarkErr) {
         watermarkFailed = true;
         console.error(`[process-queue] watermark foto fallito per ${item.file_name} (event=${eventId}):`, watermarkErr);
@@ -526,6 +539,7 @@ async function processSingleItem(
             wordmark: getBrandLabel(event?.brand),
             fontFamily: wmFont,
             logoPng: brandLogo ?? undefined,
+            partnerLogoPng: partnerLogo ?? undefined,
           },
           maxDurationSeconds: 240,
         });
@@ -791,6 +805,9 @@ export async function repairWatermarkForEvent(
   const wmFont = watermarkFontFamily(event?.watermark_font);
   const brandLogo = loadBrandLogo(event?.brand);
   const wmFontBuffer = loadWatermarkFontBuffer(event?.watermark_font);
+  // B2B white label: logo partner (alto a sinistra) caricato una volta per evento.
+  const { partner: repairPartner } = await getEventPartner(eventId);
+  const partnerLogo = repairPartner?.logo_url ? await loadPartnerLogo(repairPartner.logo_url) : null;
 
   let repaired = 0;
   let skipped = 0;
@@ -823,7 +840,7 @@ export async function repairWatermarkForEvent(
 
       let watermarked: Buffer = buffer;
       try {
-        watermarked = await applyWatermark(buffer, wmLine1, '', event?.brand, wmFont, brandLogo, wmFontBuffer);
+        watermarked = await applyWatermark(buffer, wmLine1, '', event?.brand, wmFont, brandLogo, wmFontBuffer, partnerLogo);
       } catch (wmErr) {
         // Verifica post-fix: l'errore ora Ã¨ loud (non piÃ¹ silente). Logghiamo ma
         // non marchiamo il record come repaired: rimarrÃ  watermark_missing=true.

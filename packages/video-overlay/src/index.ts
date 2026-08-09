@@ -13,6 +13,9 @@ export interface VideoOverlayBranding {
   fontFamily?: string;
   /** PNG del logo brand: se presente sostituisce il wordmark testuale nella banda. */
   logoPng?: Buffer;
+  /** PNG del logo partner white label (B2B): compositato in ALTO A SINISTRA del
+   *  frame, speculare al logo brand (che vive nella banda in basso a destra). */
+  partnerLogoPng?: Buffer;
 }
 
 export { applyVideoOverlayRemote, isVpsWatermarkConfigured, VpsNotConfiguredError } from './remote';
@@ -146,6 +149,22 @@ export async function applyVideoOverlay(
     }
     await writeFile(overlayPath, overlayPng);
 
+    // Partner logo (B2B white label): PNG in alto a SINISTRA del frame, speculare
+    // al logo brand (nella banda in basso a destra). Renderizzato via sharp come
+    // l'overlay della banda e passato a ffmpeg come secondo overlay.
+    let partnerLogoPath: string | null = null;
+    if (branding.partnerLogoPng) {
+      try {
+        const partnerH = 64;
+        const partnerLogo = await sharp(branding.partnerLogoPng).resize({ height: partnerH }).png().toBuffer();
+        partnerLogoPath = join(dir, `partner-${randomUUID()}.png`);
+        await writeFile(partnerLogoPath, partnerLogo);
+      } catch {
+        // Logo partner malformato: si prosegue senza (solo banda + logo brand).
+        partnerLogoPath = null;
+      }
+    }
+
     // Encoding settings ottimizzati per riduzione ~1/5 del file size senza
     // perdita di qualità percepita (richiesta utente 28/07/2026: 10min video =
     // 1GB su R2/Drive è insostenibile per tier Free 10GB storage):
@@ -157,12 +176,15 @@ export async function applyVideoOverlay(
     //   - +faststart: moov atom davanti per streaming/playback immediato.
     // Risultato: 10min @ 1080p ~1GB → ~200MB, watermark applicato nel stesso
     // passaggio (filter_complex + overlay). Unico encoding, zero duplicazioni.
-    await run(bin, [
+    const ffmpegArgs = [
       '-y',
       '-i', inputPath,
       '-i', overlayPath,
+      ...(partnerLogoPath ? ['-i', partnerLogoPath] : []),
       '-filter_complex',
-      `[0:v]scale=${width}:-2[base];[base][1:v]overlay=0:main_h-overlay_h`,
+      partnerLogoPath
+        ? `[0:v]scale=${width}:-2[base];[base][1:v]overlay=0:main_h-overlay_h[wm];[wm][2:v]overlay=24:24`
+        : `[0:v]scale=${width}:-2[base];[base][1:v]overlay=0:main_h-overlay_h`,
       '-c:v', 'libx264',
       '-preset', 'medium',
       '-crf', '26',
@@ -173,7 +195,8 @@ export async function applyVideoOverlay(
       '-b:a', '128k',
       '-movflags', '+faststart',
       outputPath,
-    ]);
+    ];
+    await run(bin, ffmpegArgs);
 
     return await readFile(outputPath);
   } finally {
@@ -196,6 +219,12 @@ export function brandingToRemote(
     logoBase64 = branding.logoPng.toString('base64');
     logoMimeType = 'image/png';
   }
+  let partnerLogoBase64: string | undefined;
+  let partnerLogoMimeType: string | undefined;
+  if (branding.partnerLogoPng && branding.partnerLogoPng.length > 0) {
+    partnerLogoBase64 = branding.partnerLogoPng.toString('base64');
+    partnerLogoMimeType = 'image/png';
+  }
   return {
     coupleNames: branding.coupleNames,
     date: branding.date,
@@ -205,5 +234,7 @@ export function brandingToRemote(
     fontFamily: branding.fontFamily,
     logoBase64,
     logoMimeType,
+    partnerLogoBase64,
+    partnerLogoMimeType,
   };
 }

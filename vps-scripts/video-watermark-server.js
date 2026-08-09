@@ -20,7 +20,7 @@ const os = require('os');
 // Per evitare drift, il modulo overlay.js contiene solo la parte
 // "render SVG → PNG + ffmpeg composita": se il package principale cambia, va
 // copiato qui a manooppure estratto in un terzo package condiviso in futuro.
-const { renderWatermarkOverlay, runFfmpeg, probeDuration } = require('./overlay.js');
+const { renderWatermarkOverlay, renderPartnerLogo, runFfmpeg, probeDuration } = require('./overlay.js');
 
 const PORT = parseInt(process.env.PORT || '8081', 10);
 const API_KEY = process.env.API_KEY;
@@ -102,19 +102,27 @@ async function handleWatermark(req, res) {
     console.log(`[${new Date().toISOString()}] download bytes=${dlBuffer.length} dlMs=${Date.now() - dlStart}`);
     await writeFile(inputPath, dlBuffer);
 
-    // 2) Salva logo brand se presente nella branding
-    let logoBuffer;
-    if (branding.logoBase64) {
-      logoBuffer = Buffer.from(branding.logoBase64, 'base64');
-    }
+  // 2) Salva logo brand se presente nella branding
+  let logoBuffer;
+  if (branding.logoBase64) {
+    logoBuffer = Buffer.from(branding.logoBase64, 'base64');
+  }
+  let partnerLogoBuffer;
+  if (branding.partnerLogoBase64) {
+    partnerLogoBuffer = Buffer.from(branding.partnerLogoBase64, 'base64');
+  }
 
-    // 3) Render watermark PNG overlay (SVG via sharp)
-    const overlayStart = Date.now();
-    await renderWatermarkOverlay(overlayPath, {
-      ...branding,
-      logoPng: logoBuffer,
-    });
-    console.log(`[${new Date().toISOString()}] overlay renderMs=${Date.now() - overlayStart}`);
+  // 3) Render watermark PNG overlay (SVG via sharp)
+  const overlayStart = Date.now();
+  await renderWatermarkOverlay(overlayPath, {
+    ...branding,
+    logoPng: logoBuffer,
+  });
+  console.log(`[${new Date().toISOString()}] overlay renderMs=${Date.now() - overlayStart}`);
+
+  // 3bis) Render logo partner (alto a sinistra) se presente
+  const partnerLogoPath = join(dir, 'partner-logo.png');
+  const renderedPartnerLogo = await renderPartnerLogo(partnerLogoPath, partnerLogoBuffer);
 
     // 4) Probe duration per consentire skip se > maxDurationSeconds (opzionale)
     if (maxDurationSeconds && maxDurationSeconds > 0) {
@@ -139,10 +147,11 @@ async function handleWatermark(req, res) {
       }
     }
 
-    // 5) ffmpeg composita: scale a 1080 + overlay PNG in basso, H.264/AAC +faststart.
-    // Encoding settings ottimizzati per riduzione ~1/5 del file size senza perdita
-    // di qualita' percepita (richiesta utente 28/07/2026: 10min video = 1GB su
-    // R2/Drive e' insostenibile per tier Free 10GB storage):
+    // 5) ffmpeg composita: scale a 1080 + overlay PNG in basso + partner logo
+    // (alto a sinistra, opzionale), H.264/AAC +faststart.
+    // Encoding settings ottimizzati per riduzione ~1/5 del file size senza
+    // perdita di qualita' percepita (richiesta utente 28/07/2026: 10min video =
+    // 1GB su R2/Drive e' insostenibile per tier Free 10GB storage):
     //   - crf 26 (era 23): 50% riduzione bit rate, qualita' percepita quasi identica.
     //   - preset medium (era veryfast): encoding piu' lento ma bitrate ottimale per
     //     stessa qualita' (preso in prestito da YouTube stesso target).
@@ -151,12 +160,15 @@ async function handleWatermark(req, res) {
     // Risultato: 10min @ 1080p ~1GB -> ~200MB, watermark applicato nello stesso
     // passaggio (filter_complex + overlay). Unico encoding, zero duplicazioni.
     const encodeStart = Date.now();
-    await runFfmpeg([
+    const ffmpegArgs = [
       '-y',
       '-i', inputPath,
       '-i', overlayPath,
+      ...(renderedPartnerLogo ? ['-i', renderedPartnerLogo] : []),
       '-filter_complex',
-      `[0:v]scale=1080:-2[base];[base][1:v]overlay=0:main_h-overlay_h`,
+      renderedPartnerLogo
+        ? '[0:v]scale=1080:-2[base];[base][1:v]overlay=0:main_h-overlay_h[wm];[wm][2:v]overlay=24:24'
+        : '[0:v]scale=1080:-2[base];[base][1:v]overlay=0:main_h-overlay_h',
       '-c:v', 'libx264',
       '-preset', 'medium',
       '-crf', '26',
@@ -167,7 +179,8 @@ async function handleWatermark(req, res) {
       '-b:a', '128k',
       '-movflags', '+faststart',
       outputPath,
-    ]);
+    ];
+    await runFfmpeg(ffmpegArgs);
     const outBuffer = await readFile(outputPath);
     console.log(`[${new Date().toISOString()}] ffmpeg encodeMs=${Date.now() - encodeStart} outBytes=${outBuffer.length}`);
 

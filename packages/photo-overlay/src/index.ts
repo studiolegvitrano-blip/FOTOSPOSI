@@ -26,6 +26,11 @@ export interface OverlayBranding {
   brandLogoBuffer?: Buffer | null;
   /** Larghezza del logo brand in px (default 15% della larghezza foto, min 80 max 400). */
   brandLogoWidth?: number;
+  /** Logo PNG del partner white label (ristoratore/fotografo) da sovrapporre in ALTO A SINISTRA,
+   *  speculare al logo brand. Deve essere un Buffer PNG con trasparenza. */
+  partnerLogoBuffer?: Buffer | null;
+  /** Larghezza del logo partner in px (default 15% larghezza foto, clamp 80-400). */
+  partnerLogoWidth?: number;
 }
 
 export interface OverlayOptions {
@@ -387,6 +392,28 @@ export async function applyOverlay(
       compositeOps.push({ input: resizedLogo, top: logoTop, left: logoLeft });
     } catch (e) {
       console.error('watermark brand logo err:', e);
+    }
+  }
+
+  // ── Logo partner white label in alto a SINISTRA, A COLORI ──
+  // Speculare al logo brand (alto a destra): stessa larghezza target e stessi
+  // margini, ma ancorato a sinistra. Introdotto per la feature B2B
+  // (sessione 09/08/2026): "logo partner a sinistra, Sposi.live a destra".
+  if (branding.partnerLogoBuffer) {
+    const targetLogoW = branding.partnerLogoWidth ?? Math.min(680, Math.max(135, Math.round(imgWidth * 0.255)));
+    try {
+      const resizedLogo = await sharp(branding.partnerLogoBuffer)
+        .resize(targetLogoW, null, { fit: 'inside' })
+        .toBuffer();
+      const logoMeta = await sharp(resizedLogo).metadata();
+      const logoW = logoMeta.width || targetLogoW;
+      const logoH = logoMeta.height || Math.round(targetLogoW * 0.5);
+      const logoTop = Math.round(imgHeight * 0.02);
+      const logoLeft = Math.round(imgWidth * 0.02);
+      console.log(`[applyOverlay] partnerLogo: img=${imgWidth}x${imgHeight}, targetW=${targetLogoW}, resized=${logoW}x${logoH}, top=${logoTop}, left=${logoLeft}`);
+      compositeOps.push({ input: resizedLogo, top: logoTop, left: logoLeft });
+    } catch (e) {
+      console.error('watermark partner logo err:', e);
     }
   }
 

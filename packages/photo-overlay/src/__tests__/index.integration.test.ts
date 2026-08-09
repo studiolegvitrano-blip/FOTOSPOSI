@@ -139,4 +139,73 @@ describe('applyOverlay + detectWatermark — pipeline reale (no mock sharp)', ()
     expect(presence.hasLogo).toBe(false);
     expect(presence.confidence).toBeLessThan(0.3);
   });
+
+  it('doppio logo B2B: partner logo in ALTO A SINISTRA e brand logo in ALTO A DESTRA senza sovrapposizione', async () => {
+    const sharp = (await import('sharp')).default;
+    const original = await makeFixturePhoto(600, 800);
+
+    // Logo partner: quadrato VERDE pieno (facile da campionare pixel per pixel).
+    const partnerLogo = await sharp({
+      create: { width: 100, height: 100, channels: 4, background: { r: 0, g: 200, b: 0, alpha: 1 } },
+    }).png().toBuffer();
+    // Logo brand: pattern checker blu/bianco (stddev > 20 richiesto da
+    // detectWatermark — un quadrato pieno non verrebbe riconosciuto).
+    const brandLogo = await sharp({
+      create: { width: 100, height: 100, channels: 4, background: { r: 0, g: 0, b: 220, alpha: 1 } },
+    })
+      .composite([
+        { input: Buffer.from(`<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+            <rect width="50" height="50" fill="#ffffff" />
+            <rect x="50" y="50" width="50" height="50" fill="#ffffff" />
+          </svg>`), top: 0, left: 0 },
+      ])
+      .png()
+      .toBuffer();
+
+    const watermarked = await applyOverlay(original, {
+      format: 'square',
+      branding: {
+        coupleNames: 'Agostino ❤ Danila',
+        date: '',
+        primaryColor: '#1a1a2e',
+        wordmark: 'Sposi.live',
+        partnerLogoBuffer: partnerLogo,
+        partnerLogoWidth: 120,
+        brandLogoBuffer: brandLogo,
+        brandLogoWidth: 120,
+      },
+    });
+
+    // Campiona i pixel. Entrambi i logo sono compositati con margine 2% (top=16
+    // su 800, left=12 su 600) e larghezza 120px → regioni top-left e top-right.
+    const region = async (left: number, top: number, width: number, height: number) =>
+      sharp(watermarked).extract({ left, top, width, height }).raw().toBuffer();
+
+    // Regione ALTO-SINISTRA (10px di margine, 100x100): deve essere prevalentemente VERDE.
+    const tl = Buffer.from(await region(14, 18, 100, 100));
+    let green = 0, blue = 0;
+    for (let i = 0; i < tl.length; i += 3) {
+      const r = tl[i], g = tl[i + 1], b = tl[i + 2];
+      if (g > 150 && r < 100 && b < 100) green++;
+      if (b > 150 && r < 100 && g < 100) blue++;
+    }
+    expect(green).toBeGreaterThan(5000); // ~10000 pixel attesi
+    expect(blue).toBeLessThan(200);
+
+    // Regione ALTO-DESTRA (600-120-14=466, 18): pattern checker blu/bianco →
+    // metà pixel blu (~5000) + metà bianchi.
+    const tr = Buffer.from(await region(600 - 120 - 14, 18, 100, 100));
+    let greenTr = 0, blueTr = 0;
+    for (let i = 0; i < tr.length; i += 3) {
+      const r = tr[i], g = tr[i + 1], b = tr[i + 2];
+      if (g > 150 && r < 100 && b < 100) greenTr++;
+      if (b > 150 && r < 100 && g < 100) blueTr++;
+    }
+    expect(blueTr).toBeGreaterThan(2500); // ~5000 pixel blu attesi (checker 50%)
+    expect(greenTr).toBeLessThan(200);
+
+    // detectWatermark deve continuare a vedere il logo brand (verifica gate non rotto).
+    const presence = await detectWatermark(watermarked);
+    expect(presence.hasLogo).toBe(true);
+  });
 });

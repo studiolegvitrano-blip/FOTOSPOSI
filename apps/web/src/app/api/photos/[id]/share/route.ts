@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@fotosposi/core';
 import { getPresignedDownloadUrl, getPresignedUploadUrl } from '@fotosposi/r2-storage';
 import { watermarkFontFamily } from '@/lib/watermark-fonts';
-import { ensureWatermarkFonts, loadBrandLogo } from '@/lib/watermark-fonts.server';
+import { ensureWatermarkFonts, loadBrandLogo, loadPartnerLogo } from '@/lib/watermark-fonts.server';
+import { getEventPartner } from '@fotosposi/partner';
 
 ensureWatermarkFonts();
 
@@ -94,6 +95,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const fontFamily = branding?.font_family || watermarkFontFamily((event as { watermark_font?: string }).watermark_font);
   const wordmark = event.brand === 'weddingmoments' ? 'JustMarry.live' : 'Sposi.live';
   const brandLogoBuffer = loadBrandLogo(event.brand);
+  // B2B white label: logo partner sponsor (alto a sinistra, speculare al brand).
+  const { partner: sharePartner } = await getEventPartner(eventId);
+  const partnerLogoBuffer = sharePartner?.logo_url ? await loadPartnerLogo(sharePartner.logo_url) : null;
   const brandingConfig = {
     coupleNames: event.couple_name,
     date: new Date(event.date).toLocaleDateString('it-IT'),
@@ -103,8 +107,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // Per photo-overlay (nuovo overlay)
     brandLogoBuffer,
     brandLogoWidth: format === 'story' ? 360 : 200,
+    partnerLogoBuffer,
+    partnerLogoWidth: format === 'story' ? 360 : 200,
     // Per video-overlay (legacy interface: nome diverso)
     logoPng: brandLogoBuffer ?? undefined,
+    partnerLogoPng: partnerLogoBuffer ?? undefined,
   };
 
   let result: Buffer | null = null;

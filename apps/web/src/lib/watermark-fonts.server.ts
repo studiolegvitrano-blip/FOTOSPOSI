@@ -91,3 +91,28 @@ export function loadBrandLogo(brand?: string | null): Buffer | null {
     return null;
   }
 }
+
+/**
+ * Carica il logo PNG del partner white label (partners.logo_url, URL pubblico
+ * su Supabase Storage) da comporre nel watermark in ALTO A SINISTRA,
+ * speculare al logo brand (alto a destra).
+ * Ritorna un Buffer PNG pronto per sharp.composite, oppure null se l'URL è
+ * assente o il download fallisce (mai lancia: il watermark NON deve bloccare
+ * il processing per un logo mancante).
+ */
+export async function loadPartnerLogo(logoUrl?: string | null): Promise<Buffer | null> {
+  if (!logoUrl) return null;
+  try {
+    const res = await fetch(logoUrl, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) {
+      console.error(`[watermark-fonts] logo partner download HTTP ${res.status} per ${logoUrl}`);
+      return null;
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length === 0) return null;
+    return buf;
+  } catch (e) {
+    console.error('[watermark-fonts] logo partner download fallito:', e instanceof Error ? e.message : e);
+    return null;
+  }
+}

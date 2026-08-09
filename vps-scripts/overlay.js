@@ -43,6 +43,30 @@ function runFfmpeg(args) {
   return run('ffmpeg', args);
 }
 
+/**
+ * Render del logo partner (B2B white label) come PNG trasparente alto ~64px,
+ * da compositare in ALTO A SINISTRA del frame video (speculare al logo brand
+ * che vive nella banda in basso a destra). Ritorna null se il logo manca o è
+ * malformato (non blocca mai il watermark).
+ *
+ * @param {string} outPath path del PNG di output
+ * @param {Buffer|undefined} partnerLogoPng
+ */
+async function renderPartnerLogo(outPath, partnerLogoPng) {
+  if (!partnerLogoPng) return null;
+  const sharp = (await import('sharp')).default;
+  try {
+    const partnerH = 64;
+    const partnerLogo = await sharp(partnerLogoPng).resize({ height: partnerH }).png().toBuffer();
+    const { writeFile } = require('fs/promises');
+    await writeFile(outPath, partnerLogo);
+    return outPath;
+  } catch (err) {
+    console.warn('[overlay] partner logo malformato, procedo senza:', err.message);
+    return null;
+  }
+}
+
 function probeDuration(filePath) {
   return new Promise((resolve) => {
     const p = spawn('ffmpeg', ['-i', filePath], { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -121,4 +145,4 @@ async function renderWatermarkOverlay(outPath, branding) {
   await writeFile(outPath, overlayPng);
 }
 
-module.exports = { renderWatermarkOverlay, runFfmpeg, probeDuration, escapeXml };
+module.exports = { renderWatermarkOverlay, renderPartnerLogo, runFfmpeg, probeDuration, escapeXml };

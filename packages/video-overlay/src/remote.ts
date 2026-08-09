@@ -33,6 +33,9 @@ export interface RemoteBranding {
   fontFamily?: string;
   logoBase64?: string;
   logoMimeType?: string;
+  /** Logo partner white label (B2B): base64 PNG, compositato in alto a sinistra. */
+  partnerLogoBase64?: string;
+  partnerLogoMimeType?: string;
 }
 
 export interface RemoteWatermarkRequest {

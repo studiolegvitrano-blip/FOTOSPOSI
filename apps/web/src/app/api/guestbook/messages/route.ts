@@ -3,7 +3,8 @@ import { createVideoMessage, getVideoMessages } from '@fotosposi/media';
 import { createServiceClient } from '@fotosposi/core';
 import { applyVideoOverlay } from '@fotosposi/video-overlay';
 import { watermarkFontFamily } from '@/lib/watermark-fonts';
-import { ensureWatermarkFonts, loadBrandLogo } from '@/lib/watermark-fonts.server';
+import { ensureWatermarkFonts, loadBrandLogo, loadPartnerLogo } from '@/lib/watermark-fonts.server';
+import { getEventPartner } from '@fotosposi/partner';
 
 ensureWatermarkFonts();
 
@@ -50,6 +51,10 @@ async function watermarkGuestbookVideo(eventId: string, r2Key: string): Promise<
   const line1 = !namesEnabled ? '' : (customText || event?.couple_name || '');
   const line2 = !namesEnabled || customText ? '' : (event?.date ? new Date(event.date).toLocaleDateString('it-IT') : '');
 
+  // B2B white label: logo partner sponsor (alto a sinistra) sui video guestbook.
+  const { partner: guestbookPartner } = await getEventPartner(eventId);
+  const partnerLogo = guestbookPartner?.logo_url ? await loadPartnerLogo(guestbookPartner.logo_url) : null;
+
   // FIX 31/07/2026: usa direttamente GetObjectCommand + PutObjectCommand invece di
   // getPresignedDownloadUrl+fetch+redirect. Il presigner di @aws-sdk/s3-request-presigner
   // 3.1078.0 cadeva in "b is not a function" su Vercel lambda (webpack bundling del
@@ -86,6 +91,7 @@ async function watermarkGuestbookVideo(eventId: string, r2Key: string): Promise<
       wordmark,
       fontFamily: watermarkFontFamily(event?.watermark_font),
       logoPng: loadBrandLogo(event?.brand) ?? undefined,
+      partnerLogoPng: partnerLogo ?? undefined,
     },
     maxDurationSeconds: 240,
   });
