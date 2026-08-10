@@ -83,9 +83,21 @@ export default async function Home() {
             </Link>
             <Link
               href="/collaboratori"
-              className="text-sm bg-white text-black px-4 py-2 rounded-md font-semibold hover:bg-white/90 transition-colors shadow-sm"
+              className="text-sm font-medium text-white/85 hover:text-white px-3 py-2 rounded-md transition-colors"
             >
               {n('collaboratori')}
+            </Link>
+            <Link
+              href="/partner/login"
+              className="text-sm font-medium text-white/85 hover:text-white px-3 py-2 rounded-md transition-colors"
+            >
+              {n('partner')}
+            </Link>
+            <Link
+              href="/signup"
+              className="text-sm bg-white text-black px-4 py-2 rounded-md font-semibold hover:bg-white/90 transition-colors shadow-sm"
+            >
+              {n('signup')}
             </Link>
           </div>
         </div>

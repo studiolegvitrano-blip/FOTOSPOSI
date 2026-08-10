@@ -4,14 +4,15 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { Globe } from 'lucide-react';
+import CountryFlag from './country-flag';
 
 const locales = [
-  { code: 'it', label: 'Italiano', flag: '🇮🇹' },
-  { code: 'en-US', label: 'English (US)', flag: '🇺🇸' },
-  { code: 'en-GB', label: 'English (UK)', flag: '🇬🇧' },
-  { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
-  { code: 'fr', label: 'Français', flag: '🇫🇷' },
-  { code: 'es', label: 'Español', flag: '🇪🇸' },
+  { code: 'it', label: 'Italiano' },
+  { code: 'en-US', label: 'English (US)' },
+  { code: 'en-GB', label: 'English (UK)' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'fr', label: 'Français' },
+  { code: 'es', label: 'Español' },
 ];
 
 export default function LanguageSwitcher() {
@@ -56,7 +57,7 @@ export default function LanguageSwitcher() {
         className="flex items-center gap-1.5 text-sm text-white/85 hover:text-white transition-colors cursor-pointer px-2 py-2 rounded-md hover:bg-white/10"
       >
         <Globe size={16} />
-        <span className="text-base leading-none">{current.flag}</span>
+        <CountryFlag code={current.code} className="w-5 h-3.5 rounded-[2px] ring-1 ring-white/20" />
       </button>
       {open && (
         <div
@@ -75,7 +76,7 @@ export default function LanguageSwitcher() {
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
-              <span className="text-base leading-none">{l.flag}</span>
+              <CountryFlag code={l.code} className="w-5 h-3.5 rounded-[2px] ring-1 ring-gray-300 shrink-0" />
               <span>{l.label}</span>
             </button>
           ))}
