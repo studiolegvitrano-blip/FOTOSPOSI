@@ -28,7 +28,7 @@ export default function AnalyticsClient({ data, activation, engagement, viral, b
   ];
 
   return (
-    <main className="max-w-6xl mx-auto p-4 space-y-6">
+    <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{t('title')}</h1>
         <Button variant="outline" asChild><Link href="/admin">← {c('back')}</Link></Button>
@@ -255,6 +255,6 @@ export default function AnalyticsClient({ data, activation, engagement, viral, b
           )}
         </TabsContent>
       </Tabs>
-    </main>
+    </div>
   );
 }

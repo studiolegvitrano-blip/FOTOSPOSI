@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import type { Affiliate } from '@fotosposi/commerce';
 import { ceoTokenFromCookies, verifyCeoSession } from '@/lib/ceo-auth';
 import { internalBaseUrl } from '@/lib/internal-base';
+import { AdminShell } from '@/components/admin/AdminShell';
 import AffiliatesClient from './affiliates-client';
 
 export const dynamic = 'force-dynamic';
@@ -38,12 +39,16 @@ export default async function AdminAffiliatesPage() {
 
   if (error) {
     return (
-      <main className="max-w-5xl mx-auto p-4 space-y-6">
+      <AdminShell>
         <h1 className="text-2xl font-bold">Collaboratori & Affiliati</h1>
         <p className="text-destructive">Errore: {error}</p>
-      </main>
+      </AdminShell>
     );
   }
 
-  return <AffiliatesClient initialAffiliates={affiliates ?? []} />;
+  return (
+    <AdminShell>
+      <AffiliatesClient initialAffiliates={affiliates ?? []} />
+    </AdminShell>
+  );
 }

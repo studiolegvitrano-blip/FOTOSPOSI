@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { ceoTokenFromCookies, verifyCeoSession } from '@/lib/ceo-auth';
 import { internalBaseUrl } from '@/lib/internal-base';
+import { AdminShell } from '@/components/admin/AdminShell';
 import MarketplaceClient from './marketplace-client';
 
 export const dynamic = 'force-dynamic';
@@ -37,12 +38,16 @@ export default async function AdminMarketplacePage() {
 
   if (error) {
     return (
-      <main className="max-w-5xl mx-auto p-4 space-y-6">
+      <AdminShell>
         <h1 className="text-2xl font-bold">Gestione fornitori</h1>
         <p className="text-destructive">Errore: {error}</p>
-      </main>
+      </AdminShell>
     );
   }
 
-  return <MarketplaceClient initialSuppliers={suppliers ?? []} />;
+  return (
+    <AdminShell>
+      <MarketplaceClient initialSuppliers={suppliers ?? []} />
+    </AdminShell>
+  );
 }

@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { ceoTokenFromCookies, verifyCeoSession } from '@/lib/ceo-auth';
 import { internalBaseUrl } from '@/lib/internal-base';
+import { AdminShell } from '@/components/admin/AdminShell';
 import AnalyticsClient from './analytics-client';
 
 export const dynamic = 'force-dynamic';
@@ -45,20 +46,22 @@ export default async function AdminAnalyticsPage() {
 
   if (error || !payload) {
     return (
-      <main className="max-w-5xl mx-auto p-4 space-y-6">
+      <AdminShell>
         <h1 className="text-2xl font-bold">Analytics</h1>
         <p className="text-destructive">Errore: {error ?? 'dati non disponibili'}</p>
-      </main>
+      </AdminShell>
     );
   }
 
   return (
-    <AnalyticsClient
-      data={payload.data}
-      activation={payload.activation}
-      engagement={payload.engagement ?? []}
-      viral={payload.viral}
-      b2b={payload.b2b}
-    />
+    <AdminShell>
+      <AnalyticsClient
+        data={payload.data}
+        activation={payload.activation}
+        engagement={payload.engagement ?? []}
+        viral={payload.viral}
+        b2b={payload.b2b}
+      />
+    </AdminShell>
   );
 }

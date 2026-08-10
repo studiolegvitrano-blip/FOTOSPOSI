@@ -47,7 +47,7 @@ export default function CouponsClient({ initialCoupons }: { initialCoupons: Coup
   };
 
   return (
-    <main className="max-w-5xl mx-auto p-4 space-y-6">
+    <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Coupon Sconto</h1>
         <div className="flex gap-2">
@@ -119,6 +119,6 @@ export default function CouponsClient({ initialCoupons }: { initialCoupons: Coup
           </Table>
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 }

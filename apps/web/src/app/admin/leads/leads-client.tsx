@@ -45,7 +45,7 @@ export default function LeadsClient({ initialLeads }: { initialLeads: any[] }) {
   };
 
   return (
-    <main className="max-w-5xl mx-auto p-4 space-y-6">
+    <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">B2B Leads</h1>
         <Button variant="outline" asChild><Link href="/admin">← Admin</Link></Button>
@@ -102,6 +102,6 @@ export default function LeadsClient({ initialLeads }: { initialLeads: any[] }) {
           ))}
         </div>
       )}
-    </main>
+    </div>
   );
 }

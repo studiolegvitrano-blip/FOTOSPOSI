@@ -50,7 +50,7 @@ export default function OrdersClient({ initialOrders }: Props) {
   };
 
   return (
-    <main className="max-w-5xl mx-auto p-4 space-y-6">
+    <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Ordini Bonifico</h1>
         <a href="/admin" className="text-sm text-brand hover:underline">← Dashboard</a>
@@ -106,6 +106,6 @@ export default function OrdersClient({ initialOrders }: Props) {
           )}
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 }

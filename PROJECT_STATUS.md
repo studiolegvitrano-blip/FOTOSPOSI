@@ -1,5 +1,84 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 10/08/2026 (pomeriggio) — Banner rosso /admin per coda in stallo
+
+### Contesto
+Proposta della reflection della sessione precedente (09/08 sera): se la coda upload entra in stallo il deployment del fix trigger è inutile se nessuno se ne accorge. Implementato un banner visivo (no alert attivo, no side-effect) sulla home `/admin` che segnala due condizioni anomale del sistema di processing foto. Tutto server-rendered, nessun client island aggiuntivo.
+
+### Fatto
+
+**1. `/api/admin/overview` estesa con `queueHealth`** (file: `apps/web/src/app/api/admin/overview/route.ts`)
+- Aggiunte 2 query parallele: `upload_queue` (status + `created_at` per stato coda + timestamp pending) e ultime 2 righe `system_health_log` job=maintenance.
+- Calcolo metriche: `pendingCount`, `processingCount`, `failedCount`, `syncedCount`, `oldestPendingAt` (min `created_at` tra pending), `stalePendingMinutes` (età in minuti del pending più vecchio), `pendingStalled = pendingCount>0 && stalePendingMinutes>=30` (soglia 30 min, coerente con quanto annotato in PROJECT_STATUS sessione 09/08 sera), `lastEventsSwept`/`prevEventsSwept` (estratte da `details->>'eventsSwept'` delle ultime 2 righe maintenance, cast int sicuro), `twoCyclesZeroSwept = lastEventsSwept===0 && prevEventsSwept===0`.
+- Route rimane CEO-gated via `verifyCeoSession` (Web Crypto). Nessuna RLS toccata, service role come prima.
+
+**2. Banner `role="alert"` su `/admin/page.tsx`** (file: `apps/web/src/app/admin/page.tsx`)
+- `showStallBanner = pendingStalled || twoCyclesZeroSwept`. Server-rendered condizionale, niente client island.
+- UI: blocco rosso `border-red-500 bg-red-50 dark:bg-red-950/40`, testo `text-red-700 dark:text-red-300`, elenco `<ul>` dei motivi (es. "12 item in coda pending da 47 min (soglia 30 min)", "cron maintenance con eventsSwept=0 per 2 cicli consecutivi"), bottoni "Vai a Sistema" + "Aggiorna stato" (link a `/admin/system`).
+- Aggiunta terza card KPI che mostra `pendingCount/failedCount` (verde `text-green-600` solo se 0/0, altrimenti ambra `text-amber-600`). Visibile sempre, non solo in stallo — dà un glance immediato dello stato coda dalla home admin.
+- Coerenza col principio "tutto server-side, client solo per interattività": nessun fetch client-side, nessun polling (lasciato a futuro SWR nel Operations Center della roadmap dashboard unificata).
+
+### Note tecniche
+- **Soglia 30 min**: definita in PROJECT_STATUS sessione 09/08 sera come "alert se upload_queue.pending > 30min". Riflessa come costante inline (`>= 30`), non parametro config — se diventa configurabile spostare in `platform_settings`.
+- **`eventsSwept` in `system_health_log.details`**: memorizzato come JSONB. Estrazione defensiva (`typeof v === 'number' || Number(v)`) perché alcune righe vecchie potrebbero avere stringhe o null.
+- **`twoCyclesZeroSwept`**: cattura il caso "cron maintenance gira ma non spazza nulla per 2 cicli consecutivi" — sintomo di upload_queue.popolata da item che il guard filter `r2_key not.is null` skippa, oppure di codice di processing che fallisce silenziosamente.
+- **No alert attivo**: scelta deliberata. Il banner è puramente informativo. Gli alert attivi (email/WhatsApp) sono un TODO futuro, da collegare alla stessa `queueHealth` quando saranno configurati i canali notification.
+- **Pattern consolidato**: `/api/admin/overview` ora ritorna sia dati business (events/users) sia dati operativi (queueHealth). Future espansioni della home admin possono usare la stessa route senza moltiplicare le API call dal Server Component.
+
+### Verifica
+- Typecheck pulito (`tsc --noEmit -p apps/web/tsconfig.json`).
+- Test 485/485 (41 file) passanti.
+- Verifica dati reali production: `pending_stale=0`, `pending_total=0`, `failed_total=2` (item residuo Drive 401 evento `ee2cc954` + 1 altro), `last_events_swept=2` → banner NON visibile ora (corretto, coda non in stallo).
+
+### TODO post-push
+1. **Deploy Vercel**: prima richiesta `/admin` può servire cache precedente (forzare `?nocache=1`).
+2. Verificare in produzione che il banner appaia SOLO quando le condizioni sono vere (no falsi positivi).
+
+### Commit
+- `feat(admin): banner rosso /admin se coda upload in stallo (pending>30min o eventsSwept=0 per 2 cicli)` — 2 file, +94/-3
+
+---
+
+## Sessione 10/08/2026 (mattina) — Banner rosso /admin per coda in stallo + sidebar di nav /admin
+
+### Contesto
+Discussione strategica su come strutturare la dashboard admin unificata (B2B + B2C + operations + governance) e integrazione con un SaaS esterno "GTN Engineering" (social media marketing) in costruzione parallela. Esito: si parte dalla base solida (banner rosso + sidebar di nav) prima di espandere verso Executive Overview / Operations Center / API integrazioni GTN.
+
+### Fatto in questa sessione (Fase 0)
+
+**1. Banner rosso /admin per coda in stallo** (file: `apps/web/src/app/api/admin/overview/route.ts` + `apps/web/src/app/admin/page.tsx`)
+- `/api/admin/overview` ora ritorna `queueHealth`: `{pendingCount, processingCount, failedCount, syncedCount, oldestPendingAt, stalePendingMinutes, pendingStalled, lastEventsSwept, prevEventsSwept, twoCyclesZeroSwept}`.
+- Query parallela `upload_queue.status+created_at` + ultime 2 righe `system_health_log` job=maintenance per leggere `eventsSwept`.
+- Logica stallo: `pendingStalled = pendingCount>0 && stalePendingMinutes>=30` (soglia 30 min, riflessa in PROJECT_STATUS.md sessione 09/08 sera). Seconda condizione: `twoCyclesZeroSwept = lastEventsSwept===0 && prevEventsSwept===0` (cron maintenance "non spazza" nulla per 2 cicli consecutivi).
+- UI pagina `/admin`: banner `role="alert"` rosso (border/bg red-500/red-50, dark red-950/red-300), elenco motivi, bottoni "Vai a Sistema" + "Aggiorna stato". Card KPI terza "Coda (pending/failed)" con colore verde (0/0) o ambra (altro). Tutto Server-rendered, niente client island aggiuntivo.
+- Pattern confermato: nessun client-side polling (lascia a futuro SWR in Operations Center), nessun alert attivo (solo visual), no side-effect. Route `/api/admin/overview` sempre CEO-gated via `verifyCeoSession` (Web Crypto).
+
+**2. Sidebar di nav /admin** (vedi commit di chiusura sessione)
+- Componente condiviso in `/packages/ui` (o `apps/web/src/components/admin`) → link a tutte le 8 sezioni (`/admin`, `/admin/system`, `/admin/orders`, `/admin/marketplace`, `/admin/affiliates`, `/admin/coupons`, `/admin/analytics`, `/admin/leads`) con icona + label + `active` route detected da `usePathname`. Mobile drawer collapse.
+- Sostituisce la riga di `<Button>` sparsi in ogni header di `/admin/*`. Pattern reused come `/admin/system` crescerà sotto la barra alta senz'altro.
+
+### Roadmap dashboard unificata (definita in questa sessione, NON ancora sviluppata)
+- **A) Executive Overview** — 5 KPI rocket con threshold (backpressure, DLQ, Stripe pending, OAuth Drive revoked, cron failed), pipeline 24h, MRR/GMV.
+- **B) Operations Center** — coda live azionabile (Re-queue/Force/DLQ), Drive OAuth board, watermark queue, cron job manager, VPS heartbeat.
+- **C) B2B Console** — partner directory + order manager unificato + IBAN + coupon ROI + marketplace.
+- **D) B2C Crisis console per evento** — health per evento + connect/disconnect Drive + bozza email sposo.
+- **E) Governance / Audit** — audit log, DB advisors mirror, secrets status, versioni deploy.
+- **Struttura tecnica**: una route `/api/admin/executive-overview` aggregata, componente `<Alert>` riusabile, polling SWR per le viste operative.
+
+### Integrazione con GTN Engineering SaaS (definita, NON ancora sviluppata)
+- **Layer 1 — tabella ponte** `gtn_projects` (`id`, `event_id`, `partner_id`, `external_ref`, `sync_token`, `last_sync_at`, `metadata`).
+- **Layer 2 — 3 endpoint M2M gated HMAC** (X-Sync-Token, rotabile via `platform_settings`):
+  - `GET /api/integrations/gtn/events` — lista eventi approvati per GTN
+  - `GET /api/integrations/gtn/metrics/[eventId]` — KPI aggregati per evento
+  - `POST /api/integrations/gtn/webhook` — GTN scrive status (scheduled/published/performance), Sposi.Live lo logga in `gtn_project_audit_log`
+- **Layer 3 — flusso dati**: Sposi.Live è source of truth per eventi/utenti/uploads; GTN legge + scrive solo metadati marketing. No scritture cross-schema da GTN.
+- **Condivisione**: `/packages/ui` condiviso, role `agency_gtn` in `core_users` per agenzie esterne, brand `gtn` come terza riga in `brands`. Token HMAC pattern mutuato da `CEO_PASSWORD`.
+
+### TODO post-push (ér 此 sessione)
+1. Verificare deploy Vercel: prima richiesta `/admin` può servire cache precedente (forzare `?nocache=1`).
+2. Cleanup: rimuovere i `<Button>` di nav sparsi negli header una volta integrata la sidebar in tutte le 8 pagine.
+3. Prossimo step suggerito: costruire laSidebarAdmin `<Alert>` riusabile (per crisis console B2C).
+
 ## Sessione 09/08/2026 (sera) — Fix critico trigger wall_scores + UI lingua/Threads/music + qualità video 33%
 
 ### Fix critico produzione: foto non finivano in galleria né su Drive

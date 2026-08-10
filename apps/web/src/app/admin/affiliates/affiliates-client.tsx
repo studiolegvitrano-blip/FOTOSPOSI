@@ -63,7 +63,7 @@ export default function AffiliatesClient({ initialAffiliates }: { initialAffilia
   const vol = (qty: number) => calculateVolumePrice(229, qty);
 
   return (
-    <main className="max-w-6xl mx-auto p-4 space-y-6">
+    <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Collaboratori & Affiliati</h1>
         <div className="flex gap-2">
@@ -217,6 +217,6 @@ export default function AffiliatesClient({ initialAffiliates }: { initialAffilia
           </CardContent>
         </Card>
       )}
-    </main>
+    </div>
   );
 }

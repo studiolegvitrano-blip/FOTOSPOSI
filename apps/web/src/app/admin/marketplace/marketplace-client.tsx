@@ -112,7 +112,7 @@ export default function MarketplaceClient({ initialSuppliers }: { initialSupplie
   }, [suppliers, filter]);
 
   return (
-    <main className="max-w-6xl mx-auto p-4 space-y-6">
+    <div className="space-y-6 w-full">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-bold">Gestione fornitori</h1>
@@ -299,6 +299,6 @@ export default function MarketplaceClient({ initialSuppliers }: { initialSupplie
           })()}
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 }
