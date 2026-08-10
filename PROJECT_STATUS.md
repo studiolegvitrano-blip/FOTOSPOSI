@@ -1,5 +1,56 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 10/08/2026 (sera) — Diagnostica storage /admin/storage (Forza/Cancella pending + orfani R2) + share-with-tags (iniziato)
+
+### Contesto
+Segnalazione utente: "6 oggetti su R2 senza record in media_uploads (orfani)" per l'evento `ee2cc954` di Agostino Spera & Danila Villa. Verifica DB: 5 su 6 sono in `upload_queue` con `status='pending'` retry_count=0 (caricati su R2 ma mai processati); 1 è un orphan vero (file R2 ma nessun record né in queue né in media). Utente chiede: tasto che forza la pubblicazione + capire dove sono finiti i file (R2/media/Drive) + sistema automatizzato o azione manuale Forza/Cancella.
+
+### Fatto
+
+**1. Route `/api/admin/storage-audit` (GET + POST)** — nuovo file `apps/web/src/app/api/admin/storage-audit/route.ts`
+- **GET**: lista pending/failed/processing (max 200 da `upload_queue`) + scan orfani R2 (prefisso `events/`, max 500 keys per rispettare i 60s di timeout Vercel hobby). Per ogni item verifica `in_r2` (HEAD via `objectExists` di `@fotosposi/r2-storage`), `in_media` (lookup `media_uploads.r2_key`), `in_drive` (lookup `media_uploads.drive_file_id` server-side in bulk), `couple_name` (lookup `events`). Ritorna `{items: AuditItem[], stats: {total, pending_in_queue, orphans_r2, in_media, in_drive, r2_truncated}, generatedAt}`.
+- **POST** `{action:'force'|'delete', r2_key}`:
+  - `force`: se esiste già row in `upload_queue` per quel `r2_key` → reset (status='pending', retry_count=0, error=null). Se non esiste → inferisce `event_id` dal path R2 `events/<r2_folder_name>/...` (lookup `events.r2_folder_name`), crea nuova row pending con `file_name` = basename del path. Se inferenza fallisce → 400 esplicito.
+  - `delete`: DELETE da `upload_queue` per `r2_key` + `deleteObject(r2_key)` da R2 + log di auditoria in `system_health_log` con `job='storage_audit'`, `status='success'`, `details={action:'delete', r2_key, queue_row_deleted, r2_deleted}`.
+- CEO-gated via `verifyCeoSession` (Web Crypto), service role per bypass RLS, `runtime='nodejs'`, `maxDuration=60`.
+
+**2. Pagina `/admin/storage`** — nuovo file `apps/web/src/app/admin/storage/page.tsx` + client island `storage-audit-client.tsx`
+- Server Component fetch interno via `internalBaseUrl()` con cookie CEO (stesso pattern di `/admin/system`).
+- Layout: AdminShell (sidebar condivisa) + 5 KPI Card (totale righe, pending_in_queue, orphans_r2, in_media, in_drive) + warning card se `r2_truncated=true` + tabella diagnostica + card legenda.
+- Tabella colonne: `r2_key` (troncato `.../<basename>`), Evento (couple_name), Source (`queue`/`orphan` badge), R2/media/Drive (✓ verde / ✗ rosso), Queue (status + retry count), Azioni (bottoni Forza / Cancella).
+- Client island gestisce feedback per ogni riga: `loading` / `ok:<msg>` / `err:<msg>`. Tasto "Cancella" con `confirm()` JS per protezione contro distruzioni accidentali.
+- Banner "Storage integro ✓" quando `items.length === 0`.
+
+**3. AdminSidebar estesa** — `apps/web/src/components/admin/AdminSidebar.tsx`
+- Aggiunta nona voce `{ href: '/admin/storage', label: 'Storage', icon: 'drive' }` tra Sistema e Ordini.
+- Aggiunta icona `drive` SVG inline nello switch Icon (`<path d="M4 4h16v12H4z" /><path d="M8 20h8" /><path d="M12 16v4" />`).
+
+### Note tecniche
+- **Limiti del scan R2**: `listObjectsByPrefix('events/', 500)` + check `objectExists` per ogni pending → sufficiente per eventi normali. Per bucket >500 oggetti `r2_truncated=true` avvisa l'utente. Future audit estese: job cron separato che logga in `system_health_log` (TODO).
+- **`mediaByR2Key` come Map in memory**: max 5000 row caricate dal DB per lookup bulk. Per eventi con >5000 foto, lookup fallisce silenziosamente (omo `in_media=false`) → false positive orfano. Mitigato dal limite 500 keys del scan R2: in pratica non si raggiungono mai.
+- **`force` su orfano: inferenza `event_id`**: lievemente fragile se `events.r2_folder_name` non corrisponde esattamente al primo path segment dopo `events/`. Return 400 esplicito in caso, l'utente vede il messaggio (non si inventa metadati).
+- **`delete` lascia `media_uploads` intatto**: scelta deliberata. Se l'orphan ha TTY una row in `media_uploads`, cancellarla richiederebbe RLS review → si preferisce loggare + deprire le foto orfane dopo. TODO futuro: estensione con `delete_media=true` opzionale che chiama DELETE `/api/media/[id]` riusando logica esistente.
+- **i18n SKIPPED**: testo inline IT nella pagina + client island. Le altre lingue vedono IT finché non si localizza il client island (TODO futuro). Principio "tutto server-side, client solo interattività" mantenuto.
+
+### Migration DB associata
+- **`add_social_handles_to_events_partners`**: aggiunge a `events` le colonne `groom1_social_handle`, `groom2_social_handle`, `couple_hashtag` e a `partners` `social_handle`, `social_hashtag` (per feature share-with-tags iniziata e sospesa). Schema cache ricaricato con `NOTIFY pgrst,'reload schema'`. Verificato funzionante con upsert di test.
+
+### Verifica
+- Typecheck pulito (`tsc --noEmit -p apps/web/tsconfig.json`).
+- Test 485/485 (41 file) passanti.
+- Verifica dati reali: 5 pending dell'evento `ee2cc954` + 1 orphan (`1785319990671_1000144023.jpg` non in queue) → totale 6 item, pending_in_queue=5, orphans_r2=1. Tutti in R2 ma non in media.
+
+### TODO post-push
+1. **Verificare in produzione** che la pagina `/admin/storage` carichi (forzare `?nocache=1` la prima volta).
+2. Eseguire Forza sui 5 pending di `ee2cc954` → verificare que il cron maintenance li processi (watermark + media + Drive sync).
+3. Per l'orphan `1000144023.jpg`: Forza (inferirà `event_id` da `r2_folder_name='2026_07_30_Agostino_Danila'`) oppure Cancella (irreversibile).
+4. **Riprendere share-with-tags** (sospeso per priorità storage audit): UI lightbox con input testo libero + pulsanti FB/TikTok/X. Schema DB già pronto (migration sopra).
+
+### Commit
+- `feat(admin): diagnostica storage /admin/storage con Forza/Cancella pending e orfani R2` — 5 file, +642/-0
+
+---
+
 ## Sessione 10/08/2026 (pomeriggio) — Banner rosso /admin per coda in stallo
 
 ### Contesto

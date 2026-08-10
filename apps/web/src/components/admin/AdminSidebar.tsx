@@ -17,6 +17,7 @@ type NavItem = {
 const NAV: NavItem[] = [
   { href: '/admin', label: 'Home', title: 'Pannello di gestione', icon: 'home', exact: true },
   { href: '/admin/system', label: 'Sistema', title: 'Stato di sistema — code, cron, DLQ', icon: 'pulse' },
+  { href: '/admin/storage', label: 'Storage', title: 'Diagnostica storage — pending/orfani R2 + azioni Forza/Cancella', icon: 'drive' },
   { href: '/admin/orders', label: 'Ordini', title: 'Ordini IBAN in attesa di conferma', icon: 'cart' },
   { href: '/admin/marketplace', label: 'Fornitori', title: 'Marketplace — candidature e fornitori approvati', icon: 'store' },
   { href: '/admin/affiliates', label: 'Collaboratori', title: 'Affiliates — influencer e provvigioni', icon: 'users' },
@@ -69,6 +70,10 @@ function Icon({ name, className }: { name: string; className?: string }) {
     case 'target':
       return (
         <svg {...common}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>
+      );
+    case 'drive':
+      return (
+        <svg {...common}><path d="M4 4h16v12H4z" /><path d="M8 20h8" /><path d="M12 16v4" /></svg>
       );
     default:
       return (
