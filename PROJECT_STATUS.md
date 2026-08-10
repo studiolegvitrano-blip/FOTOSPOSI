@@ -1,5 +1,39 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 09/08/2026 (sera) — Fix critico trigger wall_scores + UI lingua/Threads/music + qualità video 33%
+
+### Fix critico produzione: foto non finivano in galleria né su Drive
+
+**Sintomo**: da qualche ora le foto caricate (anche da account nuovo Google) davano errore e NON arrivavano né in galleria né su Drive. Prima "fallivano ma arrivavano", ora sparivano del tutto.
+
+**Root cause**: i trigger Postgres del wall (`trigger_recalculate_wall_scores` + funzione `recalculate_wall_scores`) avevano `SET search_path=''` (security best practice) ma referenziavano `votes`, `media_uploads` e la funzione stessa SENZA qualifica `public.`. Risultato: ogni INSERT in `media_uploads` abortiva la transazione → rollback → foto su R2 ma MAI in galleria né Drive. Dopo il primo fix parziale del trigger l'errore è passato da `function recalculate_wall_scores(uuid) does not exist` a `relation "votes" does not exist` (stessa causa: schema).
+
+**Fix** (2 migrazioni hotfix applicate in produzione):
+- `fix_trigger_recalculate_wall_scores_schema`: trigger qualifica `public.recalculate_wall_scores`
+- `fix_recalculate_wall_scores_schema`: funzione con `search_path=public` + tutte le tabelle qualificate `public.*`
+
+**Verifica**: insert di test in `media_uploads` → OK, `wall_priority_score` calcolato. Maintenance cron ha processato 5 item in blocco, foto dell'evento `9cb0fa49` ora in galleria con `drive_sync_status='synced'` e `drive_file_id` valorizzato.
+
+**Reflection**: il sistema non era "più fragile" a causa della pulizia DLQ — era una bomba a orologeria latente dal giorno in cui qualcuno ha messo `search_path=''` nei trigger senza qualificare. Qualsiasi regola "search_path vuoto" richiede SEMPRE schema qualificato ovunque. Per renderlo un orologio mancano (proposti):
+1. Test integrazione DB del trigger (assert insert media_uploads non lancia)
+2. Alert se upload_queue.pending > 30min o eventsSwept=0 per 2 cicli cron
+3. Banner rosso su /admin quando pending>0
+
+### UI fixes (commit `426719b`)
+- **LanguageSwitcher**: ora tendina a click (non più hover), menu bianco ad alto contrasto su sfondo nero, flag 🇮🇹🇺🇸🇬🇧🇩🇪🇫🇷🇪🇸, chiusura click esterno/ESC. Prima il label testuale era illeggibile su sfondo nero della home.
+- **Footer**: aggiunto **Threads** (@sposilive) tra i social dopo X.
+- **Music playlist**: cover 48px, titolo brano PRIMA dell'artista, riga artista+album+durata leggibile, pulsante `+` ridotto a icona 32x32 (niente label "Aggiungi" che non si leggeva).
+- **Qualità video 33%** (fallback Vercel senza VPS): scala 1080p→720p, crf 26→30, preset medium→veryfast, maxrate 2.5M→1.5M, audio 128k→96k. Obiettivo: ffmpeg-static dentro i 90s di Vercel.
+
+### VPS — NON ANCORA ATTIVATA
+La **VPS Oracle non è ancora stata creata** dall'utente. Di conseguenza:
+- Il watermark video lato VPS (`vps-scripts/overlay.js` + `video-watermark-server.js` col doppio logo partner) è nel repo ma NON deployato.
+- Il fallback locale (ffmpeg-static su Vercel) è ora il path attivo con qualità 33%.
+- Quando la VPS sarà attiva: scp dei 2 script + install ffmpeg + systemd service + env (vedi vps-scripts/README se presente).
+
+### Commit
+- `426719b` feat(ui): switcher lingua a bandiere + Threads footer + qualità video 33% (4 file, +91/-42)
+
 ## Sessione 09/08/2026 (pomeriggio) — White label B2B per partner (ristoratori/fotografi)
 
 ### Contesto
