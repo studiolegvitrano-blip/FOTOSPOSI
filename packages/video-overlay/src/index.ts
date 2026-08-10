@@ -107,7 +107,11 @@ export async function applyVideoOverlay(
       return inputBuffer;
     }
 
-    const width = 1080;
+    // 33% quality (user request 09/08/2026): scala 720p (era 1080p) + crf 30
+    // (era 26). Obiettivo: ridurre ~3× il file size e soprattutto tenere
+    // ffmpeg dentro il budget 90s di Vercel anche senza VPS. Watermark nel
+    // stesso passaggio (filter_complex + overlay), zero duplicazioni.
+    const width = 720;
     const textColor = branding.textColor || '#ffffff';
 
     // Se gli sposi hanno disattivato nomi/data (coupleNames e date vuoti), niente banda
@@ -165,17 +169,14 @@ export async function applyVideoOverlay(
       }
     }
 
-    // Encoding settings ottimizzati per riduzione ~1/5 del file size senza
-    // perdita di qualità percepita (richiesta utente 28/07/2026: 10min video =
-    // 1GB su R2/Drive è insostenibile per tier Free 10GB storage):
-    //   - crf 26 (era 23): 50% riduzione bit rate, qualità percepita quasi identica
-    //     (YouTube stesso target).
-    //   - preset medium (era veryfast): encoding più lento ma bitrate ottimale
-    //     per stessa qualità (1 passaggio = qualità percepita simile a crf 23).
-    //   - maxrate/bufsize: VBV cap per stabilizzare dimensione su clip lunghi.
+    // Encoding settings 33% qualidade (09/08/2026): senza VPS Oracle attiva,
+    // ffmpeg-static su Vercel deve stare dentro 90s. Scala 720p + crf 30 +
+    // preset veryfast (era medium: più veloce, bitrate leggermente più alto
+    // ma acceptable per clip brevi). maxrate 1.5M (era 2.5M).
+    //   - crf 30 → ~50% bitrate in meno rispetto a crf 26
+    //   - 720p → ~50% pixel in meno rispetto a 1080p
+    //   - Combinato → ~25-30% del peso originale. Unico encoding.
     //   - +faststart: moov atom davanti per streaming/playback immediato.
-    // Risultato: 10min @ 1080p ~1GB → ~200MB, watermark applicato nel stesso
-    // passaggio (filter_complex + overlay). Unico encoding, zero duplicazioni.
     const ffmpegArgs = [
       '-y',
       '-i', inputPath,
@@ -186,13 +187,13 @@ export async function applyVideoOverlay(
         ? `[0:v]scale=${width}:-2[base];[base][1:v]overlay=0:main_h-overlay_h[wm];[wm][2:v]overlay=24:24`
         : `[0:v]scale=${width}:-2[base];[base][1:v]overlay=0:main_h-overlay_h`,
       '-c:v', 'libx264',
-      '-preset', 'medium',
-      '-crf', '26',
-      '-maxrate', '2.5M',
-      '-bufsize', '5M',
+      '-preset', 'veryfast',
+      '-crf', '30',
+      '-maxrate', '1.5M',
+      '-bufsize', '3M',
       '-pix_fmt', 'yuv420p',
       '-c:a', 'aac',
-      '-b:a', '128k',
+      '-b:a', '96k',
       '-movflags', '+faststart',
       outputPath,
     ];

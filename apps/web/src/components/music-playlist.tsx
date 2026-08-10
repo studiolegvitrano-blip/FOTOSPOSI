@@ -253,18 +253,18 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
           {results.length > 0 && (
             <ul className="divide-y">
               {results.map((track) => (
-                <li key={track.id} className="py-2 flex items-center gap-3">
+                <li key={track.id} className="py-3 flex items-center gap-3">
                   {track.art_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={track.art_url} alt={track.name} className="w-10 h-10 rounded object-cover" />
+                    <img src={track.art_url} alt={track.name} className="w-12 h-12 rounded object-cover shrink-0" />
                   ) : (
-                    <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
-                      <Music className="w-5 h-5 text-text-muted" />
+                    <div className="w-12 h-12 rounded bg-muted flex items-center justify-center shrink-0">
+                      <Music className="w-6 h-6 text-text-muted" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{track.artists.map((a) => a.name).join(', ')}</p>
-                    <p className="text-xs text-text-muted truncate">{track.name} · {formatDuration(track.duration_ms)}</p>
+                    <p className="font-medium truncate text-sm">{track.name}</p>
+                    <p className="text-xs text-text-muted truncate">{track.artists.map((a) => a.name).join(', ')} · {track.album?.name} · {formatDuration(track.duration_ms)}</p>
                   </div>
                   {track.preview_url && (
                     <Button
@@ -280,11 +280,12 @@ export default function MusicPlaylist({ eventId }: { eventId: string }) {
                   <Button
                     size="sm"
                     variant="outline"
+                    title={t('add')}
                     onClick={() => addTrack(track)}
                     disabled={addingId === track.id}
+                    className="shrink-0 w-8 h-8 p-0"
                   >
                     {addingId === track.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                    {t('add')}
                   </Button>
                 </li>
               ))}
