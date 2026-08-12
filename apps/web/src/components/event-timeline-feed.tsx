@@ -29,11 +29,16 @@ type Props = {
    * Collega, Altro) non vengono MAI mostrati, a prescindere da questo flag.
    */
   showUploaderRoles?: boolean;
+  /**
+   * Props per share-with-tags (tag @sposi + @sposilive + #hashtag coppia + handle partner B2B).
+   * Se presente, mostra 4 tastini (FB/IG/X/WhatsApp) su ogni card galleria. Passato al FacebookFeed.
+   */
+  shareProps?: Omit<import('./social-share-buttons').SocialShareProps, 'photoUrl'>;
 };
 
 const PAGE_SIZE = 4;
 
-export default function EventTimelineFeed({ media, videos, event, eventId, onShareMedia, onOpenImage, canManage, onDeleteMedia, showUploaderRoles = true }: Props) {
+export default function EventTimelineFeed({ media, videos, event, eventId, onShareMedia, onOpenImage, canManage, onDeleteMedia, showUploaderRoles = true, shareProps }: Props) {
   const t = useTranslations('feed');
   const c = useTranslations('common');
   const [page, setPage] = useState(1);
@@ -138,6 +143,7 @@ export default function EventTimelineFeed({ media, videos, event, eventId, onSha
         eventId={eventId}
         canManage={canManage}
         onDeleteMedia={onDeleteMedia}
+        shareProps={shareProps}
       />
     </div>
   );

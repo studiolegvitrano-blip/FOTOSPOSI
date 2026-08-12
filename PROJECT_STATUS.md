@@ -1,5 +1,59 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 11/08/2026 — share-with-tags completata (da committare) + BOM fix + chiarimento cascata lead → GTN
+
+### Contesto
+Ripresa della feature share-with-tags iniziata il 10/08 (file `share-with-tags.ts` scritto, non committato). In questa sessione: implementazione completa UI (galleria + lightbox + impostazioni sposo + dashboard partner), fix BOM in `apps/web/package.json` (bloccava `next dev`), spostamento porta dev su 3001 (3000 occupata da Docker), pulizia disco (npm-cache 6.1 GB), e chiarimento fondamentale: **la "cascata lead" NON appartiene a questo progetto → appartiene al SaaS GTN Engineering** (marketing). Prompt dedicato scritto in chat (da incollare nella chat GTN).
+
+### Fatto
+
+**1. Feature share-with-tags COMPLETATA (working tree, NON committata, NON pushatta)**
+- `packages/social-sharing/src/share-with-tags.ts` (NUOVO): `buildShareText` (frase utente + 8 spazi + @sposi + @brand + @partner se B2B + #brand + #hashtag coppia + #partner), `buildShareUrl` (FB sharer, TikTok upload, X intent, IG home), `buildShareTextForInstagram`, tipi `SharePlatform`/`BrandHandle`/`ShareTagInput`. Normalizzazione handle (`@`/`#` opzionale in input).
+- `packages/events/src/service.ts`: nuova `updateEventSocial(eventId, {groom1_social_handle, groom2_social_handle, couple_hashtag})` esportata da `index.ts`. Tipo `WeddingEvent` esteso con le 3 colonne.
+- `packages/partner/src/service.ts`: `PartnerBranding` esteso con `social_handle`/`social_hashtag`, `getEventPartner` ora li seleziona e ritorna.
+- `apps/web/src/app/api/events/[id]/social/route.ts` (NUOVO): `PATCH` gated sposo/delegato (stesso pattern authorize di participants), sanitize stringhe max 60 char, chiama `updateEventSocial`.
+- `apps/web/src/app/api/partner/profile/route.ts`: PATCH estesa con `socialHandle`/`socialHashtag`.
+- `apps/web/src/components/social-share-buttons.tsx` (NUOVO): 5 tastini icona FB/IG/X/WhatsApp/TikTok (SVG inline, no dip) + toggle input testo libero + toast IG opzionale. WhatsApp via `wa.me/?text=`. IG: copia appunti + toast + apre IG. Usa `buildShareText`/`buildShareUrl` dal package.
+- `apps/web/src/components/facebook-feed.tsx`: prop `shareProps?` (Omit<SocialShareProps,'photoUrl'>) → riga "Condividi:" con tastini sotto ogni card (foto e video). Helper `absoluteUrl` per URL assoluto.
+- `apps/web/src/components/event-timeline-feed.tsx`: prop `shareProps?` pass-through a FacebookFeed.
+- `apps/web/src/components/full-gallery-lightbox.tsx`: riscritta con long-press 500ms (touch + mouse con tolleranza 10px movimento → swipe annulla) → menu custom 5 icone; tap singolo = foto successiva (preservato); ESC = chiudi menu poi lightbox; hint "Tieni premuto per condividere".
+- `apps/web/src/app/events/[id]/page.tsx` + `apps/web/src/app/event/[code]/page.tsx`: passano `shareProps` (handle evento + partner + brand detection `weddingmoments → justmarry`) sia al feed sia alla lightbox.
+- `apps/web/src/app/events/[id]/settings/page.tsx`: nuova sezione "Handle social per la condivisione" (3 input + nudge "sostienici" con link seguici brand-specific IG/FB/TikTok per Sposi.live / JustMarry.live) + save via PATCH `/api/events/[id]/social`.
+- `apps/web/src/app/partner/dashboard/page.tsx`: profilo esteso con input `socialHandle`/`socialHashtag` nella stessa PATCH profile.
+
+**2. Fix critico: BOM UTF-8 in `apps/web/package.json`**
+- Il file iniziava con byte `EF BB BF` → `next dev` crashava con `SyntaxError: Unexpected token '﻿', "{"name"... is not valid JSON` → "still not listening" su ogni porta. Rimosso il BOM (backup creato e poi rimosso). **Il fix deve essere committato insieme a share-with-tags.**
+
+**3. Dev server: porta 3000 occupata da Docker (`com.docker.backend` PID 2408)**
+- Avviato su **3001**: `cmd /c npm run dev --workspace apps/web` con `$env:PORT="3001"` via Start-Process con redirect stdout/stderr a `%TEMP%\nextdev-3001.log`.
+
+**4. Pulizia disco C: (era a 0.2 GB liberi)**
+- `C:\Users\agost\AppData\Local\npm-cache` (6.11 GB) cancellato → 6.6 GB liberi. Altri candidati: `.next` (0.54 GB), Docker (25 GB, da `docker system prune -af` su conferma).
+
+**5. CHIARIMENTO STRATEGICO: "cascata lead" → SaaS GTN Engineering, NON Sposi.live**
+- L'utente ha chiarito che la "cascata" (enrichment lead multi-fonte: matrimoni.it → sito → IG/FB/TikTok/YouTube → anagrafica completa con P.IVA, PEC, cell, social) è una feature del SaaS GTN Engineering (marketing per Sposi.live), NON di questo progetto.
+- **Prompt completo scritto in chat per l'utente** da incollare nella chat GTN (copia NON salvata su file — solo in chat).
+- Comprende: ratio universale (dati umani + dati di sistema confluiscono nello stesso lead), esempio reale `scattoemidiverto` = Scatto e Mi Diverto di Matteo Fontanieri, fonti consultate in sequenza (sito → P.IVA/responsabile/cell/PEC/email; social scoperti cercando il nickname anche se non citati), cartella `C:\lead\INBOX\<lead>\` con screen + txt appunti, merge first-wins con provenance + verified flag, nessuna email automatica per ora.
+- NOTA: matrimoni.it risponde 522/timeout da fetch server-side (Cloudflare origin down) — da valutare headless browser o fonte alternativa.
+
+### Verifica
+- Typecheck pulito: `npx tsc --noEmit -p apps/web/tsconfig.json`
+- Test 485/485 (41 file) passanti
+- Dev server su http://localhost:3001 (STATUS 200)
+
+### Commit previsto (NON ancora fatto)
+```
+feat(share): share-with-tags da galleria + lightbox (FB/IG/X/WA/TikTok) con tag automatici + impostazioni social handle + fix BOM package.json
+```
+16 file (14 modificati + 2 nuovi + 1 nuova dir API social).
+
+### TODO post-push
+1. Verifica visiva in produzione: `/events/<id>/settings` (sezione handle social), galleria card (tastini), lightbox (long-press)
+2. Verifica `/partner/dashboard` con partner reale loggato (nuovi input social)
+3. La "cascata lead" è di GTN Engineering: riportare il prompt fornito in chat nella chat GTN
+
+---
+
 ## Sessione 10/08/2026 (sera) — Diagnostica storage /admin/storage (Forza/Cancella pending + orfani R2) + share-with-tags (iniziato)
 
 ### Contesto

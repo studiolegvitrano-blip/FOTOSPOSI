@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { updateEventWatermark, type WeddingEvent } from '@fotosposi/events';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Settings, Image as ImageIcon, Users, Bell, Shield, HardDrive, Globe, Loader2 } from 'lucide-react';
+import { Settings, Image as ImageIcon, Users, Bell, Shield, HardDrive, Globe, Loader2, AtSign } from 'lucide-react';
 import { WATERMARK_FONTS } from '@/lib/watermark-fonts';
 
 /**
@@ -72,6 +72,16 @@ export default function EventSettingsPage() {
   const [namesSaving, setNamesSaving] = useState(false);
   const [namesSaved, setNamesSaved] = useState(false);
 
+  // Handle social sposi (share-with-tags). Campi opzionali: se vuoti il
+  // share text omette handle e hashtag (vedi buildShareText in social-sharing).
+  // La normalizzazione '@xxx' / '#xxx' avviene a runtime lato client share,
+  // qui l'utente può scrivere 'lillo' o '@lillo' indifferentemente.
+  const [socialG1, setSocialG1] = useState('');
+  const [socialG2, setSocialG2] = useState('');
+  const [socialHashtag, setSocialHashtag] = useState('');
+  const [socialSaving, setSocialSaving] = useState(false);
+  const [socialSaved, setSocialSaved] = useState(false);
+
   // I font vanno caricati anche nel browser per l'anteprima della scelta.
   // 1) Per i 7 font disponibili su Google Fonts: un singolo <link> CSS2.
   // 2) Per i restanti 21 font (non su Google Fonts): @font-face inline che referenzia
@@ -126,6 +136,15 @@ export default function EventSettingsPage() {
         setP2First(ev.groom2_first_name || '');
         setP2Last(ev.groom2_last_name || '');
         setP2Role((ev.groom2_role as PartnerRole) || 'groom');
+        // Handle social sposi (share-with-tags) — colonne aggiunte 10/08/2026.
+        const evSocial = d.event as typeof d.event & {
+          groom1_social_handle?: string | null;
+          groom2_social_handle?: string | null;
+          couple_hashtag?: string | null;
+        };
+        setSocialG1(evSocial.groom1_social_handle || '');
+        setSocialG2(evSocial.groom2_social_handle || '');
+        setSocialHashtag(evSocial.couple_hashtag || '');
         setLoading(false);
       })
       .catch(() => router.push(`/events/${eventId}`));
@@ -168,6 +187,33 @@ export default function EventSettingsPage() {
     setNamesSaving(false);
     if (!error) { setNamesSaved(true); setTimeout(() => setNamesSaved(false), 3000); }
     else alert(`Salvataggio non riuscito: ${error}`);
+  };
+
+  // Salva handle social della coppia via PATCH /api/events/[id]/social.
+  // I campi vuoti inviano null (si cancellano i valori precedenti).
+  const saveSocial = async () => {
+    setSocialSaving(true);
+    setSocialSaved(false);
+    try {
+      const res = await fetch(`/api/events/${eventId}/social`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          groom1_social_handle: socialG1.trim() || null,
+          groom2_social_handle: socialG2.trim() || null,
+          couple_hashtag: socialHashtag.trim() || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(`Salvataggio non riuscito: ${data.error ?? res.status}`);
+      } else {
+        setSocialSaved(true);
+        setTimeout(() => setSocialSaved(false), 3000);
+      }
+    } finally {
+      setSocialSaving(false);
+    }
   };
 
   const saveParticipantRole = async (userId: string, roleAtEvent: string | null) => {
@@ -300,6 +346,84 @@ export default function EventSettingsPage() {
               {namesSaving ? 'Salvataggio...' : 'Salva dati sposi'}
             </Button>
             {namesSaved && <span className="text-sm text-success">Salvato ✓</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Handle social della coppia (share-with-tags) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2"><AtSign className="w-4 h-4" /> Handle social per la condivisione</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-text-muted">
+            Inserisci gli handle Instagram/TikTok/X tuoi e del tuo partner (opzionali, senza "@" o con: li normalizziamo noi).
+            Verranno aggiunti automaticamente alle caption di condivisione delle foto della galleria, insieme a un tag del brand ({event?.brand === 'weddingmoments' ? '@justmarry.live #justmarry' : '@sposilive #sposilive'}).
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-text-muted">Handle sposo/a 1</label>
+              <input
+                type="text"
+                value={socialG1}
+                onChange={(e) => setSocialG1(e.target.value)}
+                placeholder="es. lillo"
+                maxLength={60}
+                className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-text-muted">Handle sposo/a 2</label>
+              <input
+                type="text"
+                value={socialG2}
+                onChange={(e) => setSocialG2(e.target.value)}
+                placeholder="es. mariaesposito"
+                maxLength={60}
+                className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-text-muted">Hashtag coppia</label>
+              <input
+                type="text"
+                value={socialHashtag}
+                onChange={(e) => setSocialHashtag(e.target.value)}
+                placeholder="es. matri2026"
+                maxLength={60}
+                className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+              />
+            </div>
+          </div>
+
+          {/* Info box nudge "manteniamoci in contatto" */}
+          <div className="rounded-md border border-brand/30 bg-brand/5 p-3 text-xs space-y-1">
+            <p className="font-medium text-brand">Perché ti chiediamo gli handle?</p>
+            <p className="text-text-muted">
+              Ogni foto condivisa dalla tua galleria aiuterà altri sposi a scoprirci. Aggiungendo i vostri handle, fate studi sull'album di matrimonio più bello del web — e ci aiutate a rimanere gratis per tutte le coppie. Seguici per restare in contatto:
+            </p>
+            <p className="flex flex-wrap gap-2 pt-1">
+              {event?.brand === 'weddingmoments' ? (
+                <>
+                  <a href="https://www.instagram.com/justmarry.live" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">@justmarry.live (Instagram)</a>
+                  <a href="https://www.facebook.com/justmarrylive" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">JustMarry.live (Facebook)</a>
+                  <a href="https://www.tiktok.com/@justmarry.live" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">@justmarry.live (TikTok)</a>
+                </>
+              ) : (
+                <>
+                  <a href="https://www.instagram.com/sposilive" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">@sposilive (Instagram)</a>
+                  <a href="https://www.facebook.com/sposilive" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Sposi.live (Facebook)</a>
+                  <a href="https://www.tiktok.com/@sposilive" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">@sposilive (TikTok)</a>
+                </>
+              )}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button size="sm" onClick={saveSocial} disabled={socialSaving}>
+              {socialSaving ? 'Salvataggio...' : 'Salva handle social'}
+            </Button>
+            {socialSaved && <span className="text-sm text-success">Salvato ✓</span>}
           </div>
         </CardContent>
       </Card>

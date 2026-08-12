@@ -38,7 +38,7 @@ export default function GuestEventPage() {
   const [showCountdown, setShowCountdown] = useState(false);
   const [ceremonyTime, setCeremonyTime] = useState<string | undefined>();
   const [receptionTime, setReceptionTime] = useState<string | undefined>();
-  const [partner, setPartner] = useState<{ name: string; logo_url?: string | null; claim_text?: string | null; address?: string | null; website?: string | null } | null>(null);
+  const [partner, setPartner] = useState<{ name: string; logo_url?: string | null; claim_text?: string | null; address?: string | null; website?: string | null; social_handle?: string | null; social_hashtag?: string | null } | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -311,6 +311,14 @@ export default function GuestEventPage() {
                       onShareMedia={handleShareMedia}
                       onOpenImage={(url) => setLightbox(url)}
                       showUploaderRoles={(event as { show_uploader_roles?: boolean }).show_uploader_roles !== false}
+                      shareProps={{
+                        groom1Handle: event.groom1_social_handle ?? null,
+                        groom2Handle: event.groom2_social_handle ?? null,
+                        coupleHashtag: event.couple_hashtag ?? null,
+                        partnerHandle: partner?.social_handle ?? null,
+                        partnerHashtag: partner?.social_hashtag ?? null,
+                        brand: event.brand === 'weddingmoments' ? 'justmarry' : 'sposilive',
+                      }}
                     />
                   )}
                 </CardContent>
@@ -350,6 +358,14 @@ export default function GuestEventPage() {
         media={media}
         initialUrl={lightbox}
         onClose={() => setLightbox(null)}
+        shareProps={{
+          groom1Handle: event.groom1_social_handle ?? null,
+          groom2Handle: event.groom2_social_handle ?? null,
+          coupleHashtag: event.couple_hashtag ?? null,
+          partnerHandle: partner?.social_handle ?? null,
+          partnerHashtag: partner?.social_hashtag ?? null,
+          brand: event.brand === 'weddingmoments' ? 'justmarry' : 'sposilive',
+        }}
       />
     </>
   );

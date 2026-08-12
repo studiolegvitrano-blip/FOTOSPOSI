@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Share2, MessageCircle, ThumbsUp, X, Trash2 } from 'lucide-react';
 import ReactionsBar, { type ReactionType } from './reactions-bar';
+import SocialShareButtons, { type SocialShareProps } from './social-share-buttons';
 
 export type FeedPost = {
   id: string;
@@ -43,6 +44,12 @@ type Props = {
   canManage?: boolean;
   /** Callback per cancellare una foto. Chiamata solo se canManage === true. */
   onDeleteMedia?: (postId: string) => void;
+  /**
+   * Props per share-with-tags (tag @sposi + @sposilive + #hashtag + handle partner B2B).
+   * Se presente, mostra 4 tastini icona (FB/IG/X/WhatsApp) su ogni card della galleria.
+   * `photoUrl` viene costruito automaticamente per ogni post dal suo imageUrl/videoUrl.
+   */
+  shareProps?: Omit<SocialShareProps, 'photoUrl'>;
 };
 
 /* Avatar con iniziali se manca la foto profilo */
@@ -71,6 +78,18 @@ function relativeTime(iso: string, t: (k: string, vars?: Record<string, number>)
   return t('giorni_fa', { count: d });
 }
 
+/**
+ * Risolve un URL media relativo (es. '/api/media/abc/download') in URL pubblico
+ * assoluto richiesto dai social sharer (FB richiede `u` assoluto). Su SSR window
+ * non esiste → fallback string vuoto (i tasti share non renderizzati server side).
+ */
+function absoluteUrl(relativePath?: string): string {
+  if (!relativePath) return '';
+  if (relativePath.startsWith('http')) return relativePath;
+  if (typeof window === 'undefined') return '';
+  return `${window.location.origin}${relativePath.startsWith('/') ? '' : '/'}${relativePath}`;
+}
+
 const REACTION_EMOJI: Record<ReactionType, string> = {
   like: '👍',
   love: '❤️',
@@ -91,6 +110,7 @@ export default function FacebookFeed({
   eventId,
   canManage = false,
   onDeleteMedia,
+  shareProps,
 }: Props & { eventId?: string }) {
   const t = useTranslations('feed');
   const [commentsOpen, setCommentsOpen] = useState<Set<string>>(new Set());
@@ -329,6 +349,22 @@ export default function FacebookFeed({
                 </button>
               )}
             </div>
+
+            {/* Tastini share social (FB/IG/X/WhatsApp) con tag automatici — solo se shareProps passata */}
+            {shareProps && (() => {
+              const mediaRel = p.imageUrl || p.videoUrl;
+              const photoAbs = absoluteUrl(mediaRel);
+              if (!photoAbs) return null;
+              return (
+                <div className="flex items-center gap-1 px-3 py-2 border-b border-border bg-surface/50">
+                  <span className="text-[11px] text-text-muted mr-1">Condividi:</span>
+                  <SocialShareButtons
+                    {...shareProps}
+                    photoUrl={photoAbs}
+                  />
+                </div>
+              );
+            })()}
 
             {/* Barra azioni */}
             <div className="flex items-center justify-around px-2 py-1 text-sm font-semibold text-text-muted">

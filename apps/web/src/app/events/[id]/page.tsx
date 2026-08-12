@@ -40,7 +40,7 @@ export default function EventDetailPage() {
   const [canManage, setCanManage] = useState(false);
   const [ceremonyTime, setCeremonyTime] = useState<string | undefined>();
   const [receptionTime, setReceptionTime] = useState<string | undefined>();
-  const [partner, setPartner] = useState<{ name: string; logo_url?: string | null; claim_text?: string | null; address?: string | null; website?: string | null } | null>(null);
+  const [partner, setPartner] = useState<{ name: string; logo_url?: string | null; claim_text?: string | null; address?: string | null; website?: string | null; social_handle?: string | null; social_hashtag?: string | null } | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Il countdown appare al max 1 volta al giorno per evento: il timestamp dell'ultima
@@ -284,6 +284,14 @@ export default function EventDetailPage() {
                       event={event}
                       eventId={eventId}
                       canManage={canManage}
+                      shareProps={{
+                        groom1Handle: event.groom1_social_handle ?? null,
+                        groom2Handle: event.groom2_social_handle ?? null,
+                        coupleHashtag: event.couple_hashtag ?? null,
+                        partnerHandle: partner?.social_handle ?? null,
+                        partnerHashtag: partner?.social_hashtag ?? null,
+                        brand: event.brand === 'weddingmoments' ? 'justmarry' : 'sposilive',
+                      }}
                       onDeleteMedia={async (postId: string) => {
                         // Cancella foto via API DELETE /api/media/[id]. Solo sposo/delegato vede
                         // il bottone (canManage=true), e solo lui arriva qui. La route autorizza
@@ -365,6 +373,14 @@ export default function EventDetailPage() {
         media={media}
         initialUrl={lightbox}
         onClose={() => setLightbox(null)}
+        shareProps={{
+          groom1Handle: event?.groom1_social_handle ?? null,
+          groom2Handle: event?.groom2_social_handle ?? null,
+          coupleHashtag: event?.couple_hashtag ?? null,
+          partnerHandle: partner?.social_handle ?? null,
+          partnerHashtag: partner?.social_hashtag ?? null,
+          brand: event?.brand === 'weddingmoments' ? 'justmarry' : 'sposilive',
+        }}
       />
     </>
   );

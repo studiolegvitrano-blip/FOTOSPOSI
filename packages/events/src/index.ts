@@ -39,6 +39,13 @@ export interface WeddingEvent {
   groom2_first_name?: string | null;
   groom2_last_name?: string | null;
   groom2_role?: PartnerRole;
+
+  /** Handle social sposo 1 (es. 'lillo' o '@lillo') per share-with-tags. */
+  groom1_social_handle?: string | null;
+  /** Handle social sposo 2 (es. 'mariaesposito' o '@mariaesposito'). */
+  groom2_social_handle?: string | null;
+  /** Hashtag della coppia (es. 'matri2026' o '#matri2026'). */
+  couple_hashtag?: string | null;
 }
 
 export interface SubEvent {
@@ -81,5 +88,6 @@ export {
   getEventWindow,
   updateEventWatermark,
   updateEventNames,
+  updateEventSocial,
   buildR2FolderName,
 } from './service';

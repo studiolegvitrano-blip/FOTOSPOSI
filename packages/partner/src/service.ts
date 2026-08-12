@@ -25,6 +25,10 @@ export interface PartnerBranding {
   claim_text: string | null;
   website: string | null;
   address: string | null;
+  /** Handle social del partner B2B per share-with-tags (es. 'sartoriaitalianaofficial'). */
+  social_handle?: string | null;
+  /** Hashtag del partner B2B (es. 'sartoriaitalianaofficial'). */
+  social_hashtag?: string | null;
 }
 
 export interface PartnerCode {
@@ -163,7 +167,7 @@ export async function getEventPartner(eventId: string): Promise<{ partner?: Part
 
   const { data: partner, error: pErr } = await supabase
     .from('partners')
-    .select('id, name, logo_url, claim_text, website, address, is_active')
+    .select('id, name, logo_url, claim_text, website, address, is_active, social_handle, social_hashtag')
     .eq('id', event.partner_id)
     .maybeSingle();
   if (pErr) return { error: pErr.message };
@@ -177,6 +181,8 @@ export async function getEventPartner(eventId: string): Promise<{ partner?: Part
       claim_text: (event.partner_claim_text ?? partner.claim_text ?? null) as string | null,
       website: partner.website,
       address: partner.address,
+      social_handle: partner.social_handle ?? null,
+      social_hashtag: partner.social_hashtag ?? null,
     },
   };
 }

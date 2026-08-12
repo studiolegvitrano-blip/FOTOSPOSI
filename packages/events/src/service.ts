@@ -232,6 +232,38 @@ export async function updateEventNames(
   return { error: error?.message, couple_name: coupleName };
 }
 
+/**
+ * Aggiorna gli handle social della coppia (share-with-tags):
+ * `groom1_social_handle`, `groom2_social_handle`, `couple_hashtag`.
+ *
+ * Tutti i campi sono NULLABLE: passando null si cancella il valore esistente.
+ * La funzione NON normalizza (accetta 'lillo' o '@lillo'): la normalizzazione
+ * avviene a runtime nel momento in cui si costruisce il testo di share
+ * (vedi packages/social-sharing/src/share-with-tags.ts → normalizeHandle).
+ *
+ * Autorizzazione: la route API chiamante deve verificare events.created_by
+ * oppure event_managers.permission in ('edit','admin').
+ */
+export async function updateEventSocial(
+  eventId: string,
+  social: {
+    groom1_social_handle: string | null;
+    groom2_social_handle: string | null;
+    couple_hashtag: string | null;
+  },
+): Promise<{ error?: string }> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from('events')
+    .update({
+      groom1_social_handle: social.groom1_social_handle || null,
+      groom2_social_handle: social.groom2_social_handle || null,
+      couple_hashtag: social.couple_hashtag || null,
+    })
+    .eq('id', eventId);
+  return { error: error?.message };
+}
+
 export async function getEventWindow(eventId: string): Promise<{ window?: EventWindow; error?: string }> {
   const supabase = createClient();
   const { data, error } = await supabase

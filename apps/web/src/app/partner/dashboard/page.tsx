@@ -23,6 +23,8 @@ interface PartnerProfile {
   logo_url: string | null;
   claim_text: string | null;
   affiliate_id: string | null;
+  social_handle: string | null;
+  social_hashtag: string | null;
 }
 
 interface PartnerCode {
@@ -57,6 +59,8 @@ export default function PartnerDashboardPage() {
   const [claimText, setClaimText] = useState('');
   const [website, setWebsite] = useState('');
   const [address, setAddress] = useState('');
+  const [socialHandle, setSocialHandle] = useState('');
+  const [socialHashtag, setSocialHashtag] = useState('');
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [eventMsg, setEventMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [newEvent, setNewEvent] = useState({ coupleName: '', date: '', location: '', church: '', venue: '' });
@@ -72,6 +76,8 @@ export default function PartnerDashboardPage() {
     setClaimText(me.partner.claim_text ?? '');
     setWebsite(me.partner.website ?? '');
     setAddress(me.partner.address ?? '');
+    setSocialHandle(me.partner.social_handle ?? '');
+    setSocialHashtag(me.partner.social_hashtag ?? '');
     const codesRes = await fetch('/api/partner/codes').then((r) => r.json());
     if (!codesRes.error) setCodes(codesRes.codes ?? []);
     const eventsRes = await fetch('/api/partner/events').then((r) => r.json());
@@ -150,7 +156,7 @@ export default function PartnerDashboardPage() {
       const res = await fetch('/api/partner/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claimText, website, address }),
+        body: JSON.stringify({ claimText, website, address, socialHandle, socialHashtag }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -405,6 +411,31 @@ export default function PartnerDashboardPage() {
               <Label htmlFor="address">Indirizzo</Label>
               <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Via Roma 1, 00100 Roma" />
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="socialHandle">Handle social (Instagram/TikTok/X)</Label>
+                <Input
+                  id="socialHandle"
+                  value={socialHandle}
+                  onChange={(e) => setSocialHandle(e.target.value)}
+                  placeholder="es. sartoriaitalianaofficial"
+                  maxLength={60}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="socialHashtag">Hashtag brand</Label>
+                <Input
+                  id="socialHashtag"
+                  value={socialHashtag}
+                  onChange={(e) => setSocialHashtag(e.target.value)}
+                  placeholder="es. sartoriaitalianaofficial"
+                  maxLength={60}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-text-muted">
+              Verranno aggiunti automaticamente alle caption delle foto condivise dagli eventi che marchi (insieme a @sposilive #sposilive o @justmarry.live #justmarry).
+            </p>
             <Button onClick={handleSaveClaim} disabled={savingClaim}>
               {savingClaim ? '...' : t('dashboard_save')}
             </Button>
