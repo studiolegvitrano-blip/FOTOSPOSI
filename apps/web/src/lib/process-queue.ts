@@ -1,5 +1,6 @@
 ﻿import { createServiceClient } from '@fotosposi/core';
 import { createMediaRecord, getDriveToken, getEventDriveFolders, updateDriveSyncStatus } from '@fotosposi/media';
+import { classifyError, FAILURE_CLASS_R2_DOWNLOAD, FAILURE_CLASS_DRIVE, FAILURE_CLASS_DETECT, FAILURE_CLASS_INVALID } from '@fotosposi/media';
 import type { EventDriveToken } from '@fotosposi/media';
 import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
 import { applyVideoOverlay } from '@fotosposi/video-overlay';
@@ -26,13 +27,10 @@ ensureWatermarkFonts();
 //     aggrega per capire le cause piÃ¹ frequenti a livello di piattaforma.
 const MAX_RETRY_COUNT = 7;
 const CONCURRENCY = 4;
-
-const FAILURE_CLASS_R2_DOWNLOAD = 'r2_download_failed';
-const FAILURE_CLASS_WATERMARK = 'watermark_apply_failed';
-const FAILURE_CLASS_DRIVE = 'drive_sync_failed';
-const FAILURE_CLASS_DETECT = 'detect_watermark_missing';
-const FAILURE_CLASS_INVALID = 'invalid_image';
-const FAILURE_CLASS_OTHER = 'other';
+// RIFONDAZIONE 14/08/2026 — soglia circuit breaker OAuth: solo dopo N refresh
+// falliti CONSECUTIVI (non al primo) il token viene marcato 'revoked'. Evita
+// revoche premature su blip OAuth transitori (rate-limit Google, 500).
+const OAUTH_REVOKE_THRESHOLD = 3;
 
 /**
  * Backoff esponenziale puro (no jitter per testabilitÃ  deterministica).
@@ -118,6 +116,44 @@ function getBrandLabel(brand?: string): string {
 }
 
 /**
+ * RIFONDAZIONE 14/08/2026 — path unico di fallimento di un item.
+ * Centralizza logFailure + (DLQ oppure update 'failed' con backoff reale).
+ * Prima della rifondazione il backoff (computeProcessingBackoffMs) era definito
+ * ma MAI usato: un item fallito veniva ritentato a ogni tick del cron (5 min)
+ * ignorando il backoff. Ora ogni fallimento scrive `next_retry_at` = now +
+ * computeProcessingBackoffMs(retryCount), così il filtro `.or('next_retry_at
+ * .is.null,next_retry_at.lte.now')` skippa l'item finché il backoff non scade.
+ * Scrive anche `failure_class` sull'item per l'audit per-item.
+ */
+async function markItemFailed(
+  supabase: ReturnType<typeof createServiceClient>,
+  item: Record<string, unknown>,
+  params: { eventId: string; failureClass: string; errorMessage: string },
+): Promise<void> {
+  const newRetry = (Number(item.retry_count) || 0) + 1;
+  await logFailure(supabase, {
+    eventId: params.eventId,
+    fileName: (item.file_name as string | null) ?? undefined,
+    failureClass: params.failureClass,
+    errorMessage: params.errorMessage,
+    retryCount: newRetry,
+  });
+  if (newRetry >= MAX_RETRY_COUNT) {
+    await moveToDeadLetter(supabase, item, params.failureClass, params.errorMessage);
+  } else {
+    const nextRetryAt = new Date(Date.now() + computeProcessingBackoffMs(newRetry)).toISOString();
+    await supabase.from('upload_queue').update({
+      status: 'failed',
+      error: params.errorMessage,
+      failure_class: params.failureClass,
+      retry_count: newRetry,
+      next_retry_at: nextRetryAt,
+      permanent_failure: false,
+    }).eq('id', String(item.id));
+  }
+}
+
+/**
  * Verifica se il watermark atteso è effettivamente presente, allineato a come
  * `applyOverlay` renderizza il testo:
  *   - Se `wmLine1` è vuoto → nessun nome atteso → sempre OK.
@@ -143,12 +179,19 @@ export function watermarkNamesOk(
 
 /**
  * Aggiorna il token OAuth Google Drive se scaduto usando il refresh_token.
- * - Nessun token / nessun expires_at / non scaduto â†’ ritorna invariato.
- * - Nessun refresh_token â†’ non puÃ² refreshare, ritorna invariato (lascia che la
+ * - Nessun token / nessun expires_at / non scaduto → ritorna invariato.
+ * - Nessun refresh_token → non pu\u00f2 refreshare, ritorna invariato (lascia che la
  *   chiamata Drive fallisca con 401, gestita poi dal flow normale).
- * - Refresh fallito â†’ same.
- * - Refresh ok â†’ persiste su `event_drive_tokens` e ritorna il nuovo token.
- * Esportata (e non piÃ¹ come closure interna) per test unitario diretto.
+ * - Refresh fallito (invalid_grant) → **CIRCUIT BREAKER (14/08/2026)**: marca il
+ *   token come `status='revoked'` su `event_drive_tokens`. La marcatura revocata
+ *   fa skippare al cron TutTI gli item della coda upload_queue di quell'evento
+ *   (vedi processQueueForEvent: filtra token.status != 'revoked'). L'utente
+ *   riconnette Drive dalla pagina /events/<id>/drive → saveDriveToken resetta
+ *   status='active' (via upsert che non tocca status se non richiesto, vedi
+ *   fix seguente in saveDriveToken).
+ * - Refresh fallito (altro errore temporaneo) → ritorna invariato.
+ * - Refresh ok → persiste su `event_drive_tokens` e ritorna il nuovo token.
+ * Esportata (e non pi\u00f9 come closure interna) per test unitario diretto.
  */
 export async function refreshDriveTokenIfExpired(
   eventId: string,
@@ -160,14 +203,47 @@ export async function refreshDriveTokenIfExpired(
   if (!current.refresh_token) return current;
   const { refreshDriveAccessToken } = await import('@fotosposi/media');
   const refreshed = await refreshDriveAccessToken(current.refresh_token);
-  if (!refreshed.access_token) return current;
+  if (!refreshed.access_token) {
+    // RIFONDAZIONE 14/08/2026 — circuit breaker con SOGLIA (non al primo errore).
+    // Un singolo invalid_grant può essere un blip OAuth transitorio (rate-limit
+    // Google, 500 degradato) che non giustifica revocare un token vivo. Solo
+    // dopo OAUTH_REVOKE_THRESHOLD (3) fallimenti CONSECUTIVI marciamo
+    // status='revoked' → il cron skippa tutti gli item della coda dell'evento.
+    // Un refresh riuscito successivamente azzera il contatore.
+    const failures = (current.consecutive_refresh_failures ?? 0) + 1;
+    if (refreshed.revoked || failures >= OAUTH_REVOKE_THRESHOLD) {
+      try {
+        await supabase.from('event_drive_tokens').update({
+          status: 'revoked',
+          consecutive_refresh_failures: failures,
+          updated_at: new Date().toISOString(),
+        }).eq('event_id', eventId);
+        console.warn(`[process-queue] token Drive evento ${eventId} REVOCATO (invalid_grant x${failures}) — marcato revoked. Riconnettere da /events/${eventId}/drive`);
+      } catch (err) {
+        console.warn('[process-queue] impossibile marcare token revoked (non bloccante):', err instanceof Error ? err.message : err);
+      }
+    } else {
+      // Errore temporaneo, sotto soglia: incrementa il contatore ma NON revoca.
+      try {
+        await supabase.from('event_drive_tokens').update({
+          consecutive_refresh_failures: failures,
+          updated_at: new Date().toISOString(),
+        }).eq('event_id', eventId);
+      } catch (err) {
+        console.warn('[process-queue] impossibile aggiornare contatore refresh (non bloccante):', err instanceof Error ? err.message : err);
+      }
+    }
+    return current;
+  }
   const newExpiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
   await supabase.from('event_drive_tokens').update({
     access_token: refreshed.access_token,
     expires_at: newExpiresAt,
     updated_at: new Date().toISOString(),
+    status: 'active',
+    consecutive_refresh_failures: 0,
   }).eq('event_id', eventId);
-  return { ...current, access_token: refreshed.access_token, expires_at: newExpiresAt };
+  return { ...current, access_token: refreshed.access_token, expires_at: newExpiresAt, consecutive_refresh_failures: 0 };
 }
 
 function escapeXml(s: string): string {
@@ -264,22 +340,29 @@ async function applyWatermark(
 export async function processQueueForEvent(eventId: string, limit = 5): Promise<{ processed: number; remaining: number }> {
   const supabase = createServiceClient();
 
-  const [{ data: event }, { data: items }] = await Promise.all([
+  // RIFONDAZIONE 14/08/2026 — CLAIM ATOMICO (P0): in passato facevamo una SELECT
+  // (status IN pending/failed) poi un UPDATE status='processing' in due passi
+  // NON atomici → due worker concorrenti potevano processare lo stesso item
+  // (doppio watermark, doppio upload, doppio Drive). Ora il claim avviene in
+  // UN'UNICA transazione RPC con FOR UPDATE SKIP LOCKED: gli item marcati
+  // 'processing' dalla RPC non sono più ripescabili da altri worker.
+  // La RPC applica già i filtri (retry<7, permanent_failure=false, backoff
+  // scaduto) che prima erano nella select di PostgREST.
+  const rpcResp = await supabase.rpc('claim_upload_queue_items', {
+    p_event_id: eventId,
+    p_limit: limit,
+  });
+
+  // POSTGREST NOTE: supabase.rpc ritorna { data, error }. Per una funzione
+  // SETOF, `data` è l'array delle righe claimate.
+  const items: any[] = (rpcResp?.data as any[]) ?? [];
+  if (rpcResp?.error) {
+    console.error('[process-queue] claim RPC fallito:', rpcResp.error.message);
+    return { processed: 0, remaining: 0 };
+  }
+
+  const [{ data: event }] = await Promise.all([
     supabase.from('events').select('couple_name, date, brand, watermark_names, watermark_text, watermark_font, groom1_first_name, groom1_last_name, groom2_first_name, groom2_last_name').eq('id', eventId).single(),
-    supabase
-      .from('upload_queue')
-      .select('*')
-      .eq('event_id', eventId)
-      .in('status', ['pending', 'failed'])
-      // FIX 30/07/2026: max 7 tentativi (MAX_RETRY_COUNT). Dopo il 7Â° fallimento
-      // l'item viene spostato in `upload_queue_dead_letter` dalla funzione
-      // `moveToDeadLetter` (vedi processSingleItem). Senza questo filtro un item
-      // irrecuperabile (es. "r2_key mancante": il file non Ã¨ mai arrivato su R2)
-      // veniva riprovato all'infinito a ogni sweep, tenendo la coda perennemente
-      // "in elaborazione".
-      .lt('retry_count', MAX_RETRY_COUNT)
-      .order('created_at', { ascending: true })
-      .limit(limit),
   ]);
 
   // Lookup nome+cognome di chi ha caricato ciascun file (per naming Drive).
@@ -327,6 +410,23 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
 
   const tokenResp = await getDriveToken(eventId);
   let token = tokenResp.token;
+  // RIFONDAZIONE 14/08/2026 — batch skip su token revoked (P1). Se il token è
+  // marcato 'revoked' (invalid_grant ripetuto, utente non ha ancora riconnesso
+  // Drive), NON ha senso processare gli item: il sync Drive fallirebbe a ogni
+  // tentativo. Rilasciamo il claim (status→pending) e usciamo senza sprecare
+  // risorse; gli item restano in coda finché l'utente riconnette Drive.
+  if (token && token.status === 'revoked') {
+    console.warn(`[process-queue] evento ${eventId}: token Drive revoked, skip batch (${items.length} item rilasciati). Riconnettere da /events/${eventId}/drive`);
+    const claimedIds = items.map((i: any) => i.id);
+    if (claimedIds.length > 0) {
+      try {
+        await supabase.from('upload_queue').update({ status: 'pending' }).in('id', claimedIds);
+      } catch (relErr) {
+        console.warn('[process-queue] rilascio claim (revoked) fallito:', (relErr as Error).message);
+      }
+    }
+    return { processed: 0, remaining: items.length };
+  }
   const hasDrive = !!token?.access_token;
   let folders: Record<string, string> | null = null;
   if (hasDrive) {
@@ -432,19 +532,11 @@ async function processSingleItem(
 ): Promise<boolean> {
   const { supabase, eventId, event, wmLine1, wmLine2, wmFont, brandLogo, partnerLogo, wmFontBuffer, hasDrive, token, folders, r2Client, r2Bucket } = ctx;
   try {
-    await supabase.from('upload_queue').update({ status: 'processing' }).eq('id', item.id);
+    // RIFONDAZIONE 14/08/2026: il claim (status→processing) è già avvenuto
+    // atomicamente nella RPC claim_upload_queue_items. Niente update qui.
 
     const r2Key = item.r2_key;
     if (!r2Key) {
-      // FIX 02/08/2026: prima l'item veniva marcato 'failed' con retry_count=99,
-      // che lo escludeva per sempre dal retry (filtro `< 7`) SENZA però spostarlo
-      // in DLQ → item irrecuperabili (il file non è MAI arrivato su R2, non c'è
-      // nulla da riprocessare) restavano appesi in upload_queue all'infinito,
-      // falsando la dashboard ("Falliti in retry" che non ritentano mai).
-      // Ora si usa moveToDeadLetter: l'item esce dalla coda attiva, è tracciato
-      // con failure_class='invalid_image' (visibile in /admin/system) e la coda
-      // principale resta snella. dlq-retry può ancora ripescarlo (r2_key NULL →
-      // tornerà qui → DLQ), senza lasciare spazzatura nella coda principale.
       await moveToDeadLetter(supabase, item, FAILURE_CLASS_INVALID, 'r2_key mancante');
       await logFailure(supabase, { eventId, fileName: item.file_name, failureClass: FAILURE_CLASS_INVALID, errorMessage: 'r2_key mancante', retryCount: MAX_RETRY_COUNT });
       return false;
@@ -482,20 +574,14 @@ async function processSingleItem(
 
     const downloadUrl = await getPresignedDownloadUrl(r2Key, 3600);
     if (!downloadUrl) {
-      const newRetry = (item.retry_count || 0) + 1;
-      await logFailure(supabase, { eventId, fileName: item.file_name, failureClass: FAILURE_CLASS_R2_DOWNLOAD, errorMessage: 'Download R2 fallito (no presigned URL)', retryCount: newRetry });
-      if (newRetry >= MAX_RETRY_COUNT) await moveToDeadLetter(supabase, item, FAILURE_CLASS_R2_DOWNLOAD, 'Download R2 fallito (no presigned URL)');
-      else await supabase.from('upload_queue').update({ status: 'failed', error: 'Download R2 fallito', retry_count: newRetry }).eq('id', item.id);
+      await markItemFailed(supabase, item, { eventId, failureClass: FAILURE_CLASS_R2_DOWNLOAD, errorMessage: 'Download R2 fallito (no presigned URL)' });
       return false;
     }
 
     const resp = await fetch(downloadUrl);
     if (!resp.ok) {
-      const newRetry = (item.retry_count || 0) + 1;
       const msg = `File su R2 non trovato (HTTP ${resp.status})`;
-      await logFailure(supabase, { eventId, fileName: item.file_name, failureClass: FAILURE_CLASS_R2_DOWNLOAD, errorMessage: msg, retryCount: newRetry });
-      if (newRetry >= MAX_RETRY_COUNT) await moveToDeadLetter(supabase, item, FAILURE_CLASS_R2_DOWNLOAD, msg);
-      else await supabase.from('upload_queue').update({ status: 'failed', error: msg, retry_count: newRetry }).eq('id', item.id);
+      await markItemFailed(supabase, item, { eventId, failureClass: FAILURE_CLASS_R2_DOWNLOAD, errorMessage: msg });
       return false;
     }
 
@@ -522,6 +608,9 @@ async function processSingleItem(
 
     // Watermark applicato a foto e video (vedi commento storico per dettagli).
     let watermarkFailed = false;
+    // RIFONDAZIONE 14/08/2026 — atteso watermark se ci sono nomi o logo brand,
+    // spostato QUI (prima del branch) perché anche il gate video lo usa.
+    const expectsWatermark = !!wmLine1 || !!brandLogo;
     if (!isVideo) {
       try {
         buffer = await applyWatermark(buffer as Buffer, wmLine1, wmLine2, event?.brand, wmFont, brandLogo, wmFontBuffer, partnerLogo);
@@ -548,7 +637,15 @@ async function processSingleItem(
           contentType = 'video/mp4';
         }
       } catch (overlayErr) {
-        console.error('Video overlay fallito:', overlayErr);
+        // RIFONDAZIONE 14/08/2026 — watermark video gate (P1). Prima l'errore
+        // ffmpeg era solo loggato e il video andava in galleria SENZA watermark,
+        // senza alcun gate. Ora marcamo watermarkFailed=true così il record
+        // nasce con watermark_missing=true → visibile in /admin/system e
+        // ritentabile (o riparabile) come le foto.
+        if (expectsWatermark) {
+          watermarkFailed = true;
+        }
+        console.error(`[process-queue] video overlay fallito per ${item.file_name} (event=${eventId}):`, overlayErr);
       }
     }
 
@@ -564,7 +661,6 @@ async function processSingleItem(
     // Self-healing check su watermark (vedi detectWatermark). Solo foto, solo
     // se il applyWatermark non ha già lanciato, solo se attesi nomi/logo.
     let watermarkMissing = watermarkFailed;
-    const expectsWatermark = !!wmLine1 || !!brandLogo;
     if (!isVideo && !watermarkFailed && expectsWatermark) {
       try {
         const verifyUrl = await getPresignedDownloadUrl(r2Key, 3600);
@@ -612,11 +708,9 @@ async function processSingleItem(
     });
 
     if (recordError || !media) {
-      const newRetry = (item.retry_count || 0) + 1;
       const msg = recordError || 'Media record fallito';
-      await logFailure(supabase, { eventId, fileName: item.file_name, failureClass: FAILURE_CLASS_OTHER, errorMessage: String(msg), retryCount: newRetry });
-      if (newRetry >= MAX_RETRY_COUNT) await moveToDeadLetter(supabase, item, FAILURE_CLASS_OTHER, String(msg));
-      else await supabase.from('upload_queue').update({ status: 'failed', error: String(msg), retry_count: newRetry }).eq('id', item.id);
+      const failureClass = classifyError(new Error(String(msg)));
+      await markItemFailed(supabase, item, { eventId, failureClass, errorMessage: String(msg) });
       return false;
     }
 
@@ -702,13 +796,8 @@ async function processSingleItem(
         const driveData = await driveRes.json().catch(() => ({ error: { message: 'JSON parse failed' } }));
         if (driveRes.ok && driveData.id) {
           await updateDriveSyncStatus(media.id, 'synced', driveData.id);
-          const finalStatus = watermarkMissing ? 'failed' : 'synced';
-          const finalError = watermarkMissing ? 'Watermark non applicato (rilevato da detectWatermark)' : null;
-          const finalRetry = watermarkMissing ? (item.retry_count || 0) + 1 : item.retry_count || 0;
           if (watermarkMissing) {
-            await logFailure(supabase, { eventId, fileName: item.file_name, failureClass: FAILURE_CLASS_DETECT, errorMessage: String(finalError), retryCount: finalRetry });
-            if (finalRetry >= MAX_RETRY_COUNT) await moveToDeadLetter(supabase, item, FAILURE_CLASS_DETECT, String(finalError));
-            else await supabase.from('upload_queue').update({ status: 'failed', error: finalError, retry_count: finalRetry }).eq('id', item.id);
+            await markItemFailed(supabase, item, { eventId, failureClass: FAILURE_CLASS_DETECT, errorMessage: 'Watermark non applicato (rilevato da detectWatermark)' });
           } else {
             await supabase.from('upload_queue').update({ status: 'synced', drive_file_id: driveData.id, processed_at: new Date().toISOString() }).eq('id', item.id);
           }
@@ -716,39 +805,30 @@ async function processSingleItem(
           await updateDriveSyncStatus(media.id, 'failed');
           const driveError = `Drive sync fallito: HTTP ${driveRes.status}`;
           const compositeError = watermarkMissing ? `Watermark mancante + ${driveError}` : driveError;
-          const newRetry = (item.retry_count || 0) + 1;
-          await logFailure(supabase, { eventId, fileName: item.file_name, failureClass: FAILURE_CLASS_DRIVE, errorMessage: compositeError, retryCount: newRetry });
-          if (newRetry >= MAX_RETRY_COUNT) await moveToDeadLetter(supabase, item, FAILURE_CLASS_DRIVE, compositeError);
-          else await supabase.from('upload_queue').update({ status: 'failed', error: compositeError, retry_count: newRetry }).eq('id', item.id);
+          await markItemFailed(supabase, item, { eventId, failureClass: FAILURE_CLASS_DRIVE, errorMessage: compositeError });
         }
       } catch (err) {
         await updateDriveSyncStatus(media.id, 'failed');
         const driveErr = `Drive sync exception: ${(err as Error).message}`;
         const compositeError = watermarkMissing ? `Watermark mancante + ${driveErr}` : driveErr;
-        const newRetry = (item.retry_count || 0) + 1;
-        await logFailure(supabase, { eventId, fileName: item.file_name, failureClass: FAILURE_CLASS_DRIVE, errorMessage: compositeError, retryCount: newRetry });
-        if (newRetry >= MAX_RETRY_COUNT) await moveToDeadLetter(supabase, item, FAILURE_CLASS_DRIVE, compositeError);
-        else await supabase.from('upload_queue').update({ status: 'failed', error: compositeError, retry_count: newRetry }).eq('id', item.id);
+        await markItemFailed(supabase, item, { eventId, failureClass: FAILURE_CLASS_DRIVE, errorMessage: compositeError });
       }
     } else {
       // Nessun Drive: status guidato solo da watermarkMissing.
       if (watermarkMissing) {
-        const newRetry = (item.retry_count || 0) + 1;
         const msg = 'Watermark non applicato (rilevato da detectWatermark)';
-        await logFailure(supabase, { eventId, fileName: item.file_name, failureClass: FAILURE_CLASS_DETECT, errorMessage: msg, retryCount: newRetry });
-        if (newRetry >= MAX_RETRY_COUNT) await moveToDeadLetter(supabase, item, FAILURE_CLASS_DETECT, msg);
-        else await supabase.from('upload_queue').update({ status: 'failed', error: msg, retry_count: newRetry }).eq('id', item.id);
+        await markItemFailed(supabase, item, { eventId, failureClass: FAILURE_CLASS_DETECT, errorMessage: msg });
       } else {
         await supabase.from('upload_queue').update({ status: 'synced', processed_at: new Date().toISOString() }).eq('id', item.id);
       }
     }
     return true;
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Errore';
-    const newRetry = (item.retry_count || 0) + 1;
-    await logFailure(supabase, { eventId, fileName: item.file_name, failureClass: FAILURE_CLASS_OTHER, errorMessage: msg, retryCount: newRetry });
-    if (newRetry >= MAX_RETRY_COUNT) await moveToDeadLetter(supabase, item, FAILURE_CLASS_OTHER, msg);
-    else await supabase.from('upload_queue').update({ status: 'failed', error: msg, retry_count: newRetry }).eq('id', item.id);
+    const msg = err instanceof Error ? err.message : String(err ?? 'Errore');
+    // RIFONDAZIONE 14/08/2026 — classificazione errori (P0): prima ogni throw
+    // finiva appiattito a 'other', rendendo /admin/system inutile. Ora
+    // classifyError mappa il messaggio nella tassonomia FAILURE_CLASS_*.
+    await markItemFailed(supabase, item, { eventId, failureClass: classifyError(err), errorMessage: msg });
     return false;
   }
 }

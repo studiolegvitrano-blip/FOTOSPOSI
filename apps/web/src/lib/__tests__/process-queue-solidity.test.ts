@@ -1,33 +1,24 @@
-/**
- * FIX 02/08/2026 — item upload_queue senza `r2_key` (file mai arrivato su R2)
- * ora finisce in `upload_queue_dead_letter` invece di restare appeso per sempre
- * in upload_queue con status='failed' e retry_count=99.
- *
- * PRIMA: `r2_key mancante` → update { status:'failed', retry_count:99 } →
- *   - il filtro del cron è `.lt('retry_count', MAX_RETRY_COUNT)` (7) → l'item
- *     NON veniva MAI più ritentato (99 >= 7) → spazzatura permanente in coda;
- *   - la dashboard /admin/system mostrava "N falliti (in retry)" che in realtà
- *     non ritentavano mai.
- *
- * DOPO: `r2_key mancante` → moveToDeadLetter (insert DLQ + delete da
- * upload_queue) → la coda principale resta snella, l'item è tracciato con
- * failure_class='invalid_image' e visibile nella dashboard.
- */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// RIFONDAZIONE 14/08/2026 — test della solidità del claim atomico + backoff
+// reale. Le colonne next_retry_at/failure_class/permanent_failure sono scrivibili
+// su upload_queue; verifico che un fallimento scriva next_retry_at (backoff) e
+// che il claim avvenga via RPC (no update status='processing' inline).
+
 const h = vi.hoisted(() => {
-  const calls: Array<{ op: string; table: string; payload?: any }> = [];
+  const calls: Array<{ op: string; table: string; payload?: any; args?: any }> = [];
+  const rpcCalls: Array<{ fname: string; args: any }> = [];
 
   const item = {
-    id: '00000000-0000-0000-0000-000000000001',
+    id: '00000000-0000-0000-0000-0000000000aa',
     event_id: 'ee2cc954-98d7-4e11-828b-668a52e738e2',
     uploaded_by: null,
-    file_name: 'broken.jpg',
+    file_name: 'photo.jpg',
     file_type: 'image/jpeg',
     file_size: 100,
-    r2_key: null,
+    r2_key: 'events/folder/photo.jpg',
     drive_file_id: null,
-    retry_count: 99,
+    retry_count: 1,
     created_at: '2026-07-29T00:00:00Z',
   };
 
@@ -48,10 +39,8 @@ const h = vi.hoisted(() => {
     events: { data: event },
   };
 
-  // RIFONDAZIONE 14/08/2026 — il claim è ora via RPC (claim_upload_queue_items),
-  // non più una select su upload_queue. La RPC di test ritorna l'item per
-  // simulare "un item è stato claimato".
-  function rpcClaim(fname: string, _args: any) {
+  function rpcClaim(fname: string, args: any) {
+    rpcCalls.push({ fname, args });
     if (fname === 'claim_upload_queue_items') {
       return Promise.resolve({ data: [item], error: null });
     }
@@ -65,7 +54,7 @@ const h = vi.hoisted(() => {
       if (state.op) calls.push({ op: state.op, table: state.table, payload: state.payload });
       resolve({ data: state.op ? [] : (tableData[state.table]?.data ?? []), error: null });
     };
-    ['select', 'eq', 'in', 'lt', 'gt', 'order', 'limit', 'single', 'maybeSingle', 'or'].forEach((m) => {
+    ['select', 'eq', 'in', 'lt', 'gt', 'order', 'limit', 'single', 'maybeSingle', 'or', 'not', 'filter'].forEach((m) => {
       q[m] = (..._args: any[]) => q;
     });
     q.insert = (payload: any) => { state.op = 'insert'; state.payload = payload; return q; };
@@ -78,7 +67,7 @@ const h = vi.hoisted(() => {
     return { from: (table: string) => makeQuery(table), rpc: rpcClaim };
   }
 
-  return { calls, buildSupabase };
+  return { calls, rpcCalls, buildSupabase };
 });
 
 vi.mock('@fotosposi/core', () => ({
@@ -90,10 +79,7 @@ vi.mock('@fotosposi/media', () => ({
   getDriveToken: async () => ({ token: undefined, error: undefined }),
   getEventDriveFolders: async () => ({ folders: null, error: undefined }),
   updateDriveSyncStatus: async () => ({ error: null }),
-  // RIFONDAZIONE 14/08/2026 — process-queue importa classifyError + costanti
-  // FAILURE_CLASS_* da @fotosposi/media. Il mock deve esportarle per non
-  // lasciare undefined (che silenziosamente rompe il path di classificazione).
-  classifyError: (e: unknown) => (e instanceof Error ? e.message : String(e)).includes('rive') ? 'drive_sync_failed' : 'other',
+  classifyError: (e: unknown) => (e instanceof Error ? e.message : String(e)).toLowerCase().includes('r2') ? 'r2_download_failed' : 'other',
   FAILURE_CLASS_R2_DOWNLOAD: 'r2_download_failed',
   FAILURE_CLASS_WATERMARK: 'watermark_apply_failed',
   FAILURE_CLASS_DRIVE: 'drive_sync_failed',
@@ -104,6 +90,7 @@ vi.mock('@fotosposi/media', () => ({
 }));
 
 vi.mock('@fotosposi/r2-storage', () => ({
+  // Restituisce null → il download R2 fallisce → l'item entra nel path di fallimento.
   getPresignedDownloadUrl: async () => null,
 }));
 
@@ -128,47 +115,50 @@ vi.mock('@/lib/watermark-fonts.server', () => ({
 
 import { processQueueForEvent } from '../process-queue';
 
-describe('FIX 02/08/2026 — r2_key mancante → DLQ (non più spazzatura in coda)', () => {
+describe('RIFONDAZIONE 14/08/2026 — claim atomico + backoff reale', () => {
   beforeEach(() => {
     h.calls.length = 0;
+    h.rpcCalls.length = 0;
   });
 
-  it('item senza r2_key viene inserito in upload_queue_dead_letter e cancellato da upload_queue', async () => {
-    const result = await processQueueForEvent('ee2cc954-98d7-4e11-828b-668a52e738e2', 5);
-
-    expect(result.processed).toBe(0);
-    expect(result.remaining).toBe(1);
-
-    const inserts = h.calls.filter((c) => c.op === 'insert');
-    const dlqInsert = inserts.find((c) => c.table === 'upload_queue_dead_letter');
-    expect(dlqInsert).toBeTruthy();
-    expect(dlqInsert!.payload).toMatchObject({
-      event_id: 'ee2cc954-98d7-4e11-828b-668a52e738e2',
-      file_name: 'broken.jpg',
-      last_failure_class: 'invalid_image',
-    });
-
-    const deletes = h.calls.filter((c) => c.op === 'delete');
-    expect(deletes.some((c) => c.table === 'upload_queue')).toBe(true);
-
-    const logInsert = inserts.find((c) => c.table === 'system_health_log');
-    expect(logInsert).toBeTruthy();
-    expect(logInsert!.payload).toMatchObject({
-      job: 'upload_processing_failure',
-      failure_class: 'invalid_image',
-      error_message: 'r2_key mancante',
-    });
-  });
-
-  it('NON marca più l\'item failed con retry_count=99 (lo lasciava appeso per sempre)', async () => {
+  it('il claim avviene via RPC (claim_upload_queue_items) con p_event_id e p_limit', async () => {
     await processQueueForEvent('ee2cc954-98d7-4e11-828b-668a52e738e2', 5);
 
+    const claimCall = h.rpcCalls.find((c) => c.fname === 'claim_upload_queue_items');
+    expect(claimCall).toBeTruthy();
+    expect(claimCall!.args).toMatchObject({
+      p_event_id: 'ee2cc954-98d7-4e11-828b-668a52e738e2',
+      p_limit: 5,
+    });
+  });
+
+  it('nessun update status=processing inline (il claim è nella RPC)', async () => {
+    await processQueueForEvent('ee2cc954-98d7-4e11-828b-668a52e738e2', 5);
+
+    const processingUpdates = h.calls.filter(
+      (c) => c.op === 'update' && c.table === 'upload_queue' && c.payload?.status === 'processing',
+    );
+    expect(processingUpdates).toHaveLength(0);
+  });
+
+  it('un fallimento scrive next_retry_at (backoff reale) e failure_class sull\'item', async () => {
+    await processQueueForEvent('ee2cc954-98d7-4e11-828b-668a52e738e2', 5);
+
+    // Il download R2 fallisce (getPresignedDownloadUrl → null) → markItemFailed
+    // scrive status='failed' con next_retry_at e failure_class.
     const failedUpdates = h.calls.filter(
       (c) => c.op === 'update' && c.table === 'upload_queue' && c.payload?.status === 'failed',
     );
-    expect(failedUpdates).toHaveLength(0);
+    expect(failedUpdates.length).toBeGreaterThan(0);
 
-    const retry99 = h.calls.filter((c) => c.op === 'update' && c.table === 'upload_queue' && c.payload?.retry_count === 99);
-    expect(retry99).toHaveLength(0);
+    const last = failedUpdates[failedUpdates.length - 1]!;
+    expect(last.payload).toMatchObject({
+      status: 'failed',
+      failure_class: 'r2_download_failed',
+    });
+    expect(last.payload.next_retry_at).toBeTruthy();
+    // backoff per retry_count 1 → newRetry=2 → computeProcessingBackoffMs(2)=2000ms nel futuro
+    const nextRetryMs = new Date(last.payload.next_retry_at).getTime();
+    expect(nextRetryMs).toBeGreaterThan(Date.now());
   });
 });

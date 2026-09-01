@@ -118,4 +118,72 @@ describe('refreshDriveTokenIfExpired', () => {
     expect(out?.access_token).toBe('fresh-token');
     expect(eqSpy).toHaveBeenCalledWith('event_id', 'evt1');
   });
+
+  it('CIRCUIT BREAKER: marca token revoked se refresh restituisce revoked=true', async () => {
+    mockRefreshDriveAccessToken.mockResolvedValue({ error: 'invalid_grant', revoked: true });
+    const eqSpy = vi.fn(() => Promise.resolve({ error: null }));
+    mockFromUpdate.mockReturnValue({ eq: eqSpy });
+
+    const out = await refreshDriveTokenIfExpired('evt1', baseToken, fakeSupabase);
+
+    // Token invariato (non refreshato)
+    expect(out?.access_token).toBe('old-token');
+    // Ma update sul DB chiamato con status='revoked'
+    expect(mockFrom).toHaveBeenCalledWith('event_drive_tokens');
+    expect(mockFromUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'revoked',
+    }));
+    expect(eqSpy).toHaveBeenCalledWith('event_id', 'evt1');
+  });
+
+  it('NON marca revoked se refresh fallisce per errore temporaneo (sotto soglia)', async () => {
+    mockRefreshDriveAccessToken.mockResolvedValue({ error: 'temporary' });
+    const eqSpy = vi.fn(() => Promise.resolve({ error: null }));
+    mockFromUpdate.mockReturnValue({ eq: eqSpy });
+
+    const out = await refreshDriveTokenIfExpired('evt1', baseToken, fakeSupabase);
+
+    expect(out?.access_token).toBe('old-token');
+    // RIFONDAZIONE 14/08/2026: anche un errore temporaneo aggiorna il contatore
+    // consecutive_refresh_failures (ma NON marca status='revoked' finché la
+    // soglia OAUTH_REVOKE_THRESHOLD=3 non è superata).
+    expect(mockFrom).toHaveBeenCalledWith('event_drive_tokens');
+    expect(mockFromUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      consecutive_refresh_failures: 1,
+    }));
+    expect(mockFromUpdate).not.toHaveBeenCalledWith(expect.objectContaining({
+      status: 'revoked',
+    }));
+    expect(eqSpy).toHaveBeenCalledWith('event_id', 'evt1');
+  });
+
+  it('RIFONDAZIONE 14/08/2026: marca revoked solo dopo 3 fallimenti consecutivi raggiunti la soglia', async () => {
+    // Simula un token che ha GIÀ 2 fallimenti consecutivi → il terzo supera la
+    // soglia OAUTH_REVOKE_THRESHOLD=3 e marca status='revoked'.
+    const twoFailures = { ...baseToken, consecutive_refresh_failures: 2 };
+    mockRefreshDriveAccessToken.mockResolvedValue({ error: 'temporary' }); // NON invalid_grant, ma la soglia scatta lo stesso
+    const eqSpy = vi.fn(() => Promise.resolve({ error: null }));
+    mockFromUpdate.mockReturnValue({ eq: eqSpy });
+
+    await refreshDriveTokenIfExpired('evt1', twoFailures, fakeSupabase);
+
+    expect(mockFromUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'revoked',
+      consecutive_refresh_failures: 3,
+    }));
+  });
+
+  it('RIFONDAZIONE 14/08/2026: refresh riuscito azzera consecutive_refresh_failures', async () => {
+    mockRefreshDriveAccessToken.mockResolvedValue({ access_token: 'fresh-token' });
+    const eqSpy = vi.fn(() => Promise.resolve({ error: null }));
+    mockFromUpdate.mockReturnValue({ eq: eqSpy });
+
+    const out = await refreshDriveTokenIfExpired('evt1', { ...baseToken, consecutive_refresh_failures: 5 }, fakeSupabase);
+
+    expect(mockFromUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'active',
+      consecutive_refresh_failures: 0,
+    }));
+    expect(out?.access_token).toBe('fresh-token');
+  });
 });

@@ -1,5 +1,57 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 14/08/2026 — Rifondazione "solidità" flusso upload→R2→queu→watermark→galleria→Drive (P0)
+
+### Contesto
+Rifondazione del gestore coda upload per eliminare duplicati/item persi/code in stallo. Chiusi i gap P0 elencati in `prompt-solidita.md`: race condition sul claim, idempotency parziale, errori non classificati, circuit breaker OAuth debole, cron IT sfalsato, watermark video non verificato.
+
+### Fatto
+
+**1. Claim atomico (P0 — elimina duplicati da worker concorrenti)**
+- Migration `00059_upload_queue_solidity.sql`: RPC `claim_upload_queue_items(event_id, limit)` → `SELECT ... FOR UPDATE SKIP LOCKED` + `UPDATE status='processing'` in UN'UNICA transazione (SECURITY DEFINER, `search_path=public`). REVOKE a PUBLIC + GRANT a service_role.
+- `process-queue.ts` `processQueueForEvent`: sostituita la vecchia SELECT (`status IN pending/failed`) + update a due passi (NON atomici) con la RPC. Rimossa la `update({status:'processing'})` inline in `processSingleItem` (ora il claim avviene nella RPC).
+
+**2. Idempotency reale (P0)**
+- `packages/media/src/service.ts` `createMediaRecord`: upsert con `ignoreDuplicates:true` (DO NOTHING) + rilettura esplicita del record esistente via `maybeSingle` quando l'upsert su r2_key già presente non ritorna riga. Il chiamante riceve SEMPRE il media_id corretto → nessun secondo Drive upload.
+
+**3. Backoff reale (P0 — prima `computeProcessingBackoffMs` era definito ma MAI usato)**
+- Nuovo helper `markItemFailed(supabase, item, {eventId, failureClass, errorMessage})` che centralizza: logFailure + (DLQ se retry≥7 ALTRIMENTI update `status='failed'` con `next_retry_at` = now + backoff, `failure_class`, `permanent_failure=false`). Sostituisce 7 punti duplicati.
+- Migration `00060_upload_queue_backoff_columns.sql` (idempotente): documenta/crea `next_retry_at`, `failure_class`, `permanent_failure` (erano nel DB remoto ma senza migration tracciata → drift).
+
+**4. Classificazione errori (P0)**
+- Nuovo `packages/media/src/errors.ts`: costanti `FAILURE_CLASS_*` + `classifyError(err)` (euristica su messaggio). Esportate da `index.ts`. L'outer catch di `processSingleItem` e il path `createMediaRecord` ora classificano (prima tutto → `other`). Ordine dei pattern corretto: `detect/verif` prima di `watermark` generico.
+
+**5. Circuit breaker OAuth 3-tentativi (P1)**
+- `event_drive_tokens.consecutive_refresh_failures INT` (migration 00059). `refreshDriveTokenIfExpired`: incrementa il contatore a ogni refresh fallito, marca `status='revoked'` SOLO su `invalid_grant` OPPURE quando `consecutive_refresh_failures >= 3`; reset a 0 su successo. `saveDriveToken` resetta a 0 + `status='active'` alla riconnessione.
+- `processQueueForEvent`: guard `token.status === 'revoked'` → rilascia il claim degli item (status→pending) e skip del batch senza sprecare risorse.
+
+**6. Evening sweep (P1 — cron IT sfalsato)**
+- Nuovo `apps/web/src/lib/maintenance-sweep.ts`: logica estratta da `maintenance/route.ts` (recovery stuck processing + sweep autonomo) con parametri `jobLabel` + `source`.
+- Nuova route `/api/cron/maintenance-evening` (riusa `runMaintenanceSweep('maintenance','evening')`). `vercel.json`: aggiunti cron `30 22 * * *` e `0 2 * * *`. Entrambi scrivono `job='maintenance'` (banner /admin invariato) con `details.source` per distinguerli.
+
+**7. Watermark video gate (P1)**
+- `processSingleItem`: il catch di `applyVideoOverlay` ora setta `watermarkFailed=true` (quando `expectsWatermark`) invece di log-solamente → il video nasce con `watermark_missing=true` e resta ritentabile/riparabile.
+
+**8. Runbook operativo in `/admin/storage`**
+- Card "Runbook operativo" con 6 sezioni: coda in stallo, `permanent_failure`, token revoked, duplicati, video senza watermark/VPS, evening sweep.
+
+### Migrazioni DB applicate (con `NOTIFY pgrst,'reload schema'`)
+- `00059_upload_queue_solidity.sql` (RPC claim + `consecutive_refresh_failures` + CHECK status)
+- `00060_upload_queue_backoff_columns.sql` (colonne backoff documentate)
+
+### Test
+- Nuovi: `errors.test.ts` (7), `process-queue-solidity.test.ts` (3: claim RPC + no update processing + backoff `next_retry_at`), estesi `service.test.ts` (idempotency), `refresh-drive-token.test.ts` (soglia 3-tentativi + reset su successo).
+- **501/501 (43 file)** passanti (baseline era 488 + 13 nuovi).
+- Typecheck `tsc --noEmit` pulito su `apps/web` e `packages/media`.
+
+### Nota sul proporzionamento watermark
+Il requisito "scritta rientri nella foto" è GIÀ implementato in `packages/photo-overlay/src/index.ts` (FIX 31/07/2026): dimensione font derivata dalla dimensione MINORE della foto, safety-check "fuori foto" con scala automatica (fino a minimo 12px), misurazione reale dei segmenti di testo via canvas. Nessun nuovo lavoro necessario.
+
+### Commit previsto
+`fix(media): rifondazione solidità coda upload (claim atomico RPC, idempotency, backoff, circuit breaker OAuth 3-tentativi, classificazione errori, evening sweep, watermark video gate)`
+
+---
+
 ## Sessione 11/08/2026 — share-with-tags completata (da committare) + BOM fix + chiarimento cascata lead → GTN
 
 ### Contesto

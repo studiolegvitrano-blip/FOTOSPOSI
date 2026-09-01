@@ -167,6 +167,65 @@ export default async function AdminStoragePage() {
               </p>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Runbook operativo (coda upload / Drive)</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-text-muted space-y-3">
+              <div>
+                <p className="font-medium text-text">1. Coda in stallo (pending da &gt;30 min)</p>
+                <p>
+                  Controlla il banner rosso in <a className="underline" href="/admin">/admin</a>. Se <code>pendingStalled</code>{' '}
+                  è vero, apri <a className="underline" href="/admin/system">/admin/system</a> e guarda i fallimenti per classe
+                  (<code>r2_download_failed</code> / <code>drive_sync_failed</code> / <code>watermark_apply_failed</code>).
+                  Un pending &gt;30 min indica che il cron <code>maintenance</code> (o il nuovo <code>maintenance-evening</code>)
+                  non sta riuscendo a processare.
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-text">2. Item <code>permanent_failure=true</code></p>
+                <p>
+                  Il claim RPC (<code>claim_upload_queue_items</code>) skippa questi item finché un admin non resetta il flag.
+                  Causa tipica: token Drive revocato o file orfano. Risolvi la causa e poi esegui{' '}
+                  <code>UPDATE upload_queue SET permanent_failure=false, next_retry_at=null WHERE id=...</code>
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-text">3. Token Drive <code>revoked</code> (invalid_grant ripetuto)</p>
+                <p>
+                  Il circuit breaker marca <code>status='revoked'</code> dopo 3 refresh falliti consecutivi. Il cron skippa tutti
+                  gli item dell'evento finché l'utente non riconnette da <code>/events/&lt;id&gt;/drive</code>. La riconnessione
+                  resetta <code>consecutive_refresh_failures=0</code> e <code>status='active'</code>.
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-text">4. Duplicati in galleria</p>
+                <p>
+                  Non dovrebbero più avvenire: claim atomico + <code>ON CONFLICT (event_id,r2_key) DO NOTHING</code>. Se ne vedi,
+                  significa che un evento è stato processato da due worker PRIMA della rifondazione 14/08; confronta{' '}
+                  <code>media_uploads</code> per <code>r2_key</code> duplicato e deduplica manualmente.
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-text">5. Video senza watermark / lunghe code video</p>
+                <p>
+                  Il watermark video usa ffmpeg-static su Vercel (senza VPS attiva). Un video &gt;100-200MB può superare il budget
+                  della lambda (60s). Quando la VPS Oracle sarà attiva, delegare i video a <code>vps-scripts/overlay.js</code>.
+                  Fino ad allora i video nascono con <code>watermark_missing=true</code> se l'overlay fallisce (gate 14/08).
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-text">6. Evening sweep (issue cron IT sfalsato)</p>
+                <p>
+                  Due cron ora coprono la giornata: <code>maintenance</code> (04:20 UTC) e <code>maintenance-evening</code>{' '}
+                  (22:30 e 02:00 UTC). Entrambi scrivono <code>system_health_log.job='maintenance'</code> con un campo{' '}
+                  <code>details.source</code> per distinguere morning/evening. Le foto caricate la sera non restano più pending
+                  fino al mattino.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </>
       )}
     </AdminShell>

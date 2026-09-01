@@ -40,9 +40,28 @@ export async function createMediaRecord(params: {
   const query = params.r2_key
     ? supabase
         .from('media_uploads')
-        .upsert(baseRow, { onConflict: 'event_id,r2_key', ignoreDuplicates: false })
+        .upsert(baseRow, { onConflict: 'event_id,r2_key', ignoreDuplicates: true })
     : supabase.from('media_uploads').insert(baseRow);
   let { data, error } = await query.select().single();
+  // RIFONDAZIONE 14/08/2026 — idempotency REALE (P0): con ignoreDuplicates:true
+  // l'upsert su (event_id, r2_key) è un DO NOTHING. Se un retry processa lo
+  // stesso r2_key e il record esiste già (es. crash dopo createMediaRecord ma
+  // prima del sync Drive), '.select().single()' ritorna ALCUNA riga (data è
+  // undefined con DO NOTHING su row già presente, ma `error` può essere
+  // `multiple-or-no-rows` in certi casi). Ripieghiamo su una lettura esplicita
+  // del record esistente così il chiamante riceve SEMPRE il media_id corretto
+  // (nessun secondo insert, nessun secondo Drive upload).
+  if (error && params.r2_key) {
+    const { data: existing, error: readErr } = await supabase
+      .from('media_uploads')
+      .select('*')
+      .eq('event_id', params.event_id)
+      .eq('r2_key', params.r2_key)
+      .maybeSingle();
+    if (existing && !readErr) {
+      return { media: existing };
+    }
+  }
   // Fallback robusto: se il unique constraint `uniq_media_event_r2key` non è ancora
   // stato applicato (DB drift tra repo e remote), Supabase rifiuta l'upsert con
   // "there is no unique or exclusion constraint matching the ON CONFLICT specification".

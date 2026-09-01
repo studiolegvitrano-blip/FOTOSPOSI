@@ -10,6 +10,17 @@ export interface EventDriveToken {
   drive_email: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * RIFONDAZIONE 14/08/2026 — stato del token. 'revoked' quando Google ha
+   * revocato il refresh_token (invalid_grant ripetuto). Il cron skippa tutti
+   * gli item della coda dell'evento con token revoked.
+   */
+  status?: string;
+  /**
+   * RIFONDAZIONE 14/08/2026 — fallimenti refresh OAuth consecutivi. Il circuit
+   * breaker segna 'revoked' solo quando SUPERANO una soglia (3), non al primo.
+   */
+  consecutive_refresh_failures?: number;
 }
 
 export async function saveDriveToken(params: {
@@ -30,6 +41,10 @@ export async function saveDriveToken(params: {
       expires_at: params.expires_at,
       drive_email: params.drive_email ?? null,
       updated_at: new Date().toISOString(),
+      // RIFONDAZIONE 14/08/2026: la riconnessione OAuth resetta il circuit
+      // breaker — status torna 'active' e il contatore fallimenti azzerato.
+      status: 'active',
+      consecutive_refresh_failures: 0,
     }, { onConflict: 'event_id' })
     .select()
     .single();
@@ -134,7 +149,7 @@ export async function getEventDriveFolders(eventId: string): Promise<{ folders?:
   return { folders: map };
 }
 
-export async function refreshDriveAccessToken(refreshToken: string): Promise<{ access_token?: string; error?: string }> {
+export async function refreshDriveAccessToken(refreshToken: string): Promise<{ access_token?: string; error?: string; revoked?: boolean }> {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -146,6 +161,16 @@ export async function refreshDriveAccessToken(refreshToken: string): Promise<{ a
     }),
   });
   const data = await res.json();
-  if (data.error) return { error: data.error_description || data.error };
+  if (data.error) {
+    // Circuit breaker (14/08/2026): Google restituisce error='invalid_grant' quando il
+    // refresh_token è stato revocato (es. utente ha revocato l'accesso, refresh token
+    // scaduto in modalità "testing" OAuth app dopo 7gg di inattività). In quel caso NON
+    // c'è nulla da ritentare — il token è morto fino a quando l'utente NON riconnette
+    // Drive dalla pagina /events/<id>/drive. Marcato `revoked: true` per consentire al
+    // caller di marcare `event_drive_tokens.status='revoked'` e skippare tutti gli item
+    // della coda di quell'evento (vedi process-queue.ts).
+    if (data.error === 'invalid_grant') return { error: data.error_description || data.error, revoked: true };
+    return { error: data.error_description || data.error };
+  }
   return { access_token: data.access_token };
 }

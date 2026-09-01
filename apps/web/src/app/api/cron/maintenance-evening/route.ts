@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runMaintenanceSweep } from '@/lib/maintenance-sweep';
 
 export const runtime = 'nodejs';
-// 300s (Fluid Compute): lo sweep ora brucia anche i watermark sui video (ffmpeg),
-// che con 60s rischiava il timeout già al primo clip.
 export const maxDuration = 300;
 
 function isAuthorized(req: NextRequest): boolean {
@@ -18,6 +16,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const result = await runMaintenanceSweep('maintenance', 'morning');
+  // RIFONDAZIONE 14/08/2026 — evening sweep (gap #6). I cron originali girano
+  // 04:00-04:50 UTC = 06:00-06:50 IT; le foto caricate la sera (22-02 IT)
+  // restavano pending 4-8h. Questo secondo sweep (22:00 e 02:00 UTC) chiude il
+  // gap. Scrive comunque job='maintenance' nel log così il banner /admin e le
+  // metriche eventsSwept continuano a funzionare (source='evening' lo distingue).
+  const result = await runMaintenanceSweep('maintenance', 'evening');
   return NextResponse.json({ ...result });
 }

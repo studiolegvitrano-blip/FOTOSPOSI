@@ -71,18 +71,25 @@ describe('createMediaRecord', () => {
     // Simula il caso scoperto 27/07/2026: la migration 00037 con uniq_media_event_r2key
     // non è ancora stata applicata → Supabase rifiuta l'upsert con "ON CONFLICT specification"
     // → prima il record andrebbe perso in galleria. Ora il fallback fa un INSERT semplice.
+    // RIFONDAZIONE 14/08/2026: con ignoreDuplicates e rilettura post-upsert il flusso è
+    //   1) from('media_uploads').upsert(...) → errore constraint
+    //   2) from('media_uploads').select().eq().eq().maybeSingle() → null (rilettura)
+    //   3) from('media_uploads').insert(...) → fallback
     const conflictChain = buildChain(null, { message: 'there is no unique or exclusion constraint matching the ON CONFLICT specification' });
+    const rereadChain = buildChain(null); // existing == null → non ritorna via rilettura
     const insertedMedia = { id: 'm3', event_id: 'evt1', uploaded_by: 'u1', type: 'photo', url: 'r2key1', drive_sync_status: 'pending', created_at: new Date().toISOString(), r2_key: 'r2key1' };
     const insertChain = buildChain(insertedMedia);
+    const chains = [conflictChain, rereadChain, insertChain];
     let callIdx = 0;
     mockFrom.mockImplementation(() => {
+      const c = chains[callIdx] ?? insertChain;
       callIdx++;
-      return callIdx === 1 ? conflictChain : insertChain;
+      return c;
     });
     const result = await createMediaRecord({ event_id: 'evt1', uploaded_by: 'u1', type: 'photo', url: 'r2key1', r2_key: 'r2key1' });
     expect(result.error).toBeUndefined();
     expect(result.media?.id).toBe('m3');
-    expect(mockFrom).toHaveBeenCalledTimes(2);
+    expect(mockFrom).toHaveBeenCalledTimes(3);
     expect(conflictChain.upsert).toHaveBeenCalled();
     expect(insertChain.insert).toHaveBeenCalled();
   });
@@ -122,6 +129,26 @@ describe('createMediaRecord', () => {
     expect(result.error).toBeUndefined();
     const upsertCall = (chain.upsert as any).mock.calls[0][0];
     expect(upsertCall.original_r2_key).toBeNull();
+  });
+
+  it('RIFONDAZIONE 14/08/2026: upsert idempotente con ignoreDuplicates (DO NOTHING) + rilettura se r2_key già esiste', async () => {
+    // Caso: retry processa lo stesso r2_key → l'upsert con ignoreDuplicates:true
+    // NON crea un duplicato; il record esistente viene riletto e ritornato.
+    const existingMedia = { id: 'm-existing', event_id: 'evt1', r2_key: 'r2key-dup', drive_sync_status: 'pending' };
+    const upsertChain = buildChain(null, { message: 'duplicate key value violates unique constraint' });
+    const rereadChain = buildChain(existingMedia); // rilettura ritorna il record esistente
+    let callIdx = 0;
+    mockFrom.mockImplementation(() => {
+      callIdx++;
+      return callIdx === 1 ? upsertChain : rereadChain;
+    });
+    const result = await createMediaRecord({ event_id: 'evt1', uploaded_by: 'u1', type: 'photo', url: 'r2key-dup', r2_key: 'r2key-dup' });
+    expect(result.error).toBeUndefined();
+    expect(result.media?.id).toBe('m-existing');
+    // Deve aver fatto solo upsert + rilettura, NON un insert fallback (nessun duplicato)
+    expect(callIdx).toBe(2);
+    expect(upsertChain.upsert).toHaveBeenCalled();
+    expect(rereadChain.insert).not.toHaveBeenCalled();
   });
 });
 

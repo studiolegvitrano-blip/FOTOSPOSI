@@ -109,6 +109,14 @@ describe('refreshDriveAccessToken', () => {
     (fetch as any).mockResolvedValue({ json: () => Promise.resolve({ error: 'invalid_grant', error_description: 'Token expired' }) });
     const result = await refreshDriveAccessToken('bad-rtok');
     expect(result.error).toBe('Token expired');
+    expect(result.revoked).toBe(true);
+  });
+
+  it('marca revoked=false per errori non permanenti', async () => {
+    (fetch as any).mockResolvedValue({ json: () => Promise.resolve({ error: 'temporary', error_description: 'Server down' }) });
+    const result = await refreshDriveAccessToken('rtok');
+    expect(result.error).toBe('Server down');
+    expect(result.revoked).toBeUndefined();
   });
 });
 

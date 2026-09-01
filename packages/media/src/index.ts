@@ -105,3 +105,16 @@ export { GoogleDriveProvider } from './google-drive-provider';
 export { MegaProvider } from './mega-provider';
 export { TeraboxProvider } from './terabox-provider';
 export type { QueueItem, QueueStatus } from './queue';
+
+// RIFONDAZIONE 14/08/2026 — tassonomia errori processing media.
+export {
+  FAILURE_CLASS_R2_DOWNLOAD,
+  FAILURE_CLASS_WATERMARK,
+  FAILURE_CLASS_DRIVE,
+  FAILURE_CLASS_DETECT,
+  FAILURE_CLASS_INVALID,
+  FAILURE_CLASS_DB,
+  FAILURE_CLASS_OTHER,
+  classifyError,
+} from './errors';
+export type { FailureClass } from './errors';
