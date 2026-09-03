@@ -105,10 +105,14 @@ vi.mock('@fotosposi/media', () => ({
 
 vi.mock('@fotosposi/r2-storage', () => ({
   getPresignedDownloadUrl: async () => null,
+  getPresignedUploadUrl: async () => ({ success: false, error: 'no r2' }),
 }));
 
 vi.mock('@fotosposi/video-overlay', () => ({
   applyVideoOverlay: async (b: Buffer) => b,
+  applyVideoOverlayRemote: async () => ({ ok: false, error: 'no vps' }),
+  brandingToRemote: (b: unknown) => b,
+  isVpsWatermarkConfigured: () => false,
 }));
 
 vi.mock('@fotosposi/photo-overlay', () => ({

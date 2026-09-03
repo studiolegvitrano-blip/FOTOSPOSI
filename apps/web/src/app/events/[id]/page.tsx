@@ -290,6 +290,7 @@ export default function EventDetailPage() {
                         coupleHashtag: event.couple_hashtag ?? null,
                         partnerHandle: partner?.social_handle ?? null,
                         partnerHashtag: partner?.social_hashtag ?? null,
+                        coupleName: event.couple_name ?? null,
                         brand: event.brand === 'weddingmoments' ? 'justmarry' : 'sposilive',
                       }}
                       onDeleteMedia={async (postId: string) => {
@@ -379,7 +380,9 @@ export default function EventDetailPage() {
           coupleHashtag: event?.couple_hashtag ?? null,
           partnerHandle: partner?.social_handle ?? null,
           partnerHashtag: partner?.social_hashtag ?? null,
+          coupleName: event?.couple_name ?? null,
           brand: event?.brand === 'weddingmoments' ? 'justmarry' : 'sposilive',
+          eventId,
         }}
       />
     </>

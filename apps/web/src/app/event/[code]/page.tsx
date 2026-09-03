@@ -317,6 +317,7 @@ export default function GuestEventPage() {
                         coupleHashtag: event.couple_hashtag ?? null,
                         partnerHandle: partner?.social_handle ?? null,
                         partnerHashtag: partner?.social_hashtag ?? null,
+                        coupleName: event.couple_name ?? null,
                         brand: event.brand === 'weddingmoments' ? 'justmarry' : 'sposilive',
                       }}
                     />
@@ -364,7 +365,9 @@ export default function GuestEventPage() {
           coupleHashtag: event.couple_hashtag ?? null,
           partnerHandle: partner?.social_handle ?? null,
           partnerHashtag: partner?.social_hashtag ?? null,
+          coupleName: event.couple_name ?? null,
           brand: event.brand === 'weddingmoments' ? 'justmarry' : 'sposilive',
+          eventId: event.id,
         }}
       />
     </>

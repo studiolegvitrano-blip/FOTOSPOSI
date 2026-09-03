@@ -5,12 +5,13 @@ import {
   buildShareText,
   buildShareTextForInstagram,
   buildShareUrl,
+  coupleNameToHashtag,
   type SharePlatform,
   type BrandHandle,
 } from '@fotosposi/social-sharing';
 
 export type SocialShareProps = {
-  /** URL pubblico assoluto della foto watermarked da condividere. */
+  /** URL pubblico assoluto della foto watermarked da condividere (fallback desktop). */
   photoUrl: string;
   /** Handle sposo 1 (es. 'lillo' o '@lillo'). */
   groom1Handle?: string | null;
@@ -24,12 +25,22 @@ export type SocialShareProps = {
   partnerHashtag?: string | null;
   /** Brand: 'sposilive' (IT) o 'justmarry' (INT). Determina @brand hardcoded. */
   brand?: BrandHandle;
+  /** Nome coppia (es. "Elisa & Nausica") → convertito in hashtag per il testo share. */
+  coupleName?: string | null;
   /** Testo libero scritto dall'utente (prima riga). Default vuoto. */
   userText?: string;
   /** Position del pannello: 'inline' (nel footer card) o 'overlay' (sopra immagine). */
   variant?: 'inline' | 'overlay';
   /** Mostra il label testuale accanto alle icone. Default false (solo icone). */
   showLabels?: boolean;
+  /**
+   * id del media + eventId + isVideo: servono per scaricare il file watermarked
+   * da `/api/photos/[id]/share` e condividerlo come FILE (Web Share API), non come
+   * link. Senza questi si degrada alla vecchia condivisione via URL.
+   */
+  mediaId?: string;
+  eventId?: string;
+  isVideo?: boolean;
 };
 
 type PlatformKey = SharePlatform | 'whatsapp';
@@ -76,9 +87,13 @@ export default function SocialShareButtons({
   partnerHandle,
   partnerHashtag,
   brand = 'sposilive',
+  coupleName,
   userText = '',
   variant = 'inline',
   showLabels = false,
+  mediaId,
+  eventId,
+  isVideo = false,
 }: SocialShareProps) {
   const [toast, setToast] = useState<string | null>(null);
   const [showUserTextInput, setShowUserTextInput] = useState(false);
@@ -89,23 +104,97 @@ export default function SocialShareButtons({
     setTimeout(() => setToast(null), 2500);
   };
 
-  const handleShare = async (platform: PlatformKey) => {
-    const baseInput = {
+  // Hashtag coppia: usa quello esplicito (impostazioni) se presente, altrimenti
+  // deriva dal nome coppia ("Elisa & Nausica" → #ElisaNausica).
+  const coupleTag = coupleHashtag || coupleNameToHashtag(coupleName);
+
+  // Testo SOLO tag (senza URL/link): è il testo che accompagna la foto/video
+  // condivisa come FILE. Righe: frase utente + @handles + #hashtags.
+  const buildTagText = () =>
+    buildShareText({
       userText: userTextInput,
       groom1Handle,
       groom2Handle,
-      coupleHashtag,
+      coupleHashtag: coupleTag,
       partnerHandle,
       partnerHashtag,
       photoUrl,
       brand,
-    };
+    });
 
+  const shareInput = () => ({
+    userText: userTextInput,
+    groom1Handle,
+    groom2Handle,
+    coupleHashtag: coupleTag,
+    partnerHandle,
+    partnerHashtag,
+    photoUrl,
+    brand,
+  });
+
+  /**
+   * Scarica il file watermarked da `/api/photos/[id]/share` e lo condivide come
+   * FILE fisico (Web Share API `files`). È il comportamento "allega foto/video"
+   * che sui social nativi (Instagram/Facebook) allega l'immagine al post, con i
+   * tag nel campo testo. Fallback: scarica il file localmente.
+   */
+  const fetchWatermarkedFile = async (): Promise<File | null> => {
+    if (!mediaId || !eventId) return null;
+    const url = `/api/photos/${mediaId}/share?eventId=${encodeURIComponent(eventId)}&format=square`;
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) return null;
+      const blob = await resp.blob();
+      const ext = isVideo ? 'mp4' : 'jpg';
+      const type = isVideo ? 'video/mp4' : 'image/jpeg';
+      return new File([blob], `fotosposi.${ext}`, { type });
+    } catch {
+      return null;
+    }
+  };
+
+  // Condivide il FILE puro con i tag (mobile). Ritorna true se la share sheet
+  // nativa è stata mostrata, false altrimenti (fallback al chiamante).
+  const nativeShareFile = async (): Promise<boolean> => {
+    if (typeof navigator === 'undefined' || !navigator.share) return false;
+    const file = await fetchWatermarkedFile();
+    if (!file) return false;
+    try {
+      const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
+      if (!nav.canShare || nav.canShare({ files: [file] })) {
+        await nav.share({
+          title: 'Sposi.live',
+          text: buildTagText(),
+          files: [file],
+        });
+        return true;
+      }
+      // Browser non supporta share di file: condividi solo testo (degradato).
+      await nav.share({ title: 'Sposi.live', text: buildTagText(), url: photoUrl });
+      return true;
+    } catch {
+      // utente ha annullato la share sheet
+      return true;
+    }
+  };
+
+  const handleShare = async (platform: PlatformKey) => {
+    const input = shareInput();
+
+    // RICHIESTA CLIENTE: la foto/video PURA con i tag, NON un link. Su mobile la
+    // Web Share API con `files` allega il file reale. Questo copre FB/IG/X/WA
+    // indistintamente tramite la share sheet nativa di sistema.
+    if (mediaId && eventId) {
+      const shared = await nativeShareFile();
+      if (shared) return;
+    }
+
+    // Fallback desktop (no navigator.share): comportamento per-piattaforma.
     if (platform === 'instagram') {
-      // IG non supporta URL share con testo precompilato → copia negli appunti.
-      const text = buildShareTextForInstagram(baseInput);
+      const text = buildShareTextForInstagram(input);
       try {
-        await navigator.clipboard.writeText(`${text}\n${photoUrl}`);
+        await navigator.clipboard.writeText(`${text}`);
         showToast('Testo copiato — apri Instagram e incolla');
       } catch {
         showToast('Copia manuale: seleziona il testo e copia');
@@ -115,40 +204,32 @@ export default function SocialShareButtons({
     }
 
     if (platform === 'whatsapp') {
-      const url = buildWhatsappUrl(photoUrl, baseInput);
+      const url = buildWhatsappUrl(photoUrl, input);
       window.open(url, '_blank', 'noopener,noreferrer');
       return;
     }
 
-    // Facebook / Twitter-X / TikTok: URL share con testo precompilato.
-    const url = buildShareUrl(platform, baseInput);
+    const url = buildShareUrl(platform, input);
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  // Web Share API nativa (mobile). fallback ai pulsanti se non supportata.
+  // Web Share API nativa (mobile): condivide il FILE watermarked se possibile.
   const handleNativeShare = async () => {
-    if (typeof navigator === 'undefined' || !navigator.share) return false;
-    const text = buildShareText({
-      userText: userTextInput,
-      groom1Handle,
-      groom2Handle,
-      coupleHashtag,
-      partnerHandle,
-      partnerHashtag,
-      photoUrl,
-      brand,
-    });
-    try {
-      await navigator.share({
-        title: 'Sposi.live',
-        text,
-        url: photoUrl,
-      });
-      return true;
-    } catch {
-      // utente ha annullato — silente
+    if (typeof navigator === 'undefined' || !navigator.share) {
+      // fallback: scarica il file
+      const file = await fetchWatermarkedFile();
+      if (file) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(file);
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
       return false;
     }
+    const ok = await nativeShareFile();
+    if (!ok) return false;
+    return true;
   };
 
   const platforms: PlatformKey[] = ['facebook', 'instagram', 'twitter', 'whatsapp', 'tiktok'];

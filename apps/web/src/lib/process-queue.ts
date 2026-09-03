@@ -2,8 +2,8 @@
 import { createMediaRecord, getDriveToken, getEventDriveFolders, updateDriveSyncStatus } from '@fotosposi/media';
 import { classifyError, FAILURE_CLASS_R2_DOWNLOAD, FAILURE_CLASS_DRIVE, FAILURE_CLASS_DETECT, FAILURE_CLASS_INVALID } from '@fotosposi/media';
 import type { EventDriveToken } from '@fotosposi/media';
-import { getPresignedDownloadUrl } from '@fotosposi/r2-storage';
-import { applyVideoOverlay } from '@fotosposi/video-overlay';
+import { getPresignedDownloadUrl, getPresignedUploadUrl } from '@fotosposi/r2-storage';
+import { applyVideoOverlay, applyVideoOverlayRemote, brandingToRemote, isVpsWatermarkConfigured } from '@fotosposi/video-overlay';
 import { applyOverlay, detectWatermark, type WatermarkPresence } from '@fotosposi/photo-overlay';
 import sharp from 'sharp';
 import { watermarkFontFamily } from '@/lib/watermark-fonts';
@@ -619,33 +619,77 @@ async function processSingleItem(
         console.error(`[process-queue] watermark foto fallito per ${item.file_name} (event=${eventId}):`, watermarkErr);
       }
     } else {
-      try {
-        const branded = await applyVideoOverlay(buffer as Buffer, {
-          branding: {
-            coupleNames: wmLine1,
-            date: wmLine2,
-            primaryColor: '#1a1a2e',
-            wordmark: getBrandLabel(event?.brand),
-            fontFamily: wmFont,
-            logoPng: brandLogo ?? undefined,
-            partnerLogoPng: partnerLogo ?? undefined,
-          },
-          maxDurationSeconds: 240,
-        });
-        if (branded !== buffer) {
-          buffer = branded as Buffer;
-          contentType = 'video/mp4';
+      // FIX 03/09/2026 (bug video senza watermark): la coda usava SOLO
+      // applyVideoOverlay locale (ffmpeg-static su Vercel), che fallisce/scade sui
+      // video reali → video nascevano watermark_missing=true. Ora VPS-FIRST:
+      // se la VPS è configurata, il watermark avviene lato VPS (ffmpeg di sistema,
+      // nessun timeout), con fallback locale identico al path della route share.
+      const brandingConfig = {
+        coupleNames: wmLine1,
+        date: wmLine2,
+        primaryColor: '#1a1a2e',
+        wordmark: getBrandLabel(event?.brand),
+        fontFamily: wmFont,
+        logoPng: brandLogo ?? undefined,
+        partnerLogoPng: partnerLogo ?? undefined,
+      };
+      let vpsDone = false;
+      if (isVpsWatermarkConfigured()) {
+        try {
+          const downloadUrl = await getPresignedDownloadUrl(r2Key, 3600);
+          if (downloadUrl) {
+            const lastSlash = r2Key.lastIndexOf('/');
+            const prefix = lastSlash >= 0 ? r2Key.substring(0, lastSlash) : '';
+            const baseName = lastSlash >= 0 ? r2Key.substring(lastSlash + 1) : r2Key;
+            const wmFilename = baseName.replace(/\.mp4$/i, '') + '.wm.mp4';
+            const ul = await getPresignedUploadUrl(prefix, wmFilename, 'video/mp4');
+            if (ul.success && ul.presignedUrl) {
+              const remoteResp = await applyVideoOverlayRemote({
+                downloadUrl,
+                uploadUrl: ul.presignedUrl,
+                branding: brandingToRemote(brandingConfig),
+              });
+              if (remoteResp.ok) {
+                const wmDownloadUrl = await getPresignedDownloadUrl(ul.key, 60);
+                if (wmDownloadUrl) {
+                  const wmResp = await fetch(wmDownloadUrl);
+                  if (wmResp.ok) {
+                    buffer = Buffer.from(await wmResp.arrayBuffer()) as Buffer;
+                    contentType = 'video/mp4';
+                    vpsDone = true;
+                  }
+                }
+              } else {
+                console.warn('[process-queue] VPS watermark failed:', remoteResp.error, '- fallback locale');
+              }
+            }
+          }
+        } catch (vpsErr) {
+          console.warn('[process-queue] VPS watermark exception:', (vpsErr as Error).message, '- fallback locale');
         }
-      } catch (overlayErr) {
-        // RIFONDAZIONE 14/08/2026 — watermark video gate (P1). Prima l'errore
-        // ffmpeg era solo loggato e il video andava in galleria SENZA watermark,
-        // senza alcun gate. Ora marcamo watermarkFailed=true così il record
-        // nasce con watermark_missing=true → visibile in /admin/system e
-        // ritentabile (o riparabile) come le foto.
-        if (expectsWatermark) {
-          watermarkFailed = true;
+      }
+
+      if (!vpsDone) {
+        try {
+          const branded = await applyVideoOverlay(buffer as Buffer, {
+            branding: brandingConfig,
+            maxDurationSeconds: 240,
+          });
+          if (branded !== buffer) {
+            buffer = branded as Buffer;
+            contentType = 'video/mp4';
+          }
+        } catch (overlayErr) {
+          // RIFONDAZIONE 14/08/2026 — watermark video gate (P1). Prima l'errore
+          // ffmpeg era solo loggato e il video andava in galleria SENZA watermark,
+          // senza alcun gate. Ora marcamo watermarkFailed=true così il record
+          // nasce con watermark_missing=true → visibile in /admin/system e
+          // ritentabile (o riparabile) come le foto.
+          if (expectsWatermark) {
+            watermarkFailed = true;
+          }
+          console.error(`[process-queue] video overlay fallito per ${item.file_name} (event=${eventId}):`, overlayErr);
         }
-        console.error(`[process-queue] video overlay fallito per ${item.file_name} (event=${eventId}):`, overlayErr);
       }
     }
 
@@ -870,7 +914,6 @@ export async function repairWatermarkForEvent(
       .select('id, r2_key, original_r2_key, uploaded_by, type')
       .eq('event_id', eventId)
       .eq('watermark_missing', true)
-      .eq('type', 'photo')
       .order('created_at', { ascending: true })
       .limit(limit),
   ]);
@@ -918,12 +961,64 @@ export async function repairWatermarkForEvent(
       if (!resp.ok) { skipped++; errors.push(`media ${m.id}: download HTTP ${resp.status}`); continue; }
       const buffer = Buffer.from(await resp.arrayBuffer()) as Buffer;
 
-      let watermarked: Buffer = buffer;
+let watermarked: Buffer = buffer;
+      const isVideo = m.type === 'video';
       try {
-        watermarked = await applyWatermark(buffer, wmLine1, '', event?.brand, wmFont, brandLogo, wmFontBuffer, partnerLogo);
+        if (isVideo) {
+          // FIX 03/09/2026: repair video — VPS-first (ffmpeg di sistema) con
+          // fallback locale ffmpeg-static. Speculare a processSingleItem.
+          const brandingConfig = {
+            coupleNames: wmLine1,
+            date: '',
+            primaryColor: '#1a1a2e',
+            wordmark: getBrandLabel(event?.brand),
+            fontFamily: wmFont,
+            logoPng: brandLogo ?? undefined,
+            partnerLogoPng: partnerLogo ?? undefined,
+          };
+          let vpsDone = false;
+          if (isVpsWatermarkConfigured()) {
+            try {
+              const downloadUrl = await getPresignedDownloadUrl(sourceKey, 3600);
+              if (downloadUrl) {
+                const lastSlash = r2Key.lastIndexOf('/');
+                const prefix = lastSlash >= 0 ? r2Key.substring(0, lastSlash) : '';
+                const baseName = lastSlash >= 0 ? r2Key.substring(lastSlash + 1) : r2Key;
+                const wmFilename = baseName.replace(/\.mp4$/i, '') + '.wm.mp4';
+                const ul = await getPresignedUploadUrl(prefix, wmFilename, 'video/mp4');
+                if (ul.success && ul.presignedUrl) {
+                  const remoteResp = await applyVideoOverlayRemote({
+                    downloadUrl,
+                    uploadUrl: ul.presignedUrl,
+                    branding: brandingToRemote(brandingConfig),
+                  });
+                  if (remoteResp.ok) {
+                    const wmDownloadUrl = await getPresignedDownloadUrl(ul.key, 60);
+                    if (wmDownloadUrl) {
+                      const wmResp = await fetch(wmDownloadUrl);
+                      if (wmResp.ok) {
+                        watermarked = Buffer.from(await wmResp.arrayBuffer()) as Buffer;
+                        vpsDone = true;
+                      }
+                    }
+                  } else {
+                    console.warn('[repairWatermark] VPS watermark failed:', remoteResp.error, '- fallback locale');
+                  }
+                }
+              }
+            } catch (vpsErr) {
+              console.warn('[repairWatermark] VPS watermark exception:', (vpsErr as Error).message, '- fallback locale');
+            }
+          }
+          if (!vpsDone) {
+            watermarked = await applyVideoOverlay(buffer, { branding: brandingConfig, maxDurationSeconds: 240 });
+          }
+        } else {
+          watermarked = await applyWatermark(buffer, wmLine1, '', event?.brand, wmFont, brandLogo, wmFontBuffer, partnerLogo);
+        }
       } catch (wmErr) {
-        // Verifica post-fix: l'errore ora Ã¨ loud (non piÃ¹ silente). Logghiamo ma
-        // non marchiamo il record come repaired: rimarrÃ  watermark_missing=true.
+        // Verifica post-fix: l'errore ora è loud (non più silente). Logghiamo ma
+        // non marchiamo il record come repaired: rimarrà watermark_missing=true.
         console.error(`[repairWatermark] fallito su media ${m.id}:`, wmErr);
         skipped++; errors.push(`media ${m.id}: ${wmErr instanceof Error ? wmErr.message : 'errore watermark'}`);
         continue;
@@ -947,34 +1042,35 @@ export async function repairWatermarkForEvent(
         Bucket: process.env.R2_BUCKET || 'fotosposi-uploads',
         Key: r2Key,
         Body: watermarked,
-        ContentType: 'image/jpeg',
+        ContentType: isVideo ? 'video/mp4' : 'image/jpeg',
       }));
 
-      // Verifica post-upload: stessa logica AND di processQueueForEvent (fix
-      // 28/07/2026) â€” prima usava `hasLogo || confidence > 0.3`, lo stesso OR
-      // permissivo che ha fatto passare i 40 file del bug originale.
-      let verifiedOk = false;
-      try {
-        const verifyUrl = await getPresignedDownloadUrl(r2Key, 3600);
-        if (verifyUrl) {
-          const vResp = await fetch(verifyUrl);
-          if (vResp.ok) {
-            const vBuf = Buffer.from(await vResp.arrayBuffer());
-            const presence = await detectWatermark(vBuf);
-            // FIX 02/08/2026: `watermarkNamesOk` allineato a come applyOverlay
-            // renderizza (cuore SOLO se il testo contiene ❤). Prima `hasHeart`
-            // era richiesto per qualsiasi testo → con watermark_text senza cuore
-            // ogni foto riparata veniva scartata erroneamente. Il logo è
-            // compositato nella stessa pipeline del testo: se il testo è ok,
-            // il composite è andato a buon fine → non blocchiamo su hasLogo.
-            const namesOk = watermarkNamesOk(wmLine1, presence);
-            const logoOk = !brandLogo || presence.hasLogo || namesOk;
-            verifiedOk = namesOk && logoOk;
+      // Verifica post-upload: solo foto (detectWatermark analizza frame statici,
+      // non video). Per i video ci fidiamo del successo della pipeline VPS/ffmpeg.
+      let verifiedOk = isVideo;
+      if (!isVideo) {
+        try {
+          const verifyUrl = await getPresignedDownloadUrl(r2Key, 3600);
+          if (verifyUrl) {
+            const vResp = await fetch(verifyUrl);
+            if (vResp.ok) {
+              const vBuf = Buffer.from(await vResp.arrayBuffer());
+              const presence = await detectWatermark(vBuf);
+              // FIX 02/08/2026: `watermarkNamesOk` allineato a come applyOverlay
+              // renderizza (cuore SOLO se il testo contiene ❤). Prima `hasHeart`
+              // era richiesto per qualsiasi testo → con watermark_text senza cuore
+              // ogni foto riparata veniva scartata erroneamente. Il logo è
+              // compositato nella stessa pipeline del testo: se il testo è ok,
+              // il composite è andato a buon fine → non blocchiamo su hasLogo.
+              const namesOk = watermarkNamesOk(wmLine1, presence);
+              const logoOk = !brandLogo || presence.hasLogo || namesOk;
+              verifiedOk = namesOk && logoOk;
+            }
           }
+        } catch {
+          // Verifica best-effort: se R2 giù, ci fidiamo dell'upload.
+          verifiedOk = true;
         }
-      } catch {
-        // Verifica best-effort: se R2 giÃ¹, ci fidiamo dell'upload.
-        verifiedOk = true;
       }
 
       if (verifiedOk) {

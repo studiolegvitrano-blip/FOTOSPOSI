@@ -14,8 +14,9 @@ type Props = {
    * Se presente, attiva il long-press sulla foto per aprire il menu custom a 5 icone
    * (FB/IG/X/WhatsApp/TikTok). Tap singolo = foto successiva (comportamento predefinito).
    * Su desktop idem: stessi 5 tasti in overlay (menu custom aperto).
+   * `eventId` + `coupleName` vengono usati per la share della foto pura con tag.
    */
-  shareProps?: Omit<SocialShareProps, 'photoUrl'>;
+  shareProps?: Omit<SocialShareProps, 'photoUrl'> & { eventId?: string };
 };
 
 function mediaUrl(m: MediaUpload): string {
@@ -291,6 +292,9 @@ export default function FullGalleryLightbox({ media, initialUrl, onClose, shareP
               {...shareProps}
               photoUrl={sharePhotoUrl}
               variant="inline"
+              mediaId={current?.id}
+              eventId={shareProps.eventId}
+              isVideo={(current?.type || 'photo') === 'video'}
             />
 
             <p className="text-[11px] text-text-muted mt-3 leading-relaxed">

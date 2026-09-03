@@ -361,6 +361,9 @@ export default function FacebookFeed({
                   <SocialShareButtons
                     {...shareProps}
                     photoUrl={photoAbs}
+                    mediaId={p.id}
+                    eventId={eventId}
+                    isVideo={!!p.videoUrl}
                   />
                 </div>
               );

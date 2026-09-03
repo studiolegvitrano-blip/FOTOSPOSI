@@ -67,6 +67,22 @@ function normalizeHashtag(h?: string | null): string | null {
 }
 
 /**
+ * Converte il nome della coppia (es. "Elisa & Nausica") in un hashtag valido
+ * (es. "#ElisaNausica"). Rimuove spazi e caratteri non ammessi negli hashtag
+ * (Instagram/TikTok accettano solo lettere, numeri, underscore). Se il campo è
+ * vuoto o necostruisce una stringa vuota → null (omesso).
+ */
+export function coupleNameToHashtag(coupleName?: string | null): string | null {
+  if (!coupleName) return null;
+  const cleaned = coupleName
+    .replace(/&/g, 'and') // "Elisa & Nausica" → "Elisa and Nausica" → poi unito
+    .replace(/[^a-zA-Z0-9_\p{L}\p{N}]/gu, '')
+    .replace(/^#+/, '');
+  if (!cleaned) return null;
+  return `#${cleaned}`;
+}
+
+/**
  * Costruisce il testo da condividere nel formato richiesto:
  *
  *   <frase utente>
