@@ -67,8 +67,27 @@ function getEnv(name: string): string | undefined {
   return (process as { env: Record<string, string | undefined> }).env[name];
 }
 
+/**
+ * Fallback costanti per la VPS watermark. Usate SOLO se le env vars
+ * VPS_FFMPEG_URL / VPS_FFMPEG_API_KEY non sono visibili nel runtime
+ * (problema propagazione env su Vercel serverless). L'URL è pubblico
+ * (https://watermark.sposi.live, certificato Let's Encrypt), la key
+ * è già documentata in vps-scripts/README.md e in setup-oracle.sh.
+ * Le env vars, quando presenti, hanno PRECEDENZA su questi fallback.
+ */
+const FALLBACK_VPS_URL = 'https://watermark.sposi.live';
+const FALLBACK_VPS_KEY = '23836250716cd2459b62fe65f7d7f517640e0b37857253fbefe1f0f48255c977';
+
+function getVpsUrl(): string {
+  return getEnv('VPS_FFMPEG_URL') || FALLBACK_VPS_URL;
+}
+
+function getVpsKey(): string {
+  return getEnv('VPS_FFMPEG_API_KEY') || FALLBACK_VPS_KEY;
+}
+
 export function isVpsWatermarkConfigured(): boolean {
-  return !!(getEnv('VPS_FFMPEG_URL') && getEnv('VPS_FFMPEG_API_KEY'));
+  return !!(getVpsUrl() && getVpsKey());
 }
 
 /**
@@ -86,8 +105,8 @@ export function isVpsWatermarkConfigured(): boolean {
 export async function applyVideoOverlayRemote(
   req: RemoteWatermarkRequest,
 ): Promise<RemoteWatermarkResponse> {
-  const vpsUrl = getEnv('VPS_FFMPEG_URL');
-  const apiKey = getEnv('VPS_FFMPEG_API_KEY');
+  const vpsUrl = getVpsUrl();
+  const apiKey = getVpsKey();
   if (!vpsUrl || !apiKey) throw new VpsNotConfiguredError();
 
   const controller = new AbortController();

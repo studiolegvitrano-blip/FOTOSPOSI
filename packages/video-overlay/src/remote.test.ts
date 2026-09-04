@@ -34,16 +34,14 @@ describe('video-overlay remote', () => {
   });
 
   describe('isVpsWatermarkConfigured', () => {
-    it('false quando VPS_FFMPEG_URL mancante', () => {
-      process.env.VPS_FFMPEG_API_KEY = 'k';
-      expect(isVpsWatermarkConfigured()).toBe(false);
-    });
-    it('false quando VPS_FFMPEG_API_KEY mancante', () => {
-      process.env.VPS_FFMPEG_URL = 'https://x';
-      expect(isVpsWatermarkConfigured()).toBe(false);
-    });
-    it('true quando entrambe presenti', () => {
+    it('true con env vars (precedenza env)', () => {
       setVps();
+      expect(isVpsWatermarkConfigured()).toBe(true);
+    });
+    it('true con fallback costanti anche senza env vars', () => {
+      clearVps();
+      // Fallback hardcoded: la VPS è sempre configurata anche se le env
+      // Vercel non sono propagate nel runtime serverless.
       expect(isVpsWatermarkConfigured()).toBe(true);
     });
   });
@@ -92,20 +90,23 @@ describe('video-overlay remote', () => {
   });
 
   describe('applyVideoOverlayRemote', () => {
-    it('throw VpsNotConfiguredError se env mancanti', async () => {
+    it('usa fallback costanti se env mancanti (non lancia VpsNotConfiguredError)', async () => {
       clearVps();
-      await expect(
-        applyVideoOverlayRemote({
-          downloadUrl: 'https://x/dl',
-          uploadUrl: 'https://x/ul',
-          branding: {
-            coupleNames: 'A & B',
-            date: '2026',
-            primaryColor: '#000',
-            wordmark: 'w',
-          },
-        }),
-      ).rejects.toBeInstanceOf(VpsNotConfiguredError);
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ ok: true, bytes: 42, durationMs: 10 }),
+      } as Response);
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      const result = await applyVideoOverlayRemote({
+        downloadUrl: 'https://x/dl',
+        uploadUrl: 'https://x/ul',
+        branding: { coupleNames: 'A & B', date: '2026', primaryColor: '#000', wordmark: 'w' },
+      });
+      expect(result.ok).toBe(true);
+      // L'URL chiamata deve essere il fallback (watermark.sposi.live), non undefined
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('watermark.sposi.live/watermark');
     });
 
     it('chiama POST {VPS_FFMPEG_URL}/watermark con headers corretti', async () => {
