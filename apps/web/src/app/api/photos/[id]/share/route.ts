@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@fotosposi/core';
 import { getPresignedDownloadUrl, getPresignedUploadUrl } from '@fotosposi/r2-storage';
 import { watermarkFontFamily } from '@/lib/watermark-fonts';
-import { ensureWatermarkFonts, loadBrandLogo, loadPartnerLogo } from '@/lib/watermark-fonts.server';
+import { ensureWatermarkFonts, loadBrandLogo, loadPartnerLogo, loadWatermarkFontBuffer } from '@/lib/watermark-fonts.server';
 import { getEventPartner } from '@fotosposi/partner';
 
 ensureWatermarkFonts();
@@ -98,6 +98,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // B2B white label: logo partner sponsor (alto a sinistra, speculare al brand).
   const { partner: sharePartner } = await getEventPartner(eventId);
   const partnerLogoBuffer = sharePartner?.logo_url ? await loadPartnerLogo(sharePartner.logo_url) : null;
+  const wmFontBuffer = loadWatermarkFontBuffer((event as { watermark_font?: string }).watermark_font);
   const brandingConfig = {
     coupleNames: event.couple_name,
     date: new Date(event.date).toLocaleDateString('it-IT'),
@@ -105,6 +106,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     wordmark,
     fontFamily,
     // Per photo-overlay (nuovo overlay)
+    fontBuffer: wmFontBuffer,
     brandLogoBuffer,
     brandLogoWidth: format === 'story' ? 360 : 200,
     partnerLogoBuffer,

@@ -630,6 +630,7 @@ async function processSingleItem(
         primaryColor: '#1a1a2e',
         wordmark: getBrandLabel(event?.brand),
         fontFamily: wmFont,
+        fontBuffer: wmFontBuffer,
         logoPng: brandLogo ?? undefined,
         partnerLogoPng: partnerLogo ?? undefined,
       };
@@ -973,6 +974,7 @@ let watermarked: Buffer = buffer;
             primaryColor: '#1a1a2e',
             wordmark: getBrandLabel(event?.brand),
             fontFamily: wmFont,
+            fontBuffer: wmFontBuffer,
             logoPng: brandLogo ?? undefined,
             partnerLogoPng: partnerLogo ?? undefined,
           };

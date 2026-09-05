@@ -31,6 +31,10 @@ export interface RemoteBranding {
   textColor?: string;
   wordmark: string;
   fontFamily?: string;
+  /** Bytes del TTF selezionato dagli sposi, base64. Il VPS lo embedda via
+   *  @font-face nell'SVG del watermark (stesso meccanismo di photo-overlay).
+   *  Se assente, il VPS usa il family testuale risolvibile via fontconfig. */
+  fontBase64?: string;
   logoBase64?: string;
   logoMimeType?: string;
   /** Logo partner white label (B2B): base64 PNG, compositato in alto a sinistra. */

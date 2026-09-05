@@ -1,5 +1,72 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 05/09/2026 — Allineamento stile watermark video a foto (no banda, logo, cuore, colore adattivo)
+
+### Contesto
+Il watermark video (VPS `overlay.js` + locale `video-overlay/src/index.ts`) era stilisticamente diverso dal watermark foto (`photo-overlay/src/index.ts`): usava una banda colorata in basso, testo bianco fisso, nessun cuore, nessun font custom, logo brand dentro la banda. L'utente ha chiesto di allinearlo allo stile foto: niente banda, logo brand in alto a destra (A COLORI), logo partner in alto a sinistra, testo con colore adattivo (bianco su scuro, nero su chiaro), cuore rosso tra i nomi, font custom.
+
+### Fatto
+
+**1. `vps-scripts/overlay.js` riscritto da zero**
+- `renderWatermarkOverlay`: striscia TRASPARENTE (niente `<rect>` di sfondo), testo bottom-left con cuore PNG inline (stesso `HEART_PNG_BASE64` di photo-overlay), colore adattivo passato dal caller, opacità 50%, font custom opzionale via `@font-face` base64 (`branding.fontBase64`).
+- `renderBrandLogo` (NUOVO): logo brand PNG ridimensionato a 8% della larghezza video (clamp 48-90px), A COLORI, compositato in alto a destra da ffmpeg (overlay separato, non dentro la striscia).
+- `renderPartnerLogo`: logo partner PNG, in alto a sinistra (speculare al brand).
+- `probeLuminance(filePath, targetWidth)`: estrae il primo frame del video via `ffmpeg -frames:v 1`, campiona la fascia bassa (25% altezza) con `sharp.stats()`, ritorna luma 0..1. Il server usa il luma per scegliere `textColor = luma < 0.5 ? '#ffffff' : '#000000'`.
+- `probeDuration`: invariato.
+- Export: `renderWatermarkOverlay`, `renderBrandLogo`, `renderPartnerLogo`, `runFfmpeg`, `probeDuration`, `probeLuminance`, `escapeXml`.
+
+**2. `vps-scripts/video-watermark-server.js` riscritto**
+- `readBody` maxBytes aumentato a 256MB (era 256KB — troppo piccolo per `fontBase64` che è ~150KB).
+- `probeLuminance` chiamato sul video scaricato per decidere `textColor` adattivo (bianco/nero).
+- `renderWatermarkOverlay` con `{ width: 1080, textColor }` — striscia testo trasparente.
+- `renderBrandLogo` + `renderPartnerLogo` come PNG separati (non più compositati dentro la striscia).
+- `buildFilterComplex(hasBrand, hasPartner)`: filter_complex con 3 overlay:
+  - `[0:v]scale=1080:-2[base]`
+  - `[base][1:v]overlay=0:main_h-overlay_h[wm]` — striscia testo in basso
+  - `[wm][2:v]overlay=main_w-overlay_w-24:24` — logo brand alto-dx
+  - `[wm2][3:v]overlay=24:24` — logo partner alto-sx
+- Encoding settings: crf 26, preset medium, maxrate 2.5M, audio 128k (migliore del locale crf 30 veryfast — il VPS ha CPU sufficiente).
+
+**3. `packages/video-overlay/src/index.ts` riscritto con stesso stile**
+- `applyVideoOverlay`: striscia TRASPARENTE (no banda), cuore PNG inline, colore adattivo via `probeLuminance` (estrazione primo frame + sharp.stats), font custom via `@font-face` base64 (`branding.fontBuffer`), logo brand e partner come PNG separati compositati da ffmpeg.
+- `probeLuminance(bin, filePath, targetWidth)`: estrae primo frame con ffmpeg, campiona fascia bassa con sharp.stats, ritorna luma 0..1.
+- `renderBrandLogoPng` + `renderPartnerLogoPng`: PNG a 8% larghezza (clamp 48-90px).
+- `buildFilterComplex(hasBrand, hasPartner)`: stesso schema del VPS (3 overlay).
+- Encoding locale: crf 30, veryfast, maxrate 1.5M, audio 96k (qualità 33% — per stare nei 90s di Vercel).
+- `brandingToRemote` estesa con `fontBase64` (TTF base64 per il VPS).
+
+**4. `packages/video-overlay/src/remote.ts` estesa**
+- `RemoteBranding` aggiunge `fontBase64?: string` (bytes TTF base64 per embedding @font-face lato VPS).
+
+**5. `apps/web/src/lib/process-queue.ts` — `fontBuffer` passato al brandingConfig video**
+- Entrambi i blocchi brandingConfig video (main queue `processSingleItem` e `repairWatermarkForEvent`) ora includono `fontBuffer: wmFontBuffer` (già calcolato per le foto, era mancante nei video).
+- `brandingToRemote(brandingConfig)` ora serializza `fontBase64` nel payload JSON per il VPS.
+
+**6. `apps/web/src/app/api/photos/[id]/share/route.ts` — `fontBuffer` aggiunto**
+- `loadWatermarkFontBuffer` importato e chiamato per caricare il TTF selezionato dagli sposi.
+- `brandingConfig` ora include `fontBuffer: wmFontBuffer` per il path video (sia VPS che locale).
+
+### Verifica
+- Typecheck pulito: `tsc --noEmit -p apps/web/tsconfig.json` (0 errori).
+- Test 506/506 (44 file) passanti.
+- VPS aggiornato via scp + restart: `curl /health` → `{"ok":true}`.
+
+### Deploy VPS
+- `scp overlay.js video-watermark-server.js ubuntu@92.4.218.108:/opt/fotosposi-vps/`
+- `sudo systemctl restart fotosposi-watermark`
+- `curl http://localhost:8081/health` → OK
+
+### TODO post-push
+1. **Ri-riparare i 12 video "Elisa & Nausica"** con il nuovo stile (senza banda, logo, cuore): chiamare `/api/r2/repair-watermark` con `eventId=2f6ee6de-53bc-4857-8add-75aac538469f` oppure attendere il cron maintenance. I video attuali hanno il watermark vecchio (banda colorata).
+2. **Verificare visivamente** un video watermarkato con il nuovo stile: logo brand alto-dx, logo partner alto-sx, testo "Elisa ❤ Nausica" in basso senza banda, colore adattivo.
+3. **`fontBase64` nel payload VPS**: il TTF (~150KB) viene inviato nel body JSON del POST `/watermark`. Il `readBody` maxBytes è stato aumentato a 256MB per accommodare. Verificare che il VPS riceva e embedda correttamente il font (librsvg su VPS potrebbe non supportare `@font-face` con data URI — in quel caso ricade su `fontFamily` testuale, degradato ma non bloccante).
+4. **`probeLuminance` su video neri/bianchi**: se il primo frame è nero (es. fade-in), il textColor sarà bianco (safe default). Se il primo frame è bianco (es. flash), sarà nero. Per video con luminanza variabile, il colore è basato solo sul primo frame (approssimazione accettabile, non perfetta come photo-overlay che campiona la fascia bassa della foto).
+
+### Commit previsto
+`feat(video): allineamento stile watermark video a foto (no banda, logo alto-dx/sx, cuore, colore adattivo, font custom)`
+
+---
+
 ## Sessione 14/08/2026 — Rifondazione "solidità" flusso upload→R2→queu→watermark→galleria→Drive (P0)
 
 ### Contesto

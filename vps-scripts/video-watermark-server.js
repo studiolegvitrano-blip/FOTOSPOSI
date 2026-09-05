@@ -3,24 +3,29 @@
 // (download originale + upload watermarkato) piu' branding, scarica → ffmpeg
 // composita il watermark PNG sul video → upload.mp4 H.264 + faststart.
 //
+// ALLINEATO ALLO STILE FOTO (sessione 09/2026): niente banda colorata, testo
+// trasparente con cuore rosso, colore adattivo (bianco/nero) campionato dal
+// primo frame, logo brand in alto a destra, logo partner in alto a sinistra.
+//
 // Dipendenze: Node 18+, ffmpeg di sistema, npm install sharp.
 // Avvio: API_KEY=$(openssl rand -hex 32) PORT=8081 node video-watermark-server.js
 
 const http = require('http');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
-const { mkdtemp, readFile, rm, writeFile, access } = require('fs/promises');
+const { mkdtemp, readFile, rm, writeFile } = require('fs/promises');
 const { tmpdir } = require('os');
 const { join } = require('path');
 const os = require('os');
 
-// Logica watermark SVG→PNG riusata dal package @fotosposi/video-overlay.
-// Il package ha un' interfaccia TS + dipendenza da ffmpeg-static (70MB bundle,
-// a cui objections il VPS non abbia), qui importiamo una copia CJS standalone.
-// Per evitare drift, il modulo overlay.js contiene solo la parte
-// "render SVG → PNG + ffmpeg composita": se il package principale cambia, va
-// copiato qui a manooppure estratto in un terzo package condiviso in futuro.
-const { renderWatermarkOverlay, renderPartnerLogo, runFfmpeg, probeDuration } = require('./overlay.js');
+const {
+  renderWatermarkOverlay,
+  renderBrandLogo,
+  renderPartnerLogo,
+  runFfmpeg,
+  probeDuration,
+  probeLuminance,
+} = require('./overlay.js');
 
 const PORT = parseInt(process.env.PORT || '8081', 10);
 const API_KEY = process.env.API_KEY;
@@ -39,7 +44,7 @@ async function checkFfmpeg() {
   });
 }
 
-function readBody(req, maxBytes = 256 * 1024) {
+function readBody(req, maxBytes = 256 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
     let total = 0;
     const chunks = [];
@@ -92,6 +97,8 @@ async function handleWatermark(req, res) {
   const inputPath = join(dir, 'in.mp4');
   const overlayPath = join(dir, 'overlay.png');
   const outputPath = join(dir, 'out.mp4');
+  const brandLogoPath = join(dir, 'brand-logo.png');
+  const partnerLogoPath = join(dir, 'partner-logo.png');
 
   try {
     // 1) Download video da R2 via presigned GET
@@ -102,33 +109,20 @@ async function handleWatermark(req, res) {
     console.log(`[${new Date().toISOString()}] download bytes=${dlBuffer.length} dlMs=${Date.now() - dlStart}`);
     await writeFile(inputPath, dlBuffer);
 
-  // 2) Salva logo brand se presente nella branding
-  let logoBuffer;
-  if (branding.logoBase64) {
-    logoBuffer = Buffer.from(branding.logoBase64, 'base64');
-  }
-  let partnerLogoBuffer;
-  if (branding.partnerLogoBase64) {
-    partnerLogoBuffer = Buffer.from(branding.partnerLogoBase64, 'base64');
-  }
+    // 2) Salva logo brand e partner se presenti
+    let brandLogoBuffer;
+    if (branding.logoBase64) {
+      brandLogoBuffer = Buffer.from(branding.logoBase64, 'base64');
+    }
+    let partnerLogoBuffer;
+    if (branding.partnerLogoBase64) {
+      partnerLogoBuffer = Buffer.from(branding.partnerLogoBase64, 'base64');
+    }
 
-  // 3) Render watermark PNG overlay (SVG via sharp)
-  const overlayStart = Date.now();
-  await renderWatermarkOverlay(overlayPath, {
-    ...branding,
-    logoPng: logoBuffer,
-  });
-  console.log(`[${new Date().toISOString()}] overlay renderMs=${Date.now() - overlayStart}`);
-
-  // 3bis) Render logo partner (alto a sinistra) se presente
-  const partnerLogoPath = join(dir, 'partner-logo.png');
-  const renderedPartnerLogo = await renderPartnerLogo(partnerLogoPath, partnerLogoBuffer);
-
-    // 4) Probe duration per consentire skip se > maxDurationSeconds (opzionale)
+    // 3) Probe durata (opzionale skip se > maxDurationSeconds)
     if (maxDurationSeconds && maxDurationSeconds > 0) {
       const dur = await probeDuration(inputPath);
       if (dur !== null && dur > maxDurationSeconds) {
-        // Skip watermark: upload del file originale
         console.log(`[${new Date().toISOString()}] duration ${dur}s exceeds ${maxDurationSeconds}s, skipping watermark`);
         const ulResp = await fetch(uploadUrl, {
           method: 'PUT',
@@ -137,38 +131,44 @@ async function handleWatermark(req, res) {
         });
         if (!ulResp.ok) throw new Error(`Upload skipped original failed: HTTP ${ulResp.status}`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          ok: true,
-          bytes: dlBuffer.length,
-          durationMs: Date.now() - t0,
-          skipped: true,
-        }));
+        res.end(JSON.stringify({ ok: true, bytes: dlBuffer.length, durationMs: Date.now() - t0, skipped: true }));
         return;
       }
     }
 
-    // 5) ffmpeg composita: scale a 1080 + overlay PNG in basso + partner logo
-    // (alto a sinistra, opzionale), H.264/AAC +faststart.
-    // Encoding settings ottimizzati per riduzione ~1/5 del file size senza
-    // perdita di qualita' percepita (richiesta utente 28/07/2026: 10min video =
-    // 1GB su R2/Drive e' insostenibile per tier Free 10GB storage):
-    //   - crf 26 (era 23): 50% riduzione bit rate, qualita' percepita quasi identica.
-    //   - preset medium (era veryfast): encoding piu' lento ma bitrate ottimale per
-    //     stessa qualita' (preso in prestito da YouTube stesso target).
-    //   - maxrate/bufsize: VBV cap per stabilizzare dimensione su clip lunghi.
-    //   - +faststart: moov atom davanti per streaming/playback immediato.
-    // Risultato: 10min @ 1080p ~1GB -> ~200MB, watermark applicato nello stesso
-    // passaggio (filter_complex + overlay). Unico encoding, zero duplicazioni.
+    // 4) Probe luminanza del primo frame per scegliere colore testo adattivo
+    //    (bianco su scuro, nero su chiaro) — stesso approccio di photo-overlay.
+    const TARGET_WIDTH = 1080;
+    let textColor = '#ffffff'; // safe default (scuro)
+    try {
+      const luma = await probeLuminance(inputPath, TARGET_WIDTH);
+      textColor = luma < 0.5 ? '#ffffff' : '#000000';
+      console.log(`[${new Date().toISOString()}] probeLuminance luma=${luma.toFixed(3)} textColor=${textColor}`);
+    } catch (lumaErr) {
+      console.warn(`[${new Date().toISOString()}] probeLuminance fallito, uso default #ffffff:`, lumaErr instanceof Error ? lumaErr.message : lumaErr);
+    }
+
+    // 5) Render striscia testo watermark (TRASPARENTE, no banda, cuore, colore adattivo)
+    const overlayStart = Date.now();
+    await renderWatermarkOverlay(overlayPath, branding, { width: TARGET_WIDTH, textColor });
+    console.log(`[${new Date().toISOString()}] overlay renderMs=${Date.now() - overlayStart}`);
+
+    // 6) Render logo brand (alto a destra) e partner (alto a sinistra)
+    const renderedBrandLogo = await renderBrandLogo(brandLogoPath, brandLogoBuffer, TARGET_WIDTH);
+    const renderedPartnerLogo = await renderPartnerLogo(partnerLogoPath, partnerLogoBuffer);
+
+    // 7) ffmpeg composita: scale 1080 + overlay testo in basso + logo brand alto-dx + logo partner alto-sx
+    //    Encoding settings: crf 26, preset medium, maxrate 2.5M, +faststart (qualità migliore del
+    //    fallback locale che usa crf 30 veryfast — il VPS ha tempo/CPU sufficienti).
     const encodeStart = Date.now();
     const ffmpegArgs = [
       '-y',
       '-i', inputPath,
       '-i', overlayPath,
+      ...(renderedBrandLogo ? ['-i', renderedBrandLogo] : []),
       ...(renderedPartnerLogo ? ['-i', renderedPartnerLogo] : []),
       '-filter_complex',
-      renderedPartnerLogo
-        ? '[0:v]scale=1080:-2[base];[base][1:v]overlay=0:main_h-overlay_h[wm];[wm][2:v]overlay=24:24'
-        : '[0:v]scale=1080:-2[base];[base][1:v]overlay=0:main_h-overlay_h',
+      buildFilterComplex(!!renderedBrandLogo, !!renderedPartnerLogo),
       '-c:v', 'libx264',
       '-preset', 'medium',
       '-crf', '26',
@@ -184,7 +184,7 @@ async function handleWatermark(req, res) {
     const outBuffer = await readFile(outputPath);
     console.log(`[${new Date().toISOString()}] ffmpeg encodeMs=${Date.now() - encodeStart} outBytes=${outBuffer.length}`);
 
-    // 6) Upload watermarkato a R2 via presigned PUT
+    // 8) Upload watermarkato a R2 via presigned PUT
     const ulStart = Date.now();
     const ulResp = await fetch(uploadUrl, {
       method: 'PUT',
@@ -207,6 +207,28 @@ async function handleWatermark(req, res) {
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+/**
+ * Costruisce la stringa filter_complex di ffmpeg.
+ * Input 0 = video. Input 1 = overlay striscia testo (trasparente).
+ * Input 2 (opzionale) = logo brand. Input 3 (opzionale) = logo partner.
+ *
+ * Posizionamenti:
+ *   - Striscia testo: bottom, overlay=0:main_h-overlay_h (centrata in orizzontale)
+ *   - Logo brand: top-right, overlay=main_w-overlay_w-24:24
+ *   - Logo partner: top-left, overlay=24:24
+ */
+function buildFilterComplex(hasBrand, hasPartner) {
+  let filter = '[0:v]scale=1080:-2[base];[base][1:v]overlay=0:main_h-overlay_h[wm]';
+  if (hasBrand) {
+    filter += `;[wm][2:v]overlay=main_w-overlay_w-24:24`;
+  }
+  if (hasPartner) {
+    const idx = hasBrand ? 3 : 2;
+    filter += `;[wm${hasBrand ? '' : ''}][${idx}:v]overlay=24:24`;
+  }
+  return filter;
 }
 
 const server = http.createServer(async (req, res) => {
