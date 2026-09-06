@@ -48,6 +48,10 @@ export interface RemoteWatermarkRequest {
   branding: RemoteBranding;
   /** Massima durata accettabile in secondi; se undefined il VPS processa sempre. */
   maxDurationSeconds?: number;
+  /** Timeout client per la chiamata HTTP al VPS (ms). Default 55s. Le route con
+   *  maxDuration lambda maggiore (es. repair, 300s) devono passare un valore più
+   *  alto (es. 250s) per video lunghi il cui encode VPS supera i 55s. */
+  timeoutMs?: number;
 }
 
 export interface RemoteWatermarkResponse {
@@ -113,8 +117,9 @@ export async function applyVideoOverlayRemote(
   const apiKey = getVpsKey();
   if (!vpsUrl || !apiKey) throw new VpsNotConfiguredError();
 
+  const timeoutMs = req.timeoutMs ?? 55_000; // default sotto il maxDuration 60s della share lambda
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 55_000); // 55s, sotto maxDuration lambda 60s
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${vpsUrl.replace(/\/$/, '')}/watermark`, {
       method: 'POST',

@@ -993,6 +993,9 @@ let watermarked: Buffer = buffer;
                     downloadUrl,
                     uploadUrl: ul.presignedUrl,
                     branding: brandingToRemote(brandingConfig),
+                    // maxDuration questa route è 300s: posso aspettare video lunghi
+                    // il cui encode VPS supera i 55s di default (risolto 413/abort).
+                    timeoutMs: 250_000,
                   });
                   if (remoteResp.ok) {
                     const wmDownloadUrl = await getPresignedDownloadUrl(ul.key, 60);
