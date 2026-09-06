@@ -32,11 +32,15 @@ export interface VideoOverlayOptions {
   maxDurationSeconds?: number;
 }
 
-function escapeXml(s: string): string {
-  return s.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"');
+export function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-function escapeXmlAttr(s: string): string {
+export function escapeXmlAttr(s: string): string {
   return escapeXml(s);
 }
 
