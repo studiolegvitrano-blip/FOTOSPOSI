@@ -56,14 +56,34 @@ Il watermark video (VPS `overlay.js` + locale `video-overlay/src/index.ts`) era 
 - `sudo systemctl restart fotosposi-watermark`
 - `curl http://localhost:8081/health` → OK
 
-### TODO post-push
-1. **Ri-riparare i 12 video "Elisa & Nausica"** con il nuovo stile (senza banda, logo, cuore): chiamare `/api/r2/repair-watermark` con `eventId=2f6ee6de-53bc-4857-8add-75aac538469f` oppure attendere il cron maintenance. I video attuali hanno il watermark vecchio (banda colorata).
-2. **Verificare visivamente** un video watermarkato con il nuovo stile: logo brand alto-dx, logo partner alto-sx, testo "Elisa ❤ Nausica" in basso senza banda, colore adattivo.
-3. **`fontBase64` nel payload VPS**: il TTF (~150KB) viene inviato nel body JSON del POST `/watermark`. Il `readBody` maxBytes è stato aumentato a 256MB per accommodare. Verificare che il VPS riceva e embedda correttamente il font (librsvg su VPS potrebbe non supportare `@font-face` con data URI — in quel caso ricade su `fontFamily` testuale, degradato ma non bloccante).
-4. **`probeLuminance` su video neri/bianchi**: se il primo frame è nero (es. fade-in), il textColor sarà bianco (safe default). Se il primo frame è bianco (es. flash), sarà nero. Per video con luminanza variabile, il colore è basato solo sul primo frame (approssimazione accettabile, non perfetta come photo-overlay che campiona la fascia bassa della foto).
+### Completamento repair 12 video + fix emersi (continuazione 05/09)
 
-### Commit previsto
-`feat(video): allineamento stile watermark video a foto (no banda, logo alto-dx/sx, cuore, colore adattivo, font custom)`
+**Repair completato**: tutti i 12 video "Elisa & Nausica" (`eventId=2f6ee6de-53bc-4857-8add-75aac538469f`) sono stati ri-riparati con il nuovo stile, `watermark_missing=false` su tutti. Il repair lavora sull'originale pulito (`original_r2_key` valorizzato) → nessuna degradazione.
+
+Fix emersi durante il repair (3 root cause in cascata):
+
+**1. `escapeXml` corrotto (no-op) in `packages/video-overlay/src/index.ts`** (commit `648dba4`)
+- `escapeXml` sostituiva `&`→`&`, `<`→`<`, `>`→`>`, `"`→`"` (literal, no-op). Con testo coppia contenente `&` (es. "Elisa & Nausica") l'SVG conteneva `&Nausica` raw → XML invalido → librsvg `Opening and ending tag mismatch: svg ...`. La VPS `overlay.js` aveva l'`escapeXml` corretto, ma il repair cadde sul path locale (→ errore). Corretto a `&amp;`/`&lt;`/`&gt;`/`&quot;`, allineato a photo-overlay. `escapeXml`/`escapeXmlAttr` ora esportati.
+- Nuovo test regressione `packages/video-overlay/src/watermark-svg.integration.test.ts`: renderizza l'SVG con `&` via sharp, verde solo con escape corretto (verificato rosso col no-op).
+
+**2. nginx VPS `client_max_body_size 1m` → 413** (fix infra VPS)
+- Root cause del `VPS watermark failed: HTTP 413`: il body del POST `/watermark` ora include `branding.fontBase64` (~100KB) + `logoBase64` (logo brand `logo-sposi-trans.png` = 835KB → base64 ~1.1MB) → body ~1.2MB > 1m.
+- Fix: `client_max_body_size 256m` (coerente col `readBody` 256MB del sidecar) + reload nginx. Confermato: body 1.5MB ora raggiunge il sidecar.
+
+**3. Timeout VPS hardcoded 55s → abort su video lunghi** (commit `865655f`)
+- `applyVideoOverlayRemote` aveva timeout client fisso 55s (sotto il maxDuration 60s della share route). I 4 video lunghi (encode VPS 80-83s) venivano abortiti → fallback locale → `ffmpeg-static ENOENT`.
+- Fix: `RemoteWatermarkRequest.timeoutMs` opzionale (default 55s); il repair (route maxDuration 300s) passa `timeoutMs: 250_000`. Migliora anche: VPS `proxy_read_timeout 120s → 300s` in nginx.
+
+### TODO post-repair
+1. **Verificare visivamente** un video watermarkato con il nuovo stile: logo brand alto-dx, logo partner alto-sx, testo in basso senza banda, colore adattivo, font custom.
+2. **Drive non ri-sincronizzato**: il repair NON tocca `drive_sync_status`/`drive_file_id`. Le copie su Google Drive dei 12 video restano col watermark VECCHIO. La galleria streamma da R2 (nuovo stile), Drive è solo backup. Per allinearle: ri-sync a Drive (non implementato nel repair).
+3. **`ffmpeg-static ENOENT` su Vercel** (latente): il fallback locale video è rotto su Vercel lambda (`spawn /var/task/node_modules/ffmpeg-static/ffmpeg ENOENT` — binario ffmpeg-static non tracciato nel bundle della route `repair-watermark`). Fino a quando il VPS è up il VPS-first copre tutto; se il VPS va giù il fallback locale fallisce. TODO: `outputFileTracingIncludes` per ffmpeg-static o disabilitare il fallback locale sul repair.
+4. **`fontBase64`/logo nel body VPS**: verificare visivamente che il font Playfair (`watermark_font='classico'`) e il logo brand siano applicati (test VPS-side confermato che librsvg accetta `@font-face` base64).
+
+### Commit
+- `d5c77ec` feat(video): allineamento stile watermark video a foto (no banda, logo alto-dx/sx, cuore, colore adattivo, font custom)
+- `648dba4` fix(video): escapeXml watermarked era un no-op → SVG invalido con '&' nei nomi (XML parse error librsvg) + test regressione
+- `865655f` fix(video): timeout VPS parametrizzato — repair usa 250s (video lunghi >55s abortivano il fallback locale ffmpeg ENOENT)
 
 ---
 
