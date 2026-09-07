@@ -121,16 +121,17 @@ function probeDuration(filePath) {
 
 /**
  * Render del logo brand (alto a destra, A COLORI) come PNG trasparente.
- * Ridimensionato a altezza ~8% della larghezza video (clamp 48-90px per
- * video 720/1080). Non ritorna mai null: se logoPng manca o è malformato,
- * ritorna null (il server non passa l'input a ffmpeg).
+ * ALLINEATO ALLE FOTO (09/2026): larghezza ~20% della larghezza video
+ * (clamp 120-500px), aspect ratio preservato — stessa scala relativa del
+ * logo foto (25.5% width). Non ritorna mai null: se logoPng manca o è
+ * malformato ritorna null (il server non passa l'input a ffmpeg).
  */
 async function renderBrandLogo(outPath, brandLogoPng, targetWidth) {
   if (!brandLogoPng) return null;
   const sharp = (await import('sharp')).default;
   try {
-    const logoH = Math.min(90, Math.max(48, Math.round(targetWidth * 0.08)));
-    const logo = await sharp(brandLogoPng).resize({ height: logoH }).png().toBuffer();
+    const logoW = Math.min(500, Math.max(120, Math.round(targetWidth * 0.2)));
+    const logo = await sharp(brandLogoPng).resize({ width: logoW, fit: 'inside' }).png().toBuffer();
     await writeFile(outPath, logo);
     return outPath;
   } catch (err) {
@@ -140,16 +141,16 @@ async function renderBrandLogo(outPath, brandLogoPng, targetWidth) {
 }
 
 /**
- * Render del logo partner (B2B white label) come PNG trasparente alto ~64px,
- * da compositare in ALTO A SINISTRA del frame video (speculare al logo brand
- * che vive in alto a destra). Ritorna null se il logo manca o è malformato.
+ * Render del logo partner (B2B white label) come PNG trasparente, speculare al
+ * logo brand (alto a sinistra). Stessa scala: larghezza ~20% del frame
+ * (clamp 120-500px), aspect ratio preservato. Ritorna null se manca/malformato.
  */
-async function renderPartnerLogo(outPath, partnerLogoPng) {
+async function renderPartnerLogo(outPath, partnerLogoPng, targetWidth) {
   if (!partnerLogoPng) return null;
   const sharp = (await import('sharp')).default;
   try {
-    const partnerH = 64;
-    const partnerLogo = await sharp(partnerLogoPng).resize({ height: partnerH }).png().toBuffer();
+    const partnerW = Math.min(500, Math.max(120, Math.round((targetWidth || 1080) * 0.2)));
+    const partnerLogo = await sharp(partnerLogoPng).resize({ width: partnerW, fit: 'inside' }).png().toBuffer();
     await writeFile(outPath, partnerLogo);
     return outPath;
   } catch (err) {

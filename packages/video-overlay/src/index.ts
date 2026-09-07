@@ -134,14 +134,15 @@ async function probeLuminance(bin: string, filePath: string, targetWidth: number
 
 /**
  * Render del logo brand come PNG trasparente (alto a destra, A COLORI).
- * Ridimensionato a altezza ~8% della larghezza video (clamp 48-90px).
- * Ritorna null se logoPng manca o è malformato.
+ * ALLINEATO ALLE FOTO (09/2026): larghezza ~20% della larghezza video
+ * (clamp 120-500px), aspect ratio preservato — stessa scala relativa del
+ * logo foto (25.5% width). Ritorna null se logoPng manca o è malformato.
  */
 async function renderBrandLogoPng(logoPng: Buffer, targetWidth: number): Promise<Buffer | null> {
   const sharp = (await import('sharp')).default;
   try {
-    const logoH = Math.min(90, Math.max(48, Math.round(targetWidth * 0.08)));
-    return await sharp(logoPng).resize({ height: logoH }).png().toBuffer();
+    const logoW = Math.min(500, Math.max(120, Math.round(targetWidth * 0.2)));
+    return await sharp(logoPng).resize({ width: logoW, fit: 'inside' }).png().toBuffer();
   } catch {
     return null;
   }
@@ -149,14 +150,14 @@ async function renderBrandLogoPng(logoPng: Buffer, targetWidth: number): Promise
 
 /**
  * Render del logo partner come PNG trasparente (alto a sinistra, A COLORI).
- * Ridimensionato a altezza ~8% della larghezza video (clamp 48-90px).
+ * Stessa scala del logo brand (larghezza ~20% del frame, clamp 120-500px).
  * Speculare al logo brand.
  */
 async function renderPartnerLogoPng(logoPng: Buffer, targetWidth: number): Promise<Buffer | null> {
   const sharp = (await import('sharp')).default;
   try {
-    const logoH = Math.min(90, Math.max(48, Math.round(targetWidth * 0.08)));
-    return await sharp(logoPng).resize({ height: logoH }).png().toBuffer();
+    const logoW = Math.min(500, Math.max(120, Math.round(targetWidth * 0.2)));
+    return await sharp(logoPng).resize({ width: logoW, fit: 'inside' }).png().toBuffer();
   } catch {
     return null;
   }

@@ -155,7 +155,7 @@ async function handleWatermark(req, res) {
 
     // 6) Render logo brand (alto a destra) e partner (alto a sinistra)
     const renderedBrandLogo = await renderBrandLogo(brandLogoPath, brandLogoBuffer, TARGET_WIDTH);
-    const renderedPartnerLogo = await renderPartnerLogo(partnerLogoPath, partnerLogoBuffer);
+    const renderedPartnerLogo = await renderPartnerLogo(partnerLogoPath, partnerLogoBuffer, TARGET_WIDTH);
 
     // 7) ffmpeg composita: scale 1080 + overlay testo in basso + logo brand alto-dx + logo partner alto-sx
     //    Encoding settings: crf 26, preset medium, maxrate 2.5M, +faststart (qualità migliore del
