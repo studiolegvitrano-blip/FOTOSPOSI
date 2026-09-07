@@ -58,7 +58,12 @@ Il watermark video (VPS `overlay.js` + locale `video-overlay/src/index.ts`) era 
 
 ### Completamento repair 12 video + fix emersi (continuazione 05/09)
 
-**Repair completato**: tutti i 12 video "Elisa & Nausica" (`eventId=2f6ee6de-53bc-4857-8add-75aac538469f`) sono stati ri-riparati con il nuovo stile, `watermark_missing=false` su tutti. Il repair lavora sull'originale pulito (`original_r2_key` valorizzato) → nessuna degradazione.
+**Repair completato**: tutti i **23** video "Elisa & Nausica" (`eventId=2f6ee6de-53bc-4857-8add-75aac538469f`) sono stati ri-riparati con il nuovo stile, `watermark_missing=false` su tutti (nota: l'evento aveva 23 video, non 12 come stimato inizialmente — upload aggiuntivi arrivati nel frattempo). Il repair lavora sull'originale pulito (`original_r2_key` valorizzato) → nessuna degradazione.
+
+**Allineamento dimensione logo foto/video** (commit `97e3ec0`)
+- Prima: logo video dimensionato per ALTEZZA ~8% del frame (clamp 48-90px), logo partner fisso 64px — molto più piccolo del logo foto (larghezza 25.5%, clamp 135-680px).
+- Ora: logo brand E partner dimensionati per LARGHEZZA ~20% del frame (clamp 120-500px), aspect ratio preservato — scala relativa coerente con le foto. Applicato in `video-overlay/src/index.ts`, VPS `overlay.js` e `video-watermark-server.js` (firma `renderPartnerLogo` ora riceve `targetWidth`).
+- I 23 video ri-riparati via VPS con la nuova dimensione logo.
 
 Fix emersi durante il repair (3 root cause in cascata):
 
@@ -84,6 +89,7 @@ Fix emersi durante il repair (3 root cause in cascata):
 - `d5c77ec` feat(video): allineamento stile watermark video a foto (no banda, logo alto-dx/sx, cuore, colore adattivo, font custom)
 - `648dba4` fix(video): escapeXml watermarked era un no-op → SVG invalido con '&' nei nomi (XML parse error librsvg) + test regressione
 - `865655f` fix(video): timeout VPS parametrizzato — repair usa 250s (video lunghi >55s abortivano il fallback locale ffmpeg ENOENT)
+- `97e3ec0` feat(video): logo brand/partner per larghezza ~20% del frame (allineato alle foto, prima altezza 8%/64px fissa)
 
 ---
 
