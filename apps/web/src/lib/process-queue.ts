@@ -410,22 +410,16 @@ export async function processQueueForEvent(eventId: string, limit = 5): Promise<
 
   const tokenResp = await getDriveToken(eventId);
   let token = tokenResp.token;
-  // RIFONDAZIONE 14/08/2026 — batch skip su token revoked (P1). Se il token è
-  // marcato 'revoked' (invalid_grant ripetuto, utente non ha ancora riconnesso
-  // Drive), NON ha senso processare gli item: il sync Drive fallirebbe a ogni
-  // tentativo. Rilasciamo il claim (status→pending) e usciamo senza sprecare
-  // risorse; gli item restano in coda finché l'utente riconnette Drive.
+  // FIX 11/09/2026 — Drive token revoked NON deve bloccare la pubblicazione.
+  // Prima (rifondazione 14/08) il batch veniva skippato INTERAMENTE: nessun
+  // watermark, nessun upload R2, nessuna galleria → nuovi upload di eventi con
+  // Drive scollegato restavano pending per giorni. Ora: se il token è 'revoked'
+  // trattiamo l'evento come SENZA Drive (hasDrive=false): l'item viene watermarkato
+  // e pubblicato in galleria (R2), il solo backup su Google Drive viene saltato.
+  // L'utente riconnettendo Drive da /events/{id}/drive riabilita il backup.
   if (token && token.status === 'revoked') {
-    console.warn(`[process-queue] evento ${eventId}: token Drive revoked, skip batch (${items.length} item rilasciati). Riconnettere da /events/${eventId}/drive`);
-    const claimedIds = items.map((i: any) => i.id);
-    if (claimedIds.length > 0) {
-      try {
-        await supabase.from('upload_queue').update({ status: 'pending' }).in('id', claimedIds);
-      } catch (relErr) {
-        console.warn('[process-queue] rilascio claim (revoked) fallito:', (relErr as Error).message);
-      }
-    }
-    return { processed: 0, remaining: items.length };
+    console.warn(`[process-queue] evento ${eventId}: token Drive revoked — processa SENZA sync Drive (galleria/R2 ok, backup Drive saltato). Riconnettere da /events/${eventId}/drive`);
+    token = undefined;
   }
   const hasDrive = !!token?.access_token;
   let folders: Record<string, string> | null = null;
