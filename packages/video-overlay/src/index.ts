@@ -44,6 +44,16 @@ export function escapeXmlAttr(s: string): string {
   return escapeXml(s);
 }
 
+/** True se un colore hex (#rrggbb) è chiaro (luminanza percepite > 0.5). */
+function isHexLight(hex: string): boolean {
+  let h = hex.replace('#', '').trim();
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  const r = parseInt(h.slice(0, 2), 16) || 0;
+  const g = parseInt(h.slice(2, 4), 16) || 0;
+  const b = parseInt(h.slice(4, 6), 16) || 0;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
+}
+
 function ffmpegBinaryPath(): string {
   // ffmpeg-static exports the absolute path to the platform binary. Kept as a require()
   // (not a static import) so bundlers/tracing pick up the binary as a runtime asset.
@@ -266,13 +276,21 @@ export async function applyVideoOverlay(
       }
     }
 
+    // Colore testo adattivo (bianco/nero). Per video la luminanza può variare tra
+    // il primo frame (usato da probeLuminance) e le scene successive: aggiungiamo
+    // un contorno di colore OPPOSTO per garantire leggibilità su QUALSIASI sfondo,
+    // e alziamo l'opacità a 0.9 (a 0.5 bianco su fondo ~chiaro era invisibile).
+    const strokeColor = isHexLight(textColor) ? '#000000' : '#ffffff';
+    const strokeWidth = Math.max(1, Math.round(actualTextPx * 0.1));
+    const textCommon = `fill="${textColor}" fill-opacity="0.9" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-opacity="0.65" paint-order="stroke fill"`;
+
     let svgParts: string[] = [];
     let cursorX = actualPadLeft;
     for (let i = 0; i < segments.length; i++) {
       const seg = segments[i] || '';
       if (seg.length > 0) {
         svgParts.push(
-          `<text x="${cursorX.toFixed(1)}" y="${baselineY}" font-family="${resolvedFontFamily}" font-size="${actualTextPx}" fill="${textColor}" fill-opacity="0.5" font-weight="500">${escapeXml(seg)}</text>`,
+          `<text x="${cursorX.toFixed(1)}" y="${baselineY}" font-family="${resolvedFontFamily}" font-size="${actualTextPx}" ${textCommon} font-weight="500">${escapeXml(seg)}</text>`,
         );
       }
       cursorX += seg.length * (actualTextPx * 0.55);
@@ -287,7 +305,7 @@ export async function applyVideoOverlay(
 
     if (!hasNames && branding.wordmark) {
       svgParts.push(
-        `<text x="${TARGET_WIDTH - SIDE_PADDING}" y="${baselineY}" font-family="Inter, sans-serif" font-size="${Math.round(actualTextPx * 0.6)}" fill="${textColor}" fill-opacity="0.5" text-anchor="end">${escapeXml(branding.wordmark)}</text>`,
+        `<text x="${TARGET_WIDTH - SIDE_PADDING}" y="${baselineY}" font-family="Inter, sans-serif" font-size="${Math.round(actualTextPx * 0.6)}" ${textCommon} text-anchor="end">${escapeXml(branding.wordmark)}</text>`,
       );
     }
 

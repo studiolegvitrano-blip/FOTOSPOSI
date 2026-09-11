@@ -34,6 +34,18 @@ function escapeXmlAttr(s) {
   return escapeXml(s);
 }
 
+/** True se un colore hex (#rrggbb) è chiaro (luminanza percepite > 0.5). */
+function isHexLight(hex) {
+  if (typeof hex !== 'string') return false;
+  let h = hex.replace('#', '').trim();
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  const r = parseInt(h.slice(0, 2), 16) || 0;
+  const g = parseInt(h.slice(2, 4), 16) || 0;
+  const b = parseInt(h.slice(4, 6), 16) || 0;
+  // luma percepite (sRGB)
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
+}
+
 function run(cmd, args) {
   return new Promise((resolve, reject) => {
     const p = spawn(cmd, args, { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -236,8 +248,17 @@ async function renderWatermarkOverlay(outPath, branding, opts) {
     }
   }
 
+  // Colore testo adattivo (bianco/nero) passato dal caller. Per video la luminanza
+  // può variare (primo frame ≠ scene successive): per garantire leggibilità su QUALSIASI
+  // sfondo aggiungiamo un contorno di colore OPPOSTO (rim scuro se testo bianco, chiaro
+  // se testo nero). Più opacità (0.9, non 0.5) — altrimenti testo bianco ~96% opaco su
+  // fondo chiaro del video risultava INVISIBILE (bug ripple 11/09/2026).
+  const isLightText = isHexLight(textColor);
+  const strokeColor = isLightText ? '#000000' : '#ffffff';
+  const strokeWidth = Math.max(1, Math.round(actualTextPx * 0.1));
+
   // Costruisci SVG: sfondo TRASPARENTE (niente <rect> di sfondo). Testo in basso
-  // a sinistra con cuore PNG inline. Opacità 0.5 come photo-overlay.
+  // a sinistra con cuore PNG inline e contorno di contrasto (leggibile ovunque).
   let svgParts = [];
   if (hasNames) {
     let cursorX = actualPadLeft;
@@ -245,7 +266,7 @@ async function renderWatermarkOverlay(outPath, branding, opts) {
       const seg = segments[i] || '';
       if (seg.length > 0) {
         svgParts.push(
-          `<text x="${cursorX.toFixed(1)}" y="${baselineY}" font-family="${resolvedFontFamily}" font-size="${actualTextPx}" fill="${textColor}" fill-opacity="0.5" font-weight="500">${escapeXml(seg)}</text>`,
+          `<text x="${cursorX.toFixed(1)}" y="${baselineY}" font-family="${resolvedFontFamily}" font-size="${actualTextPx}" fill="${textColor}" fill-opacity="0.9" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-opacity="0.65" paint-order="stroke fill" font-weight="500">${escapeXml(seg)}</text>`,
         );
       }
       cursorX += seg.length * (actualTextPx * 0.55);
@@ -263,7 +284,7 @@ async function renderWatermarkOverlay(outPath, branding, opts) {
   // Wordmark fallback (se non ci sono nomi): testo piccolo in basso a destra
   if (!hasNames && branding.wordmark) {
     svgParts.push(
-      `<text x="${width - SIDE_PADDING}" y="${baselineY}" font-family="Inter, sans-serif" font-size="${Math.round(actualTextPx * 0.6)}" fill="${textColor}" fill-opacity="0.5" text-anchor="end">${escapeXml(branding.wordmark)}</text>`,
+      `<text x="${width - SIDE_PADDING}" y="${baselineY}" font-family="Inter, sans-serif" font-size="${Math.round(actualTextPx * 0.6)}" fill="${textColor}" fill-opacity="0.9" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-opacity="0.65" paint-order="stroke fill" text-anchor="end">${escapeXml(branding.wordmark)}</text>`,
     );
   }
 
