@@ -1,5 +1,44 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 11/09/2026 — Watermark video invisibile su fondo chiaro (fix contrasto) + coda bloccata da Drive revoked (fix pubblicazione non bloccante)
+
+### Contesto
+Due problemi segnalati dall'utente durante il test: (1) il watermark video "spariva" sui video reali; (2) le foto/video caricati non venivano elaborati — "il sistema doveva essere solido ma non bastava per 29 upload, immagina 200 matrimoni × 200 invitati".
+
+### Fatto
+
+**1. Root cause watermark video invisibile** (`packages/video-overlay/src/index.ts` + VPS `vps-scripts/overlay.js`, commit `f439aba`)
+- Il testo era bianco a `fill-opacity 0.5`; `probeLuminance` campiona SOLO il primo frame (fade-in/scuro → sceglie bianco) ma la scena reale ha la striscia bassa ~96% chiara (mean 199, bright 94.8%) → **testo bianco su fondo bianco = invisibile**.
+- Fix: contorno di colore OPPOSTO (`stroke` con `paint-order="stroke fill"`, `strokeWidth = max(1, textPx*0.1)`), opacità 0.5→0.9, helper `isHexLight`. Verificato sul VPS: su sfondo bianco il testo ora produce ~6% di pixel scuri (bordo) → visibile (prima 0%).
+
+**2. Root cause coda bloccata = token Drive `revoked`** (commit `51dc3ce`)
+- Entrambi gli eventi test (Elisa `2f6ee6de`, Agostino `ee2cc954`) avevano `event_drive_tokens.status='revoked'` (Elisa 11/09, Agostino 2/09).
+- Il guard della rifondazione 14/08 faceva: `if (token && token.status==='revoked')` → rilasciava il claim e ritornava `{processed:0}` → l'INTERO evento non veniva processato (niente watermark, niente R2, niente galleria). Da qui `itemsProcessed=0` nei log maintenance e coda che cresce indefinitamente.
+- Fix: token `revoked` → `token = undefined` invece del `return` → `hasDrive=false` → **l'item viene watermarkato e pubblicato in galleria (R2) comunque; si salta solo il backup Drive**. Riconnettendo Drive da `/events/{id}/drive` il backup riprende.
+- Il media record + upload R2 (gallery) avvengono PRIMA del sync Drive in `processSingleItem`, quindi Drive è correttamente "best-effort opzionale", non gate.
+- Verificato live: maintenance `itemsProcessed` 0 → 9-10 per run; Elisa drenata (18→7 tail, 1 senza `r2_key` non recuperabile), Agostino in discesa (92→72 e continua).
+
+### Stato allocco coda (11/09)
+- `upload_queue`: Elisa ~7 pending residui (1 senza r2_key = orfano, non recuperabile), Agostino ~72 pending che si drenano via sweep (ITEMS_PER_EVENT=5, MAINTENANCE maxDuration 300s, cron 2-3x/giorno su Vercel Hobby).
+- N.B. throughput limitato: a 5 item/evento/run, i 72 di Agostino servono ~15 run se non si alza `ITEMS_PER_EVENT`.
+
+### Verifica
+- Typecheck pulito `tsc --noEmit -p apps/web/tsconfig.json`.
+- Test 13/13 video-overlay + process-queue solidità/dlq/refresh token passanti.
+
+### Commit
+- `f439aba` fix(video): watermark testo invisibile su fondo chiaro — contorno di contrasto + opacità 0.9
+- `51dc3ce` fix(queue): Drive token revoked NON blocca più la pubblicazione (solo backup Drive saltato); sblocca backlog Agostino/Elisa
+
+### TODO prossima sessione (dal punto 1)
+1. **Ri-watermarkare i video Elisa & Nausica** con la fix di contrasto (25 video marcati `watermark_missing=true`, in attesa di re-repair con `/api/r2/repair-watermark`). Serve perché R2 ha ancora il watermark vecchio (testo bianco invisibile).
+2. **Raggiungere il backlog Agostino** (72 pending): trigger sweep o alzare `ITEMS_PER_EVENT` (valutare timeout 300s con i video).
+3. **Riconnettere Drive** dei 2 eventi (istruzioni all'utente) per ripristinare il backup.
+4. **Verifica visiva** galleria: foto/video watermarkati col nuovo stile/contrasto.
+5. **Outstanding**: fallback locale video `ffmpeg-static ENOENT` su Vercel (latente, se VPS giù); `client_max_body_size 256m` + `proxy_read_timeout 300s` già a posto su nginx VPS.
+
+---
+
 ## Sessione 05/09/2026 — Allineamento stile watermark video a foto (no banda, logo, cuore, colore adattivo)
 
 ### Contesto
