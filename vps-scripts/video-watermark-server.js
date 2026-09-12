@@ -220,13 +220,20 @@ async function handleWatermark(req, res) {
  *   - Logo partner: top-left, overlay=24:24
  */
 function buildFilterComplex(hasBrand, hasPartner) {
-  let filter = '[0:v]scale=1080:-2[base];[base][1:v]overlay=0:main_h-overlay_h[wm]';
-  if (hasBrand) {
-    filter += `;[wm][2:v]overlay=main_w-overlay_w-24:24`;
-  }
+  // FIX 12/09/2026: ogni overlay intermedio deve avere UN LABEL; solo l'ULTIMO
+  // overlay della catena termina SENZA label così ffmpeg lo auto-mappa al file
+  // di output. Prima: senza logo (no brand/no partner) la catena terminava con
+  // "[wm]" mai consumato -> "Filter overlay has an unconnected output".
+  let filter = '[0:v]scale=1080:-2[base];[base][1:v]overlay=0:main_h-overlay_h';
+  if (hasBrand || hasPartner) filter += '[wm]';
+  if (hasBrand) filter += ';[wm][2:v]overlay=main_w-overlay_w-24:24[wb]';
   if (hasPartner) {
     const idx = hasBrand ? 3 : 2;
-    filter += `;[wm${hasBrand ? '' : ''}][${idx}:v]overlay=24:24`;
+    const src = hasBrand ? 'wb' : 'wm';
+    filter += `;[${src}][${idx}:v]overlay=24:24`;
+  } else if (hasBrand) {
+    // brand è l'ultimo: togli il label [wb] residuo -> auto-map finale
+    filter = filter.replace('[wb]', '');
   }
   return filter;
 }

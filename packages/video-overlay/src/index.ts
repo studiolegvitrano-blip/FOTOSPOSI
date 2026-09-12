@@ -369,15 +369,21 @@ export async function applyVideoOverlay(
  * Input 2 (opzionale) = logo brand. Input 3 (opzionale) = logo partner.
  * Striscia testo in basso, brand alto-dx, partner alto-sx.
  */
-function buildFilterComplex(hasBrand: boolean, hasPartner: boolean): string {
-  let filter = `[0:v]scale=720:-2[base];[base][1:v]overlay=0:main_h-overlay_h[wm]`;
-  if (hasBrand) {
-    filter += `;[wm][2:v]overlay=main_w-overlay_w-24:24[wm2]`;
-  }
+export function buildFilterComplex(hasBrand: boolean, hasPartner: boolean): string {
+  // FIX 12/09/2026: solo l'ULTIMO overlay della catena termina SENZA label così
+  // ffmpeg auto-mappa l'output al file; gli overlay intermedi hanno un label per
+  // concatenare. Prima: senza logo (no brand/no partner) o con solo brand, la
+  // catena terminava con un label mai consumato -> "overlay has an unconnected
+  // output" (opaco). Stessa logica del VPS video-watermark-server.js.
+  let filter = `[0:v]scale=720:-2[base];[base][1:v]overlay=0:main_h-overlay_h`;
+  if (hasBrand || hasPartner) filter += `[wm]`;
+  if (hasBrand) filter += `;[wm][2:v]overlay=main_w-overlay_w-24:24[wb]`;
   if (hasPartner) {
     const idx = hasBrand ? 3 : 2;
-    const src = hasBrand ? 'wm2' : 'wm';
+    const src = hasBrand ? 'wb' : 'wm';
     filter += `;[${src}][${idx}:v]overlay=24:24`;
+  } else if (hasBrand) {
+    filter = filter.replace('[wb]', '');
   }
   return filter;
 }

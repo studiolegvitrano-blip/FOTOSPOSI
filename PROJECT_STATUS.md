@@ -1,5 +1,52 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 12/09/2026 — Ri-watermark 28 video Elisa & Nausica con fix contrasto + fix latente buildFilterComplex (overlay unconnected)
+
+### Contesto
+Esecuzione del Punto 1 della sessione 11/09: ri-applicare il watermark ai video dell'evento `2f6ee6de-53bc-4857-8add-75aac538469f` (Elisa & Nausica) con la fix di contrasto (commit `f439aba`), che il cron maintenance NON fa (repair manuale via `POST /api/r2/repair-watermark`).
+
+### Fatto
+
+**1. Repair via route HTTP: 23 video riparati (10→23 ok)**
+- Stato iniziale query DB: 28 video totali, 21 con `watermark_missing=true`.
+- `POST /api/r2/repair-watermark` con `{eventId, limit:50}` + header `x-cron-secret`. Ogni run processa ~4-6 video prima del `maxDuration=300s` della lambda (il VPS lavora in async e scrive su R2, poi il template lambda muore → la risposta HTTP diventa 504 ma il lavoro PID completa). Rilanciato 6 volte.
+- Risultato: 23 ok. RIMASTI 5 video con `watermark_missing=true`: i più RECENTI, con encode VPS di **298-557s** (durata reale 1-2min ma bitrate alto, source 720p/60fps). Superano sia il `timeoutMs:250_000` del repair-client sia il `maxDuration=300s` della lambda → non completeranno MAI via route HTTP.
+
+**2. Repair dei 5 video lunghi via runner locale (no cap orchestratore)**
+- Script ESM locale (`apps/web/repair-5.mjs`, creato e poi rimosso) che interroga la DB via service role, replica `composeWatermarkLine1` (coupleNames = `"Elisa & Nausica Sposi Palermo 07/09/2026"`), genera presigned download/upload, POSTa al VPS `https://watermark.sposi.live/watermark` (NON c'è il limite 300s), scarica il `.wm.mp4`, lo scrive sulla `r2_key` principale e imposta `watermark_missing=false`.
+- Di questi, 4 completati in un run (~153-283s encode VPS l'uno). Il 5° (`1789120574394`, encode>300s) ricevè `HTTP 504` da nginx (`proxy_read_timeout 300s` della demo Vercel locale) MA il VPS aveva comunque COMPLETATO e caricato il `.wm.mp4` su R2 (47MB, presigned valido 3600s) → spostato alla `r2_key` principale + `watermark_missing=false`. Nessuna re-encode persa.
+
+**3. ROOT CAUSE emersa: bug latente `buildFilterComplex` — "Filter overlay has an unconnected output"** (fix in questo commit)
+- I 5 video fallivano via script con `ffmpeg: Filter overlay has an unconnected output`. Causa: la funzione (locale `packages/video-overlay/src/index.ts` + VPS `vps-scripts/video-watermark-server.js`) lasciava l'ULTIMO overlay con un output LABEL non consumato:
+  - Nessun logo (no brand/no partner): la catena terminava con `...[wm]`, label mai consumato → errore ffmpeg.
+  - Solo brand: terminava con `[wm2]` (versione locale) o `[wm]` replicato (VPS).
+- Questo NON era mai emerso prima perché nel flusso normale il logo brand (fotosposi) è sempre presente → l'ultimo overlay era SENZA label → ffmpeg auto-mappa l'output al file. Il mio runner senza logo l'ha esposto.
+- Fix (identico su entrambi i file): solo gli overlay INTERMEDI hanno un label per concatenare; l'ULTIMO termina senza label. Casi coperti: nessun logo / solo brand / solo partner / brand+partner.
+- Sono stati usati input label coerenti 0=video, 1=strip testo, 2=brand, 3=partner.
+
+**4. VPS ri-deployata + test**
+- `scp vps-scripts/video-watermark-server.js` + `sudo systemctl restart fotosposi-watermark` → `active`. Verificata la fix su VPS con i 4 video lunghi (ora OK senza logo).
+- Test regressione locale `packages/video-overlay/src/filter-complex.test.ts` (nuovo, 5 test): verifica che nessun caso produca un label orfano finale e che la stringa filter sia corretta per i 4 scenari.
+- Typecheck pulito `tsc --noEmit -p apps/web/tsconfig.json`. Test: video-overlay 18/18 (3 file), process-queue-solidity 3/3.
+
+### Verifica finale
+- `SELECT count(*) FILTER (WHERE watermark_missing=false) FROM media_uploads WHERE event_id='2f6ee6de-...+75aac538469f' AND type='video'` → **28/28** (prima 10/28, RESTANO 0).
+- Verifica visiva programmatica su `1789120574394_1000187830.mp4` (il più lungo): estratto frame a 10s → striscia bassa (13% altezza) 27.1% pixel <90 vs 19.8% sul frame intero → bordo di contrasto del testo VISIBILE (la fix `f439aba` era già sul VPS dal 11/09 e il VPS registrava `textColor=#ffffff` white su luma adattivo).
+
+### Nota operativa per il futuro
+- I video lunghi (encode VPS >~250-300s) NON sono riparabili via route HTTP: il repair route e il cron maintenance hanno `maxDuration=300s` e il repair-client un `timeoutMs:250_000`. Per questi serve un runner locale/VPS direct (o alzare `maxDuration` — ma Vercel Hobby ha cap 300s per funzione). Da tenere conto anche per i 72 pending di Agostino (`ee2cc954`): eventuali video lunghi andranno gestiti fuori lambda.
+
+### Commit
+- `fix(video): buildFilterComplex overlay label orfano — "Filter overlay has an unconnected output" senza logo (+ test regressione)`: tocca `packages/video-overlay/src/index.ts`, `vps-scripts/video-watermark-server.js`, nuovo test. VPS ri-deployata.
+
+### TODO post-push
+1. **Drenare backlog Agostino** (72 pending): `POST /api/cron/maintenance` con `Authorization: Bearer <CRON_SECRET>` è sicuro, oppure alzare `ITEMS_PER_EVENT` in `maintenance-sweep.ts` (5→20-25, attento timeout col video lunghi — valutare runner locale per essi).
+2. **Riconnettere Drive** dei 2 eventi (istruzioni via `/events/{id}/drive`) per ripristinare il backup (in sospeso dalla fix `51dc3ce`).
+3. Verifica visiva galleria dei 28 video con il nuovo watermark (contrasto bordo + logo).
+4. Outstanding latente: fallback locale video `ffmpeg-static ENOENT` su Vercel se VPS giù. TODO `outputFileTracingIncludes` per ffmpeg-static o disabilitare fallback sul repair.
+
+---
+
 ## Sessione 11/09/2026 — Watermark video invisibile su fondo chiaro (fix contrasto) + coda bloccata da Drive revoked (fix pubblicazione non bloccante)
 
 ### Contesto
