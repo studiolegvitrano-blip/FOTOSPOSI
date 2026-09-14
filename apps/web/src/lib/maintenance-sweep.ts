@@ -10,7 +10,7 @@ import { processQueueForEvent } from '@/lib/process-queue';
 // Caps keep a single cron run inside Vercel's function time budget even with many
 // simultaneous events (e.g. 500 weddings on the same Saturday).
 const MAX_EVENTS_PER_RUN = 40;
-const ITEMS_PER_EVENT = 5;
+const ITEMS_PER_EVENT = 20;
 const STUCK_PROCESSING_MINUTES = 30;
 
 export interface MaintenanceSweepResult {

@@ -1,5 +1,28 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 14/09/2026 — Drenaggio backlog Agostino (72→34→0) + ITEMS_PER_EVENT 5→20 + chiave Nebula senza credito
+
+### Fatto
+
+**1. Drenaggio backlog Agostino (COMPITO 1)**
+- Stato iniziale: 39 pending (non 72 — i cron avevano già drenato), **0 video tra i pending** (tutte foto) → alzare `ITEMS_PER_EVENT` sicuro.
+- Run di verifica manuale con il codice deployato (`GET /api/cron/maintenance` + `Bearer CRON_SECRET` — la route è **GET-only**, POST risponde 405): `itemsProcessed=10` (5×2 eventi), 0 errori, Agostino 39→34.
+- **`ITEMS_PER_EVENT` alzato 5→20** in `apps/web/src/lib/maintenance-sweep.ts`: motivazione = backlog 100% foto corte (0 video), il cron Hobby a 5 item/evento/run richiedeva ~7-15 run; a 20 bastano 1-2 run. Cap `maxDuration=300s` della lambda rimane il limite reale: se la run muore a metà, gli item restano `processing` e vengono recuperati dal prossimo run (recovery stuck processing ≥30min, già in `runMaintenanceSweep`).
+- NOTA route: `POST /api/cron/maintenance` NON funziona (405, solo `GET` esportato). Il trigger manuale corretto è `GET /api/cron/maintenance` con `Authorization: Bearer <CRON_SECRET>`.
+
+**2. Chiave "Nebula AI" (`api.b.ai`) — valida ma SENZA credito (non integrata)**
+- Chiave fornita dall'utente (`sk-blyf...`): autenticazione OK (`GET /v1/models` risponde il catalogo), ma OGNI chiamata chat/completions → **403 `access_denied: Deposit required to unlock premium models`**, anche su modelli entry-level (`gemini-3-flash`).
+- **`gpt-5.2` (modello richiesto dall'esempio curl) NON esiste nel catalogo**. Modelli disponibili: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.5`, `gpt-5.6-sol`, `gpt-5.6-terra`, `claude-opus-4.5/4.6/4.7/4.8`, `claude-sonnet-4.5/4.6/5`, `claude-haiku-4.5`, `gemini-3-flash`, `gemini-3.1-pro`, `gemini-3.5-flash`.
+- **NON salvata in `.env.local`, NON integrata nel codice**: inutilizzabile finché l'utente non fa il deposito richiesto dalla piattaforma. Se dopo il deposito si vuole integrare: aggiungere `NEBULA_API_KEY` (+ base URL `https://api.b.ai/v1`) in `.env.local` e valutare come provider alternativo/fallback nel modulo che usa l'AI.
+
+**3. Stato coda a fine sessione**
+- Agostino: drenato fino a 34 pending col run di verifica; drain finale col nuovo limite 20/evento (post-deploy).
+- Elisa: 7 pending (incl. 1 orfano senza `r2_key`, non recuperabile) + 5 failed in backoff — il maintenance li drena man mano.
+- Verificato che il drain NON tocca le foto già processate (solo item in coda).
+
+### Commit
+- `chore(queue): ITEMS_PER_EVENT 5→20 nel maintenance sweep (backlog foto drenato più velocemente, run di verifica 10/10 ok prima del push)`
+
 ## Sessione 12/09/2026 — Ri-watermark 28 video Elisa & Nausica con fix contrasto + fix latente buildFilterComplex (overlay unconnected)
 
 ### Contesto
