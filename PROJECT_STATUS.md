@@ -1,5 +1,25 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 15/09/2026 — ROOT CAUSE "31 foto → 5 in galleria": loop upload client abortiva al primo errore di rete + rate limit per-IP
+
+### Sintomo
+Utente carica 31 foto → solo 5 in galleria; retry con 13 → solo 3. Il resto "perso". DB: solo 9 righe mai create (8 synced + 1 senza r2_key in DLQ) → **35 file su 44 non sono MAI arrivati nè in coda nè su R2**: persi lato CLIENT durante l'upload, non nel processing.
+
+### Root cause (2 difetti in `apps/web/src/app/events/[id]/upload/page.tsx` + 1 in `/api/queue`)
+1. **`await fetch` NON protetti nel loop per-file** (presign `/api/r2/upload`, PUT R2, enqueue): un singolo errore di rete (blip WiFi, timeout) lanciava un'eccezione NON catturata → **l'intero batch moriva in silenzio**. Il file in corso era già in coda senza r2_key (finiva in DLQ `invalid_image`), i successivi non venivano mai inviati. Combacia col sintomo: batch1 5 file ok → 6° presign lancia → 26 persi; batch2 3 ok → stesso abort → 9 persi.
+2. **2 chiamate queue-api per file** (enqueue PRIMA dell'upload + mark DOPO) → il doppio del consumo del budget rate-limit, e le righe nascevano senza r2_key (upload fallito = riga orfana in DLQ).
+3. **Rate limit PER-IP su `/api/queue`** (60/min condivisi): con gli invitati sul WiFi della location (stesso IP NAT) TUTTI condividono lo stesso budget → 429 di massa. `/api/r2/upload` era già per-utente (fix 26/07), `/api/queue` no.
+
+### Fix (commit di questa sessione)
+- **Loop per-file interamente in try/catch**: un errore su un file lo conta `failedFiles` e CONTINUA il batch (riepilogo finale con alert "N file non caricati, ricarica i mancanti"). Mai più batch morti in silenzio.
+- **Flusso riordinato: presign → PUT R2 → enqueue UNA SOLA volta con `r2_key` già valorizzata**. La riga in coda nasce SOLO se il file è davvero su R2 → niente righe senza r2_key, metà delle chiamate queue-api (1/file invece di 2), le azioni `mark`/`retry` restano per retrocompatibilità ma non sono più usate.
+- **`/api/queue`: rate limit PER-UTENTE** (`queue-api:user:<id>`, 120/min) e azione `state` (sola lettura, polling 5s) FUORI dal budget. Chiamata `enqueue` accetta `r2Key` opzionale.
+- Typecheck OK, test 67/67 (media + process-queue-solidity).
+
+### Nota operativa
+- I 35 file persi NON sono recuperabili (mai arrivati su R2): l'utente deve ricaricarli. Con il fix, ogni file fallito viene contato e segnalato, e il batch prosegue.
+- La DLQ di oggi ha 1 riga (`1000189082.jpg`, r2_key NULL) — irrecuperabile per costruzione, col nuovo flusso questo path sparisce.
+
 ## Sessione 14/09/2026 — Backlog drenato a 0 (foto+video) + VPS video async (niente più limite 300s) + fix fallback ffmpeg Vercel + modulo SEO/blog + fix Groq modello ritirato
 
 ### Fatto

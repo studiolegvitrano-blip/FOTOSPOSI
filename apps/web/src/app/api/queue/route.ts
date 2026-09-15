@@ -17,15 +17,6 @@ import { createServerSideClient, createServiceClient, rateLimit } from '@fotospo
  * autenticato. Azioni: enqueue, mark (r2_key dopo upload R2), fail, state (coda+stats).
  */
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for') || 'unknown';
-  const rl = rateLimit(`queue-api:${ip}`, 60, 60000);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: 'Troppe richieste. Riprova tra qualche secondo.' },
-      { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetIn / 1000)) } },
-    );
-  }
-
   try {
     const cookieStore = await cookies();
     const authClient = createServerSideClient(() => cookieStore.getAll());
@@ -36,10 +27,26 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { action } = body as { action: string };
+
+    // HARDENING 15/09/2026 (bug "1 su 31 … poi solo 5"): il vecchio rate limit
+    // era PER-IP (`queue-api:<ip>`, 60/min): con gli invitati sul WiFi della
+    // location (stesso IP NAT) TUTTI condividono lo stesso budget → 429 di massa
+    // e batch di upload persi a metà. Ora: chiave PER-UTENTE (120/min) e l'azione
+    // 'state' (sola lettura, polling ogni 5s dal client) è FUORI dal budget.
+    if (action !== 'state') {
+      const rl = rateLimit(`queue-api:user:${user.id}`, 120, 60000);
+      if (!rl.allowed) {
+        return NextResponse.json(
+          { error: 'Troppe richieste. Riprova tra qualche secondo.' },
+          { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetIn / 1000)) } },
+        );
+      }
+    }
+
     const svc = createServiceClient();
 
     if (action === 'enqueue') {
-      const { eventId, fileName, fileType, fileSize, compressed } = body;
+      const { eventId, fileName, fileType, fileSize, compressed, r2Key } = body;
       if (!eventId || !fileName) {
         return NextResponse.json({ error: 'eventId e fileName richiesti' }, { status: 400 });
       }
@@ -66,6 +73,11 @@ export async function POST(request: NextRequest) {
           file_size: fileSize || 0,
           status: 'pending',
           compressed: compressed ?? false,
+          // HARDENING 15/09/2026: il client ora chiama enqueue UNA sola volta per
+          // file, DOPO l'upload R2 riuscito, passando r2Key: la riga nasce già
+          // valorizzata → niente più righe senza r2_key (finivano in DLQ come
+          // 'invalid_image') e niente seconda chiamata 'mark' per file.
+          r2_key: typeof r2Key === 'string' && r2Key ? r2Key : null,
         })
         .select('id')
         .single();

@@ -197,77 +197,87 @@ const startPolling = () => {
     setPhase('queueing');
     setQueueProgress({ current: 0, total: allowed.length });
     let queued = 0;
+    let failedFiles = 0;
 
     for (let i = 0; i < allowed.length; i++) {
       const file = allowed[i]!;
       setQueueProgress({ current: i + 1, total: allowed.length });
 
-      let uploadFile: Blob | File = file;
-      let compressed = false;
+      // HARDENING 15/09/2026 (bug "1 su 31 … poi solo 5"): un singolo errore di
+      // rete nel loop (compress, presign, PUT R2, enqueue) NON deve MAI abortire
+      // l'intero batch in silenzio. Ogni file è indipendente: errore → contato e
+      // si continua con il prossimo (riepilogo finale all'utente).
+      try {
+        let uploadFile: Blob | File = file;
+        let compressed = false;
 
-      if (file.type.startsWith('image/')) {
-        // Compressione foto automatica:
-        //   - tier Free → SEMPRE comprime a 1200px (limite di piano: SD quality)
-        //   - tier Premium/Deluxe → comprime SOLO se >2MB a 1920px (risparmio banda
-        //     venue WiFi senza sacrificare qualità originale del salvataggio finale:
-        //     il watermark in process-queue.ts è già applicato su copia compressa,
-        //     ma il file originale resta in Drive backup se l'utente ha connesso Drive)
-        if (isFree) {
-          try { uploadFile = await compressImage(file, 1200); compressed = true; } catch { }
-        } else if (file.size > 2 * 1024 * 1024) {
-          // Soglia 2MB: foto moderne iPhone/Android sono 4-8MB, riduciamo a 1920px
-          // lato lungo (~500KB-1MB finali, qualità visiva praticamente identica
-          // per display web e social).
-          try { uploadFile = await compressImage(file, 1920); compressed = true; } catch { }
+        if (file.type.startsWith('image/')) {
+          // Compressione foto automatica:
+          //   - tier Free → SEMPRE comprime a 1200px (limite di piano: SD quality)
+          //   - tier Premium/Deluxe → comprime SOLO se >2MB a 1920px (risparmio banda
+          //     venue WiFi senza sacrificare qualità originale del salvataggio finale:
+          //     il watermark in process-queue.ts è già applicato su copia compressa,
+          //     ma il file originale resta in Drive backup se l'utente ha connesso Drive)
+          if (isFree) {
+            try { uploadFile = await compressImage(file, 1200); compressed = true; } catch { }
+          } else if (file.size > 2 * 1024 * 1024) {
+            // Soglia 2MB: foto moderne iPhone/Android sono 4-8MB, riduciamo a 1920px
+            // lato lungo (~500KB-1MB finali, qualità visiva praticamente identica
+            // per display web e social).
+            try { uploadFile = await compressImage(file, 1920); compressed = true; } catch { }
+          }
         }
-      }
 
-      const enq = await queueApi({
-        action: 'enqueue',
-        eventId,
-        fileName: file.name,
-        fileType: file.type || 'application/octet-stream',
-        fileSize: uploadFile.size,
-        compressed,
-      });
-      const id: string | undefined = enq?.id;
-      // Prima un errore qui veniva ignorato in silenzio (`continue`): l'utente vedeva la
-      // barra di caricamento ma il file spariva nel nulla, senza traccia in coda né in galleria.
-      if (!id) { alert(`"${file.name}" non accodato: ${enq?.error || 'errore sconosciuto'}`); continue; }
+        const prefix = `events/${eventId}`; // fallback prefix lato server resta compatibile (vedi route)
+        const r2Resp = await fetch('/api/r2/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, contentType: file.type, prefix, eventId, fileSize: uploadFile.size }),
+        });
+        const r2Data = await r2Resp.json();
+        if (!r2Resp.ok || !r2Data.presignedUrl) {
+          failedFiles++;
+          continue;
+        }
 
-      const prefix = `events/${eventId}`; // fallback prefix lato server resta compatibile (vedi route)
-      const r2Resp = await fetch('/api/r2/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, contentType: file.type, prefix, eventId }),
-      });
-      const r2Data = await r2Resp.json();
-      if (!r2Resp.ok || !r2Data.presignedUrl) {
-        // Errore temporaneo (rate limit 429, network, R2 transient) → 'retry', non 'fail':
-        // il client non deve marcare un item permanentemente failed quando il problema è
-        // solo di rete o di rate-limit (vedi stress test 26/07: 8 foto finite in failed
-        // con r2_key NULL che il cron avrebbe potuto recuperare se non filtrate a monte).
-        await queueApi({ action: 'retry', id, error: r2Data.error || 'Presigned URL fallita' });
-        continue;
-      }
+        const uploadResp = await fetch(r2Data.presignedUrl, {
+          method: 'PUT',
+          body: uploadFile,
+          headers: { 'Content-Type': file.type },
+        });
+        if (!uploadResp.ok) {
+          failedFiles++;
+          continue;
+        }
 
-      const uploadResp = await fetch(r2Data.presignedUrl, {
-        method: 'PUT',
-        body: uploadFile,
-        headers: { 'Content-Type': file.type },
-      });
-      if (!uploadResp.ok) {
-        await queueApi({ action: 'retry', id, error: `Upload R2 PUT ${uploadResp.status}` });
-        continue;
+        // UNA SOLA chiamata coda per file, DOPO l'upload riuscito (prima: enqueue
+        // + mark = 2 chiamate/file, con un fetch non protetto che abortiva l'intero
+        // batch al primo errore di rete). La riga nasce già con r2_key.
+        const enq = await queueApi({
+          action: 'enqueue',
+          eventId,
+          fileName: file.name,
+          fileType: file.type || 'application/octet-stream',
+          fileSize: uploadFile.size,
+          compressed,
+          r2Key: r2Data.key,
+        });
+        const id: string | undefined = enq?.id;
+        if (!id) { failedFiles++; continue; }
+
+        queued++;
+        setQueue(prev => [...prev, {
+          id, event_id: eventId, uploaded_by: user.id,
+          file_name: file.name, file_type: file.type, file_size: uploadFile.size,
+          status: 'pending' as const, storage_path: null, compressed_path: null, drive_file_id: null,
+          error: null, retry_count: 0, compressed, created_at: new Date().toISOString(), processed_at: null, r2_key: r2Data.key,
+        } as QueueItem]);
+      } catch {
+        failedFiles++;
       }
-      await queueApi({ action: 'mark', id, r2Key: r2Data.key });
-      queued++;
-      setQueue(prev => [...prev, {
-        id, event_id: eventId, uploaded_by: user.id,
-        file_name: file.name, file_type: file.type, file_size: uploadFile.size,
-        status: 'pending' as const, storage_path: null, compressed_path: null, drive_file_id: null,
-        error: null, retry_count: 0, compressed, created_at: new Date().toISOString(), processed_at: null, r2_key: r2Data.key,
-      } as QueueItem]);
+    }
+    if (failedFiles > 0) {
+      alert(`${failedFiles} file su ${allowed.length} non sono stati caricati (rete o formato non supportato). Ricarica i file mancanti.`);
     }
     setStats(prev => ({ ...prev, pending: prev.pending + queued }));
     setPhase('processing');
