@@ -3,7 +3,7 @@ import { createMediaRecord, getDriveToken, getEventDriveFolders, updateDriveSync
 import { classifyError, FAILURE_CLASS_R2_DOWNLOAD, FAILURE_CLASS_DRIVE, FAILURE_CLASS_DETECT, FAILURE_CLASS_INVALID } from '@fotosposi/media';
 import type { EventDriveToken } from '@fotosposi/media';
 import { getPresignedDownloadUrl, getPresignedUploadUrl } from '@fotosposi/r2-storage';
-import { applyVideoOverlay, applyVideoOverlayRemote, brandingToRemote, isVpsWatermarkConfigured } from '@fotosposi/video-overlay';
+import { applyVideoOverlay, applyVideoOverlayRemote, applyVideoOverlayRemoteAsync, brandingToRemote, isVpsWatermarkConfigured } from '@fotosposi/video-overlay';
 import { applyOverlay, detectWatermark, type WatermarkPresence } from '@fotosposi/photo-overlay';
 import sharp from 'sharp';
 import { watermarkFontFamily } from '@/lib/watermark-fonts';
@@ -556,7 +556,7 @@ async function processSingleItem(
         .maybeSingle();
       if (existingMedia && existingMedia.drive_file_id) {
         console.log(`[process-queue] auto-cleanup item ${item.id} (event=${eventId}, file=${item.file_name}): già in media_uploads + Drive (media_id=${existingMedia.id})`);
-        await supabase.from('upload_queue').update({ status: 'synced', processed_at: new Date().toISOString(), drive_file_id: existingMedia.drive_file_id, error: null }).eq('id', item.id);
+        await supabase.from('upload_queue').update({ status: 'synced', processed_at: new Date().toISOString(), drive_file_id: existingMedia.drive_file_id, error: null, video_job_id: null }).eq('id', item.id);
         return true;
       }
     } catch (_autoCleanupErr) {
@@ -639,12 +639,18 @@ async function processSingleItem(
             const wmFilename = baseName.replace(/\.mp4$/i, '') + '.wm.mp4';
             const ul = await getPresignedUploadUrl(prefix, wmFilename, 'video/mp4');
             if (ul.success && ul.presignedUrl) {
-              const remoteResp = await applyVideoOverlayRemote({
-                downloadUrl,
-                uploadUrl: ul.presignedUrl,
-                branding: brandingToRemote(brandingConfig),
-              });
-              if (remoteResp.ok) {
+              // MODALITA' ASYNC (14/09/2026): submit → poll con budget. Se il
+              // budget (VIDEO_POLL_BUDGET_MS, default 150s) finisce prima del
+              // completamento, l'item torna 'pending' conservando video_job_id:
+              // la run successiva riprende il polling SENZA ri-encodare (il VPS
+              // continua in background). Risolve il caso video lunghi >300s che
+              // sforava sempre maxDuration lambda / proxy nginx (504).
+              const resumeJobId = typeof item.video_job_id === 'string' && item.video_job_id ? item.video_job_id : undefined;
+              const asyncResp = await applyVideoOverlayRemoteAsync(
+                { downloadUrl, uploadUrl: ul.presignedUrl, branding: brandingToRemote(brandingConfig) },
+                { resumeJobId, pollBudgetMs: Number(process.env.VIDEO_POLL_BUDGET_MS) || 150_000 },
+              );
+              if (asyncResp.ok) {
                 const wmDownloadUrl = await getPresignedDownloadUrl(ul.key, 60);
                 if (wmDownloadUrl) {
                   const wmResp = await fetch(wmDownloadUrl);
@@ -654,8 +660,21 @@ async function processSingleItem(
                     vpsDone = true;
                   }
                 }
+              } else if (asyncResp.inProgress && asyncResp.jobId) {
+                await supabase.from('upload_queue').update({
+                  status: 'pending',
+                  video_job_id: asyncResp.jobId,
+                  next_retry_at: new Date(Date.now() + 45_000).toISOString(),
+                  error: null,
+                }).eq('id', item.id);
+                console.log(`[process-queue] video_job ${asyncResp.jobId} in corso oltre il budget — item ${item.id} requeued (riprendera' senza re-encode)`);
+                return false;
               } else {
-                console.warn('[process-queue] VPS watermark failed:', remoteResp.error, '- fallback locale');
+                console.warn('[process-queue] VPS watermark async failed:', asyncResp.error, '- fallback locale');
+                // Job fallito/perso: pulisci il jobId cosi' il prossimo tentativo riparte pulito.
+                if (item.video_job_id) {
+                  await supabase.from('upload_queue').update({ video_job_id: null }).eq('id', item.id);
+                }
               }
             }
           }
@@ -838,7 +857,7 @@ async function processSingleItem(
           if (watermarkMissing) {
             await markItemFailed(supabase, item, { eventId, failureClass: FAILURE_CLASS_DETECT, errorMessage: 'Watermark non applicato (rilevato da detectWatermark)' });
           } else {
-            await supabase.from('upload_queue').update({ status: 'synced', drive_file_id: driveData.id, processed_at: new Date().toISOString() }).eq('id', item.id);
+            await supabase.from('upload_queue').update({ status: 'synced', drive_file_id: driveData.id, processed_at: new Date().toISOString(), video_job_id: null }).eq('id', item.id);
           }
         } else {
           await updateDriveSyncStatus(media.id, 'failed');
@@ -858,7 +877,7 @@ async function processSingleItem(
         const msg = 'Watermark non applicato (rilevato da detectWatermark)';
         await markItemFailed(supabase, item, { eventId, failureClass: FAILURE_CLASS_DETECT, errorMessage: msg });
       } else {
-        await supabase.from('upload_queue').update({ status: 'synced', processed_at: new Date().toISOString() }).eq('id', item.id);
+        await supabase.from('upload_queue').update({ status: 'synced', processed_at: new Date().toISOString(), video_job_id: null }).eq('id', item.id);
       }
     }
     return true;

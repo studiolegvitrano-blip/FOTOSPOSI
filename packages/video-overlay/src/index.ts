@@ -22,8 +22,8 @@ export interface VideoOverlayBranding {
   partnerLogoPng?: Buffer;
 }
 
-export { applyVideoOverlayRemote, isVpsWatermarkConfigured, VpsNotConfiguredError } from './remote';
-export type { RemoteWatermarkRequest, RemoteWatermarkResponse } from './remote';
+export { applyVideoOverlayRemote, applyVideoOverlayRemoteAsync, submitVideoWatermarkJob, getVideoWatermarkJobStatus, isVpsWatermarkConfigured, VpsNotConfiguredError } from './remote';
+export type { RemoteWatermarkRequest, RemoteWatermarkResponse, VideoJobStatus, VideoJobSubmitResponse, VideoJobStatusResponse, AsyncWatermarkResult } from './remote';
 
 export interface VideoOverlayOptions {
   branding: VideoOverlayBranding;

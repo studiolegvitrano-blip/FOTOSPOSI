@@ -155,3 +155,145 @@ export async function applyVideoOverlayRemote(
 export function resetVpsWatermarkForTests(): void {
   // niente stato in modulo da pulire: env lette per-request via getEnv.
 }
+
+// ─── MODALITA' ASYNC (14/09/2026) ────────────────────────────────────────────
+// Il modo sincrono forza il chiamante (lambda Vercel, maxDuration 300s) ad
+// attendere l'encode completo: i video lunghi (>~250-300s di encode VPS)
+// sforano SEMPRE. Con `async:true` il VPS accoda il job e risponde subito
+// 202 {jobId}; il client fa polling su GET /jobs/:jobId. Se il budget di
+// attesa finisce prima del completamento, il chiamante salva il jobId sulla
+// riga di coda (upload_queue.video_job_id) e riprende il polling alla run
+// successiva SENZA ri-encodare (il VPS continua a lavorare in background).
+
+export type VideoJobStatus = 'queued' | 'running' | 'done' | 'error' | 'not_found';
+
+export interface VideoJobSubmitResponse {
+  ok: boolean;
+  jobId?: string;
+  error?: string;
+}
+
+export interface VideoJobStatusResponse {
+  ok: boolean;
+  status: VideoJobStatus;
+  error?: string;
+  bytes?: number;
+  durationMs?: number;
+}
+
+/**
+ * Sottomette un job async al VPS (POST /watermark con async:true). Risposta
+ * attesa immediata (202) — timeout è solo per problemi di rete/server giù.
+ */
+export async function submitVideoWatermarkJob(
+  req: RemoteWatermarkRequest,
+  timeoutMs = 30_000,
+): Promise<VideoJobSubmitResponse> {
+  const vpsUrl = getVpsUrl();
+  const apiKey = getVpsKey();
+  if (!vpsUrl || !apiKey) throw new VpsNotConfiguredError();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${vpsUrl.replace(/\/$/, '')}/watermark`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+      body: JSON.stringify({
+        downloadUrl: req.downloadUrl,
+        uploadUrl: req.uploadUrl,
+        branding: req.branding,
+        maxDurationSeconds: req.maxDurationSeconds,
+        async: true,
+      }),
+      signal: controller.signal,
+    });
+    const body = (await res.json().catch(() => ({}))) as VideoJobSubmitResponse;
+    if (!res.ok || !body.ok || !body.jobId) {
+      return { ok: false, error: body.error || `VPS submit failed HTTP ${res.status}` };
+    }
+    return { ok: true, jobId: body.jobId };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Stato corrente di un job. `not_found` = job sconosciuto/scaduto lato VPS
+ * (es. riavvio server) → il chiamante deve re-inviare un nuovo job.
+ */
+export async function getVideoWatermarkJobStatus(
+  jobId: string,
+  timeoutMs = 15_000,
+): Promise<VideoJobStatusResponse> {
+  const vpsUrl = getVpsUrl();
+  const apiKey = getVpsKey();
+  if (!vpsUrl || !apiKey) throw new VpsNotConfiguredError();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${vpsUrl.replace(/\/$/, '')}/jobs/${jobId}`, {
+      headers: { 'X-API-Key': apiKey },
+      signal: controller.signal,
+    });
+    const body = (await res.json().catch(() => ({}))) as VideoJobStatusResponse;
+    if (!res.ok || !body.ok) {
+      return { ok: false, status: 'error', error: body.error || `VPS status failed HTTP ${res.status}` };
+    }
+    return { ok: true, status: body.status, bytes: body.bytes, durationMs: body.durationMs, error: body.error };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export interface AsyncWatermarkResult {
+  ok: boolean;
+  bytes?: number;
+  durationMs?: number;
+  error?: string;
+  /** true = job ancora in corso allo scadere del budget: il chiamante salvi
+   *  jobId sull'item e riprovi alla run successiva (nessun re-encode). */
+  inProgress?: boolean;
+  jobId?: string;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Sottomette (o riprende, se `resumeJobId` è dato) un job async e fa polling
+ * finché: (a) done → ok:true; (b) error → ok:false; (c) il budget di attesa
+ * finisce mentre il job è ancora queued/running → ok:false + inProgress:true.
+ */
+export async function applyVideoOverlayRemoteAsync(
+  req: RemoteWatermarkRequest,
+  opts?: { pollBudgetMs?: number; pollIntervalMs?: number; resumeJobId?: string },
+): Promise<AsyncWatermarkResult> {
+  const pollBudgetMs = opts?.pollBudgetMs ?? 150_000;
+  const pollIntervalMs = opts?.pollIntervalMs ?? 5_000;
+
+  let jobId = opts?.resumeJobId;
+  if (!jobId) {
+    const submit = await submitVideoWatermarkJob(req);
+    if (!submit.ok || !submit.jobId) return { ok: false, error: submit.error || 'submit fallito' };
+    jobId = submit.jobId;
+  }
+
+  const deadline = Date.now() + pollBudgetMs;
+  // Prima poll subito, poi a intervalli: job corti non aspettano 5s gratis.
+  for (;;) {
+    const st = await getVideoWatermarkJobStatus(jobId);
+    if (st.ok) {
+      if (st.status === 'done') return { ok: true, jobId, bytes: st.bytes, durationMs: st.durationMs };
+      if (st.status === 'error') return { ok: false, jobId, error: st.error || 'job VPS fallito' };
+      if (st.status === 'not_found') {
+        // VPS ha perso il job (restart/TTL): re-invia UNA volta e riparti.
+        const resub = await submitVideoWatermarkJob(req);
+        if (!resub.ok || !resub.jobId) return { ok: false, error: resub.error || 're-submit fallito' };
+        jobId = resub.jobId;
+      }
+    } else {
+      return { ok: false, jobId, error: st.error || 'status poll fallito' };
+    }
+    if (Date.now() >= deadline) return { ok: false, jobId, inProgress: true };
+    await sleep(pollIntervalMs);
+  }
+}

@@ -40,6 +40,7 @@ const nextConfig: NextConfig = {
     '@fotosposi/ui',
     '@fotosposi/video-overlay',
     '@fotosposi/partner',
+    '@fotosposi/seo',
   ],
   // Make sure Vercel's function tracer bundles the ffmpeg-static binary (it's invoked via
   // child_process.spawn, which the tracer can't follow like a normal `require`).
@@ -53,13 +54,18 @@ const nextConfig: NextConfig = {
     // sharp e ffmpeg-static sono dichiarati come deps esplicite in apps/web/package.json
     // (vedi FIX 29/07/2026), quindi Vercel li installa automaticamente e il tracer
     // di Next.js li include nel bundle lambda. NON serve più tracciarli esplicitamente.
-    'src/app/api/photos/[id]/share/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png'],
-    'src/app/api/r2/process-queue/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png'],
-    'src/app/api/cron/maintenance/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png'],
-    'src/app/api/guestbook/messages/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png'],
+    'src/app/api/photos/[id]/share/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png', 'node_modules/ffmpeg-static/**', '../../node_modules/ffmpeg-static/**'],
+    'src/app/api/r2/process-queue/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png', 'node_modules/ffmpeg-static/**', '../../node_modules/ffmpeg-static/**'],
+    'src/app/api/cron/maintenance/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png', 'node_modules/ffmpeg-static/**', '../../node_modules/ffmpeg-static/**'],
+    'src/app/api/cron/maintenance-evening/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png', 'node_modules/ffmpeg-static/**', '../../node_modules/ffmpeg-static/**'],
+    'src/app/api/guestbook/messages/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png', 'node_modules/ffmpeg-static/**', '../../node_modules/ffmpeg-static/**'],
     // FIX 28/07/2026: route one-shot per riparare foto con watermark mancante
     // (vedi PROJECT_STATUS.md sessione 28/07). Stessi asset delle altre route.
-    'src/app/api/r2/repair-watermark/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png'],
+    // ffmpeg-static incluso (14/09/2026): e' il FALLBACK locale se la VPS e' down
+    // — prima le route cron non lo tracciavano -> spawn ENOENT su Vercel -> i video
+    // fallivano SEMPRE senza VPS. Con questo fix la pipeline video degrada
+    // (qualita' 33%) ma non si ferma mai. Il VPS resta il primario (qualita' piena).
+    'src/app/api/r2/repair-watermark/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png', 'node_modules/ffmpeg-static/**', '../../node_modules/ffmpeg-static/**'],
   },
 };
 
