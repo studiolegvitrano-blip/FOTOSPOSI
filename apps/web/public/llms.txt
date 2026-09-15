@@ -1,0 +1,20 @@
+# Sposi.live
+
+> Piattaforma italiana per il matrimonio digitale: gli sposi raccolgono foto e video degli invitati via QR code (senza app da installare), creano la lista nozze online, un wall fotografico in diretta e giochi per intrattenere gli invitati.
+
+## Cosa fa
+- Raccolta foto/video degli invitati con QR code (compressione e watermark automatici, backup su Google Drive)
+- Lista nozze online e regali
+- Guestbook digitale, wall in diretta, giochi (vota il vestito, scherzi)
+- Sito web del matrimonio generato con AI
+- Marketplace di fornitori e programma per professionisti wedding (portale partner white label)
+
+## Pagine principali
+- Home: https://www.sposi.live/
+- Domande frequenti: https://www.sposi.live/faq
+- Blog: https://www.sposi.live/blog
+- Marketplace fornitori: https://www.sposi.live/marketplace
+- Per i professionisti: https://www.sposi.live/partner
+
+## Contatti
+Web: https://www.sposi.live

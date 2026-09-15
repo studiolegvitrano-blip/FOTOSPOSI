@@ -1,27 +1,57 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
-## Sessione 14/09/2026 — Drenaggio backlog Agostino (72→34→0) + ITEMS_PER_EVENT 5→20 + chiave Nebula senza credito
+## Sessione 14/09/2026 — Backlog drenato a 0 (foto+video) + VPS video async (niente più limite 300s) + fix fallback ffmpeg Vercel + modulo SEO/blog + fix Groq modello ritirato
 
 ### Fatto
 
-**1. Drenaggio backlog Agostino (COMPITO 1)**
+**1. Drenaggio backlog (COMPITO 1) — completato**
 - Stato iniziale: 39 pending (non 72 — i cron avevano già drenato), **0 video tra i pending** (tutte foto) → alzare `ITEMS_PER_EVENT` sicuro.
-- Run di verifica manuale con il codice deployato (`GET /api/cron/maintenance` + `Bearer CRON_SECRET` — la route è **GET-only**, POST risponde 405): `itemsProcessed=10` (5×2 eventi), 0 errori, Agostino 39→34.
-- **`ITEMS_PER_EVENT` alzato 5→20** in `apps/web/src/lib/maintenance-sweep.ts`: motivazione = backlog 100% foto corte (0 video), il cron Hobby a 5 item/evento/run richiedeva ~7-15 run; a 20 bastano 1-2 run. Cap `maxDuration=300s` della lambda rimane il limite reale: se la run muore a metà, gli item restano `processing` e vengono recuperati dal prossimo run (recovery stuck processing ≥30min, già in `runMaintenanceSweep`).
-- NOTA route: `POST /api/cron/maintenance` NON funziona (405, solo `GET` esportato). Il trigger manuale corretto è `GET /api/cron/maintenance` con `Authorization: Bearer <CRON_SECRET>`.
+- Trigger manuale: **`GET /api/cron/maintenance` + `Bearer CRON_SECRET`** (la route è **GET-only**: POST risponde 405).
+- `ITEMS_PER_EVENT` 5→20 in `maintenance-sweep.ts` (backlog 100% foto corte; commit `b9b5b0a`) → drain: 39→0 pending in 4 run.
+- **Final state: 0 pending / 0 processing / 0 failed** su tutti gli eventi.
 
-**2. Chiave "Nebula AI" (`api.b.ai`) — valida ma SENZA credito (non integrata)**
-- Chiave fornita dall'utente (`sk-blyf...`): autenticazione OK (`GET /v1/models` risponde il catalogo), ma OGNI chiamata chat/completions → **403 `access_denied: Deposit required to unlock premium models`**, anche su modelli entry-level (`gemini-3-flash`).
-- **`gpt-5.2` (modello richiesto dall'esempio curl) NON esiste nel catalogo**. Modelli disponibili: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.5`, `gpt-5.6-sol`, `gpt-5.6-terra`, `claude-opus-4.5/4.6/4.7/4.8`, `claude-sonnet-4.5/4.6/5`, `claude-haiku-4.5`, `gemini-3-flash`, `gemini-3.1-pro`, `gemini-3.5-flash`.
-- **NON salvata in `.env.local`, NON integrata nel codice**: inutilizzabile finché l'utente non fa il deposito richiesto dalla piattaforma. Se dopo il deposito si vuole integrare: aggiungere `NEBULA_API_KEY` (+ base URL `https://api.b.ai/v1`) in `.env.local` e valutare come provider alternativo/fallback nel modulo che usa l'AI.
+**2. Video lunghi Elisa (8 righe failed → 5 video unici) + straggler — tutti riparati via VPS async**
+- I 5 video (encode VPS >300s → irraggiungibili dal vecchio flusso HTTP sync) sono stati processati con il nuovo protocollo async via runner locale (script temporanei `repair-long-videos*.mjs`, eseguiti e rimossi): submit job → poll → CopyObject `.wm.mp4` → r2_key → `watermark_missing=false` → righe coda `synced`.
+- +1 video straggler (`..._1000186093.mp4`, caricato 13/09, era watermark_missing=true): riparato uguale.
+- NOTA comportamento: le righe failed vengono ri-claimate non solo dai cron ma anche da `/api/r2/process-queue` quando un invitato apre la pagina upload → codice VECCHIO deployato (sync 55s) le ri-falliva DOPO la mia sync manuale. Fino al push del nuovo flusso async, le sync manuali DB dei video sono fragili. Risolto dal punto 3.
 
-**3. Stato coda a fine sessione**
-- Agostino: drenato fino a 34 pending col run di verifica; drain finale col nuovo limite 20/evento (post-deploy).
-- Elisa: 7 pending (incl. 1 orfano senza `r2_key`, non recuperabile) + 5 failed in backoff — il maintenance li drena man mano.
-- Verificato che il drain NON tocca le foto già processate (solo item in coda).
+**3. VPS video async — fine del problema "video lunghi >300s" (solidità per 250 matrimoni × 200 invitati)**
+- `vps-scripts/video-watermark-server.js` riscritto con coda job in-memory: `POST /watermark {async:true}` → 202 `jobId`; `GET /jobs/:id` → `queued|running|done|error|not_found`; `MAX_CONCURRENT=2` encode paralleli (env), TTL job done 60min. Retrocompatibile (senza `async` = sync come prima). Deployata su Oracle + testata live (submit, poll, health `running/queued/maxConcurrent`).
+- `packages/video-overlay/src/remote.ts`: `submitVideoWatermarkJob`, `getVideoWatermarkJobStatus`, `applyVideoOverlayRemoteAsync({pollBudgetMs, pollIntervalMs, resumeJobId})`. Resume con re-submit automatico su `not_found` (VPS riavviata).
+- `apps/web/src/lib/process-queue.ts`: branch video usa async. Budget polling `VIDEO_POLL_BUDGET_MS` (default 150s) < maxDuration 300s. Se il budget scade col job ancora in corso → item torna `pending` con `video_job_id` salvato + `next_retry_at` +45s: la run successiva **riprende lo stesso job senza ri-encodare**. Completato/fallito → `video_job_id` azzerato.
+- Migration: `upload_queue ADD COLUMN video_job_id text` (+ NOTIFY pgrst).
+- Test nuovi: `remote-async.test.ts` (9 test: submit, poll stati, budget→inProgress con jobId, resume, re-submit, errori). Suite: video-overlay 18/18, process-queue-solidity 3/3, seo 8/8.
+
+**4. VPS Oracle irraggiungibile ~1h + fix fallback locale Vercel (ridondanza "orologio svizzero")**
+- La VPS Oracle (92.4.218.108) ha avuto un blocco di rete ~1h (timeout TCP su 22 e 443, ping negativo): il sidecar sul VPS non era morto (uptime 20476s al ritorno) → era l'infrastruttura di rete Oracle. Risolta da sola.
+- Punto debole scoperto: se la VPS è down, ogni video fallisce perché il fallback locale non aveva `ffmpeg-static` tracciato nella lambda (ENOENT). `next.config.ts`: aggiunto `node_modules/ffmpeg-static/**` (+ path monorepo `../../node_modules/ffmpeg-static/**`) a TUTTE le route che toccano video (share, process-queue, cron maintenance + maintenance-evening, guestbook, repair-watermark). Ora VPS down = degrado qualità (720p/33%) ma **i video non si bloccano mai**.
+
+**5. Fix critico AI: Groq ha ritirato `llama-3.3-70b-versatile` (404 model_not_found)**
+- Sostituito in `packages/core/src/ai.ts` con `openai/gpt-oss-120b` (così torna il primario gratis per site-builder, concierge, SEO, ecc.). Modelli residui Groq all'account: gpt-oss-120b/20b, qwen3.6/3.8-27b, whisper, compound.
+
+**6. Chiave "Nebula AI" (`api.b.ai`) — valida ma SENZA credito (decisione utente: lasciare perdere)**
+- Auth OK, `GET /v1/models` risponde; OGNI chat/completions → 403 `Deposit required to unlock premium models`. `gpt-5.2` non esiste nel catalogo. NON salvata/integrata.
+
+**7. Modulo SEO v1 (`@fotosposi/seo`) — motore articoli stile BabyLoveGrowth (gratis, via Groq)**
+- Migration: tabella `blog_posts` (id, slug, locale, title, meta_description, keyword, content_md, status draft/published, published_at, event_id nullable, created/updated) + RLS public read sui soli published (+ NOTIFY).
+- Package `/packages/seo`: `generateSeoArticle(keyword)` (Groq via `generateChat`), `insertDraft` (upsert su locale+slug), `publishPost`, `listPublishedPosts`, `getPostBySlug`, `markdownToHtml` (converter sicuro, HTML-escape prima, solo heading/liste/bold/link https+relativi; link javascript: strippati → testo) + test (8/8).
+- Web: `/blog` (lista, revalidate 3600, canonical+OG), `/blog/[slug]` (generateMetadata + JSON-LD Article), `sitemap.ts` (statiche + post da DB), `robots.ts` (allow marketing, disallow aree private), `public/llms.txt` (AEO).
+- Admin: `POST /api/admin/seo/generate` {keyword, locale?, publish?:false default bozza} + `POST /api/admin/seo/publish` {id} (CEO-gated come gli altri /api/admin/*).
+- Seed pubblicati e visibili su https://www.sposi.live/blog: `regali-sposi-idee`, `lista-nozze-online-guida-completa`.
+
+### Test/verifica
+- Vitest: video-overlay 18/18, seo 8/8, process-queue 3/3. `tsc --noEmit` apps/web OK. npm workspace linkato (`@fotosposi/seo` + transpilePackages + dep in apps/web).
 
 ### Commit
-- `chore(queue): ITEMS_PER_EVENT 5→20 nel maintenance sweep (backlog foto drenato più velocemente, run di verifica 10/10 ok prima del push)`
+- `feat(video): job VPS async con resume (niente più limite 300s) + fix ffmpeg-static nelle lambda Vercel (VPS down non blocca più i video)`
+- `fix(ai): Groq llama-3.3-70b-versatile ritirato → openai/gpt-oss-120b`
+- `feat(seo): modulo @fotosposi/seo + blog pubblico + sitemap/robots/llms.txt + route admin generate/publish`
+
+### TODO prossima sessione
+1. **Drive reconnect manuale** (utente) su entrambi gli eventi → /events/{id}/drive.
+2. Generare altre keyword (batch settimanale via /api/admin/seo/generate) + schedulare (cron settimanale) e monitorare indicizzazione su Search Console.
+3. AEO: monitorare citazioni (ChatGPT/Perplexity) mensilmente.
+4. VPS single-point-of-failure resta: le foto vanno sempre (sharp in lambda), i video degradano su ffmpeg-static. Valutare un secondo nodo (Hetzner ~€4/mese) o health check + alert se /health giù >15 min.
 
 ## Sessione 12/09/2026 — Ri-watermark 28 video Elisa & Nausica con fix contrasto + fix latente buildFilterComplex (overlay unconnected)
 

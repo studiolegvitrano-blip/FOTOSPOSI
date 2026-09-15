@@ -29,6 +29,7 @@ Questo è un modular monolith Next.js + Supabase per una piattaforma di gestione
   /face-recognition → opt-in (solo dopo GDPR)
   /notifications    → email/WhatsApp
   /analytics        → dashboard B2B
+  /seo              → blog SEO: blog_posts, generazione articoli AI, markdownToHtml sicuro
   /music            → colonna sonora condivisa (Spotify search, event_songs, export M3U/PDF)
 /packages/ui        → design system condiviso
 /supabase/migrations → schema DB diviso per modulo
