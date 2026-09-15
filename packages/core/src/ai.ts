@@ -1,5 +1,5 @@
 const PROVIDERS = [
-  { name: 'groq', key: () => process.env.GROQ_API_KEY, url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile' },
+  { name: 'groq', key: () => process.env.GROQ_API_KEY, url: 'https://api.groq.com/openai/v1/chat/completions', model: 'openai/gpt-oss-120b' },
   { name: 'nvidia', key: () => process.env.NVIDIA_API_KEY, url: 'https://integrate.api.nvidia.com/v1/chat/completions', model: 'deepseek-ai/deepseek-v4-pro' },
   { name: 'gemini', key: () => process.env.GEMINI_API_KEY, model: 'gemini-1.5-flash' },
 ];
