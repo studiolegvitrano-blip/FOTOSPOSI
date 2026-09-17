@@ -19,6 +19,7 @@ Utente carica 31 foto → solo 5 in galleria; retry con 13 → solo 3. Il resto 
 ### Nota operativa
 - I 35 file persi NON sono recuperabili (mai arrivati su R2): l'utente deve ricaricarli. Con il fix, ogni file fallito viene contato e segnalato, e il batch prosegue.
 - La DLQ di oggi ha 1 riga (`1000189082.jpg`, r2_key NULL) — irrecuperabile per costruzione, col nuovo flusso questo path sparisce.
+- Evento Marinella e Salvo (`d88403f7`): **tier → deluxe** (niente limite foto, video abilitati) e **data → 30/09/2026** su richiesta utente (chiedeva 31/09 che non esiste; settembre ha 30 giorni). 24 media totali (8 synced + 16 pregressi).
 
 ## Sessione 14/09/2026 — Backlog drenato a 0 (foto+video) + VPS video async (niente più limite 300s) + fix fallback ffmpeg Vercel + modulo SEO/blog + fix Groq modello ritirato
 
