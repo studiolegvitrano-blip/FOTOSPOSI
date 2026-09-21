@@ -11,4 +11,4 @@ export {
 } from './service';
 
 export type { SharePlatform, BrandHandle, ShareTagInput } from './share-with-tags';
-export { buildShareText, buildShareUrl, buildShareTextForInstagram, coupleNameToHashtag } from './share-with-tags';
+export { buildShareText, buildShareUrl, buildShareTextForInstagram, buildDefaultCaption, coupleNameToHashtag } from './share-with-tags';

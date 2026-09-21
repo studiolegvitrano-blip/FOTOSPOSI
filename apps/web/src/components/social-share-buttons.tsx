@@ -5,6 +5,7 @@ import {
   buildShareText,
   buildShareTextForInstagram,
   buildShareUrl,
+  buildDefaultCaption,
   coupleNameToHashtag,
   type SharePlatform,
   type BrandHandle,
@@ -43,7 +44,7 @@ export type SocialShareProps = {
   isVideo?: boolean;
 };
 
-type PlatformKey = SharePlatform | 'whatsapp';
+type PlatformKey = SharePlatform | 'whatsapp' | 'linkedin';
 
 const PLATFORM_META: Record<PlatformKey, { label: string; color: string }> = {
   facebook: { label: 'Facebook', color: '#1877F2' },
@@ -51,6 +52,7 @@ const PLATFORM_META: Record<PlatformKey, { label: string; color: string }> = {
   twitter: { label: 'X', color: '#000000' },
   whatsapp: { label: 'WhatsApp', color: '#25D366' },
   tiktok: { label: 'TikTok', color: '#000000' },
+  linkedin: { label: 'LinkedIn', color: '#0A66C2' },
 };
 
 /**
@@ -97,7 +99,9 @@ export default function SocialShareButtons({
 }: SocialShareProps) {
   const [toast, setToast] = useState<string | null>(null);
   const [showUserTextInput, setShowUserTextInput] = useState(false);
-  const [userTextInput, setUserTextInput] = useState(userText);
+  // Didascalia PRECOMPILATA (richiesta 22/09/2026): il campo descrizione nasce
+  // già scritto (nome coppia + frase nostra); l'utente può cancellare o aggiungere.
+  const [userTextInput, setUserTextInput] = useState(userText || buildDefaultCaption(coupleName));
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -203,6 +207,20 @@ export default function SocialShareButtons({
       return;
     }
 
+    if (platform === 'linkedin') {
+      // LinkedIn non ha web share con testo precompilato (sharing/share-offsite
+      // accetta solo URL). Stesso pattern IG: copia il testo + apri il feed.
+      const text = buildShareTextForInstagram(input);
+      try {
+        await navigator.clipboard.writeText(`${text}`);
+        showToast('Testo copiato — apri LinkedIn e incolla');
+      } catch {
+        showToast('Copia manuale: seleziona il testo e copia');
+      }
+      window.open('https://www.linkedin.com/feed/', '_blank', 'noopener,noreferrer');
+      return;
+    }
+
     if (platform === 'whatsapp') {
       const url = buildWhatsappUrl(photoUrl, input);
       window.open(url, '_blank', 'noopener,noreferrer');
@@ -232,7 +250,7 @@ export default function SocialShareButtons({
     return true;
   };
 
-  const platforms: PlatformKey[] = ['facebook', 'instagram', 'twitter', 'whatsapp', 'tiktok'];
+  const platforms: PlatformKey[] = ['facebook', 'instagram', 'twitter', 'whatsapp', 'tiktok', 'linkedin'];
   const supportsNativeShare = typeof navigator !== 'undefined' && !!navigator.share;
   const baseClass =
     variant === 'overlay'
@@ -348,6 +366,12 @@ function PlatformIcon({ platform, className }: { platform: PlatformKey; classNam
       return (
         <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
           <path d="M16.6 5.82a4.28 4.28 0 0 1-1.06-2.32V3h-3.1v12.36a2.6 2.6 0 0 1-2.6 2.42 2.6 2.6 0 0 1-2.6-2.6 2.6 2.6 0 0 1 2.6-2.6c.27 0 .53.04.78.12V9.5a5.7 5.7 0 0 0-.78-.05 5.7 5.7 0 0 0-5.7 5.7 5.7 5.7 0 0 0 5.7 5.7 5.7 5.7 0 0 0 5.7-5.7V9.1a7.3 7.3 0 0 0 4.3 1.4V7.4a4.28 4.28 0 0 1-2.54-1.58Z" />
+        </svg>
+      );
+    case 'linkedin':
+      return (
+        <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+          <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.225 0z" />
         </svg>
       );
   }

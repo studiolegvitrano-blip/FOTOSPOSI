@@ -50,6 +50,12 @@ const BRAND_HASHTAG: Record<BrandHandle, string> = {
   justmarry: '#justmarry',
 };
 
+/** Hashtag generici di wedding (dopo brand + coppia + partner). Richiesta cliente 22/09/2026. */
+const BRAND_GENERIC_HASHTAGS: Record<BrandHandle, string[]> = {
+  sposilive: ['#Matrimonio', '#Nozze', '#Wedding'],
+  justmarry: ['#Wedding', '#WeddingItaly'],
+};
+
 /** Normalizza un handle: trim + prepend '@' se mancante. '' se vuoto. */
 function normalizeHandle(h?: string | null): string | null {
   if (!h) return null;
@@ -113,6 +119,7 @@ export function buildShareText(input: ShareTagInput): string {
   hashtags.push(BRAND_HASHTAG[brand]);
   if (coupleH) hashtags.push(coupleH);
   if (partnerH) hashtags.push(partnerH);
+  for (const g of BRAND_GENERIC_HASHTAGS[brand]) hashtags.push(g);
 
   const lines: string[] = [];
   const userText = (input.userText ?? '').trim();
@@ -160,4 +167,15 @@ export function buildShareUrl(platform: SharePlatform, input: ShareTagInput): st
 /** Testo completo copiabile per Instagram (utente incolla manualmente). */
 export function buildShareTextForInstagram(input: ShareTagInput): string {
   return buildShareText(input);
+}
+
+/**
+ * Didascalia DEFAULT precompilata (richiesta cliente 22/09/2026): il campo
+ * "Descrizione" del pannello share nasce GIÀ SCRITTO e l'utente può cancellare,
+ * modificare o aggiungere a seguire. Vuota se il nome coppia manca.
+ */
+export function buildDefaultCaption(coupleName?: string | null): string {
+  const name = (coupleName || '').trim();
+  if (!name) return '';
+  return `💍 Una giornata indimenticabile per ${name}! ❤️\nGrazie per aver condiviso con noi questo momento speciale!`;
 }

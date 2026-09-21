@@ -50,6 +50,12 @@
 - **Dead code**: azioni mark/fail/retry in /api/queue (client usa solo state/enqueue), `/api/gte/{ugc,performance,engagement,brand-config}` senza consumatori, tabella `b2b_reports`, `getDueCapsuleMessages` (solo legacy).
 - **P2 vari**: cron routes apribili se CRON_SECRET env mancante (`if (!secret) return true` ×6); durata video validata SOLO client-side (server non verifica mai — il VPS encode>300s già noto); vista pubblica capsula non controlla `status` (capsula failed mostra video originale NON watermarkato); niente Drive backup capsule video nel nuovo flusso (syncCapsuleToDrive esiste ma mai chiamata); email/whatsapp senza validazione formato; access_token/PII nelle response lista (defense-in-depth); i18n ~33% (40/120 file); SafeLinks scanner segnano downloaded_at; ui→site-builder dependency direzione inusuale; 2 componenti share sovrapposti da consolidare; due copie agenti review su /packages/markeplace ecc.
 
+### 3. Condivisione social intelligente — file reale + LinkedIn + didascalia precompilata (richiesta founder 22/09/2026)
+- **Base già esistente** (share-with-tags 10-11/08): `nativeShareFile()` condivide il FILE watermarked (square jpg via `/api/photos/[id]/share`) con Web Share API `files` + testo tag — già NON un link. Textarea testo modificabile. Hashtag auto da nome coppia (`&`→`and`).
+- **Aggiunto**: (1) **LinkedIn** (6° tasto: icona nativa #0A66C2; fallback desktop = stesso pattern IG: clipboard testo + open linkedin.com/feed — sharing/share-offsite accetta solo URL, niente testo); (2) **didascalia DEFAULT precompilata** `buildDefaultCaption(coupleName)` ('💍 Una giornata indimenticabile per {nome}! ❤️' + riga grazie) — il campo descrizione nasce GIÀ SCRITTO, l'utente cancella/modifica/aggiunge (textarea precompilata); (3) **hashtag generici**: sposilive → #Matrimonio #Nozze #Wedding, justmarry → #Wedding #WeddingItaly (dopo brand + coppia + partner).
+- **NOTA design**: niente righe DB per-social (facebook_text/instagram_text/...) — il testo è DETERMINISTICO da couple_name + couple_hashtag + brand, generato a runtime. Pubblicazione diretta via API (TikTok Content Posting API, LinkedIn Posts API, OAuth) = Fase 2 per gli sposi; gli invitati restano su Web Share nativo (nessun account da collegare).
+- File: `packages/social-sharing/src/share-with-tags.ts` + `index.ts`, `apps/web/src/components/social-share-buttons.tsx`, test +3 (10/10). Typecheck OK.
+
 ### TODO prossima sessione
 1. **Deploy VPS** (fix cuore watermark): scp overlay.js + restart fotosposi-watermark. I video in galleria hanno ancora il cuore vecchio flottante — il fix vale per i video/capsule processati DOPO il deploy.
 2. **Frase nostra nel watermark**: placeholder 'Sposi.live · Capsula del Tempo' — da decidere (costante FRASE_NOSTRA_WATERMARK in packages/time-capsule/src/watermark.ts).
@@ -58,6 +64,7 @@
 5. **Legacy route `/api/time-capsule/[eventId]` SENZA auth** (preesistente): usa service client + body-provided sender_user_id — gap di sicurezza, da gated in futuro.
 6. Verifica visiva capsula in produzione + Search Console batch SEO settimanale.
 7. **Re-run security review agent** (tornato vuoto) + recovery step stuck processing capsule + riconoscimento orfani R2 capsules in /api/r2/orphans.
+8. **Share API dirette per sposi (Fase 2)**: TikTok Content Posting API (foto, Direct Post), LinkedIn Posts API, Facebook/Instagram Graph API con OAuth "Collega il tuo account" — pubblicazione diretta foto+didascalia. Gli invitati restano su Web Share nativo.
 
 ## Sessione 15/09/2026 — ROOT CAUSE "31 foto → 5 in galleria": loop upload client abortiva al primo errore di rete + rate limit per-IP
 
