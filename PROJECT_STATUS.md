@@ -57,14 +57,19 @@
 - File: `packages/social-sharing/src/share-with-tags.ts` + `index.ts`, `apps/web/src/components/social-share-buttons.tsx`, test +3 (10/10). Typecheck OK.
 
 ### TODO prossima sessione
-1. **Deploy VPS** (fix cuore watermark): scp overlay.js + restart fotosposi-watermark. I video in galleria hanno ancora il cuore vecchio flottante — il fix vale per i video/capsule processati DOPO il deploy.
-2. **Frase nostra nel watermark**: placeholder 'Sposi.live · Capsula del Tempo' — da decidere (costante FRASE_NOSTRA_WATERMARK in packages/time-capsule/src/watermark.ts).
-3. **Importi prezzo**: default in codice (base €9 + €1/mese) — da confermare/con cambiare via platform_settings.
-4. **WhatsApp delivery**: provider da completare (selectWhatsAppProvider esiste in notifications; il channel whatsapp resta scheduled fino ad allora).
-5. **Legacy route `/api/time-capsule/[eventId]` SENZA auth** (preesistente): usa service client + body-provided sender_user_id — gap di sicurezza, da gated in futuro.
-6. Verifica visiva capsula in produzione + Search Console batch SEO settimanale.
-7. **Re-run security review agent** (tornato vuoto) + recovery step stuck processing capsule + riconoscimento orfani R2 capsules in /api/r2/orphans.
-8. **Share API dirette per sposi (Fase 2)**: TikTok Content Posting API (foto, Direct Post), LinkedIn Posts API, Facebook/Instagram Graph API con OAuth "Collega il tuo account" — pubblicazione diretta foto+didascalia. Gli invitati restano su Web Share nativo.
+1. **Frase nostra nel watermark**: placeholder 'Sposi.live · Capsula del Tempo' — da decidere (costante FRASE_NOSTRA_WATERMARK in packages/time-capsule/src/watermark.ts).
+2. **Importi prezzo**: default in codice (base €9 + €1/mese) — da confermare/con cambiare via platform_settings.
+3. **WhatsApp delivery**: provider da completare (selectWhatsAppProvider esiste in notifications; il channel whatsapp resta scheduled fino ad allora).
+4. **Legacy route `/api/time-capsule/[eventId]` SENZA auth** (preesistente): usa service client + body-provided sender_user_id — gap di sicurezza, da gated in futuro.
+5. Verifica visiva capsula + galleria in produzione + Search Console batch SEO settimanale.
+6. **Re-run security review agent** (tornato vuoto) + recovery step stuck processing capsule + riconoscimento orfani R2 capsules in /api/r2/orphans.
+7. **Share API dirette per sposi (Fase 2)**: TikTok Content Posting API (foto, Direct Post), LinkedIn Posts API, Facebook/Instagram Graph API con OAuth "Collega il tuo account" — pubblicazione diretta foto+didascalia. Gli invitati restano su Web Share nativo.
+
+### Deploy VPS cuore + test E2E (23/09/2026, completamento punto 1 della sessione 18/09)
+- **Deployato**: `scp vps-scripts/overlay.js ubuntu@92.4.218.108:/opt/fotosposi-vps/` + `sudo systemctl restart fotosposi-watermark` → active, health `{"ok":true,"maxConcurrent":2}`.
+- **Test E2E su VPS** (script node temporaneo, eseguito e rimosso): (1) **cuore ALLINEATO** — fondo a 128 vs baseline 129 (delta -1px; il bug vecchio era -22px flottante SOPRA la riga), verificato analizzando l'overlay PNG generato dall'overlay.js DEPLOYATO; (2) **ffmpeg filter senza label orfani** — no-logo E brand-only (filter produzione `[0:v]scale...[wm];[wm][2:v]overlay...` SENZA [wb] finale) → nessun "unconnected output"; (3) **cuore VISIBILE su fondo chiaro** (0xECECEC + testo bianco): 1594 px rossi nella striscia (min atteso 40).
+- **Suite completa locale: 552/552 (49 file)**. NB test E2E: il filto brand-only del TEST con `[wb]` finale è il pattern SBAGLIATO (unconnected) — la produzione rimuove il label dall'ultimo overlay (verificato grep dal VPS). Script node su VPS: risoluzione ESM segue il path dello script → eseguire DENTRO /opt/fotosposi-vps (non /tmp) per risolvere node_modules.
+- Il fix cuore vale per i video/capsule processati DOPO il deploy: i video in galleria hanno ancora il cuore vecchio flottante (ri-watermark solo su richiesta, NON toccare le foto).
 
 ## Sessione 15/09/2026 — ROOT CAUSE "31 foto → 5 in galleria": loop upload client abortiva al primo errore di rete + rate limit per-IP
 
