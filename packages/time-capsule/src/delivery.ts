@@ -69,6 +69,13 @@ export async function runCapsuleSweep(opts?: {
   const { messages: failedCapsules } = await getFailedVideoCapsules(3);
   for (const capsule of failedCapsules || []) {
     if (!opts?.brandingFor) break;
+    // Guard revenue: una capsula payment_required senza order (checkout mai creato)
+    // NON deve mai essere processata/consegnata gratis. Le capsule PAID fallite
+    // dopo il pagamento (order_id presente) vengono riprocessate regolarmente.
+    if (capsule.payment_required && !capsule.order_id) {
+      result.errors.push(`skip ${capsule.id}: capsula non pagata (niente order) — non processata`);
+      continue;
+    }
     try {
       await updateCapsule(capsule.id, { status: 'processing', video_job_id: null });
       const resp = await processCapsuleWatermarkJob(capsule, await opts.brandingFor(capsule), {

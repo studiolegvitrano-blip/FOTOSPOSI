@@ -35,6 +35,12 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Solo chi ha creato la capsula può confermarla' }, { status: 403 });
   }
 
+  // Idempotenza: double-confirm (retry/refresh) = doppio submitVideoWatermarkJob
+  // → doppio encode VPS. Già processata → ok esplicito.
+  if (capsule.status !== 'awaiting_payment') {
+    return NextResponse.json({ capsule, ok: true, already: true });
+  }
+
   const verification = await verifyCapsuleCheckoutSession({ sessionId: body.sessionId, capsuleId: capsule.id });
   if (verification.error) return NextResponse.json({ error: verification.error }, { status: 500 });
   if (!verification.paid) {

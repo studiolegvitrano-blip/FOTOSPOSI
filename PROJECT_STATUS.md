@@ -24,6 +24,32 @@
 - Vitest: time-capsule 17/17 (prezzi proporzionali + boundary + payment_required + watermark text), suite completa 55/55 (7 file). `tsc --noEmit` apps/web OK.
 - Migration verificata live: insert test con nuove colonne OK, poi cancellato.
 
+### Review strutturale 4-agenti + fix P0 (stessa sessione)
+
+**Review con 4 agenti paralleli (moduli/regole ferree, architettura/drift, capsule fresh-eyes; il security-agent è tornato vuoto — da rifare).**
+
+**P0 fixati (commit di questa sessione):**
+1. **Flusso pagamento rotto end-to-end**: la route `/capsule/confirm` NON veniva mai chiamata — il client reindirizzava a Stripe e al ritorno `?paid=1` mostrava "Pagamento completato" ma la capsula restava `awaiting_payment` PER SEMPRE (mai watermarkata, mai consegnata; nessuna sweep query la becca). **Fix**: client salva `capsule_pending_{eventId}` in localStorage prima del redirect; al ritorno `?paid=1&session_id=...` (Stripe appende session_id) chiama POST confirm → capsula processing. + Idempotenza: guard `status !== 'awaiting_payment'` → ok esplicito (double-confirm = doppio encode VPS).
+2. **Data minima del picker sistematicamente rifiutata (400)**: validazione strict `months < 6` su mesi-30.4375 — 6 mesi calendario = ~5.95 mesi → 400 sulla PRIMA data offerta dal picker, con video già su R2 (orfan per ogni retry). **Fix**: tolleranza ±0.5 mese (`months < 5.5` / `months > 60.5`) + clamp.
+3. **Sweep consegnava capsule MAI PAGATE**: `getFailedVideoCapsules` non filtra il pagamento — le capsule marcate `failed` per errore createOrder/checkout venivano riprocessate e CONSEGNATE gratis. **Fix doppio**: (a) create route → errore order/checkout ora ripristina `awaiting_payment` (non 'failed'); (b) delivery loop 2 → guard `payment_required && !order_id` → skip + error log.
+4. **Legacy `/api/time-capsule/[eventId]` azione `cron-deliver` invocabile da chiunque** (marcava TUTTE le capsule delivered): gate CRON_SECRET Bearer. La route resta SENZA auth per create (pagina legacy `/e/[id]/capsule` per invitati ANONIMI ancora linkata da /event/[code] — gated completo romperebbe il flusso anonimo).
+
+**P1 fixati (stesso commit):**
+- `recipientGuestId` NON validato come appartenente all'evento (FK richiede solo esistenza in event_guests di QUALSIASI evento) → verifica `.eq('event_id', eventId)` prima dell'insert.
+- Label/bottone prezzo UX: `price === 0` mai vero (base minimo 900 cents) → il bottone "Paga e crea" compariva anche per sposo ≤12 mesi che non paga. Ora `capsulePaymentRequired()` decide label ("Gratis (fino a 12 mesi)") e bottone.
+- **sharp non dichiarato in video-overlay** (import 4× senza dep — pattern fragile regola ferrea) → `"sharp": "^0.34.5"` aggiunto, `npm ls sharp` → deduped singola copia.
+- **`@fotosposi/social-sharing` non dichiarato in packages/ui** (share-button.tsx:4 lo importa via hoisting) → dep aggiunta.
+
+**P1/P2 RIMASTI (da pianificare prossime sessione):**
+- **Stuck 'processing' + video_job_id null = capsula persa** (delivery.ts re-submit azzera video_job_id; kill-window lambda → job VPS completato ma mai promosso). Serve recovery step come nel flusso media.
+- **Orfani R2 capsules non riconosciuti** da `/api/r2/orphans` (considera solo media_uploads + upload_queue; il "Forza" creerebbe righe in upload_queue — tabella sbagliata per capsule).
+- **Drift DB senza migration tracciata**: `upload_queue` (tabella più critica!), `time_capsule_messages` (pre-00061), `event_codes`, `feed_reactions/comments`, `event_drive_folders`, `event_branding`, `event_work_diary` (package work-diary non in AGENTS.md).
+- **Duplicazioni**: `escapeXml` ×3 (video-overlay canonica, photo-overlay privata, process-queue privata — il bug no-op 05/09 è successo perché le copie divergevano), `getBrandLabel` ×2 (process-queue + capsule-watermark → spostare in core), derivazione filename `.wm.mp4` ×3 già divergenti (process-queue solo .mp4 vs time-capsule .mp4|mov|...).
+- **process-queue.ts 1056 righe** — monolite da split (claim/branding/video-flow/repair).
+- **Cross-module in /packages** (regola ferrea #1): wrapped ×12 query su 5 moduli (media/games/commerce/face-recognition/events), analytics ×6, gte, partner→events/affiliates, core→events/event_guests (inversione layering preesistente).
+- **Dead code**: azioni mark/fail/retry in /api/queue (client usa solo state/enqueue), `/api/gte/{ugc,performance,engagement,brand-config}` senza consumatori, tabella `b2b_reports`, `getDueCapsuleMessages` (solo legacy).
+- **P2 vari**: cron routes apribili se CRON_SECRET env mancante (`if (!secret) return true` ×6); durata video validata SOLO client-side (server non verifica mai — il VPS encode>300s già noto); vista pubblica capsula non controlla `status` (capsula failed mostra video originale NON watermarkato); niente Drive backup capsule video nel nuovo flusso (syncCapsuleToDrive esiste ma mai chiamata); email/whatsapp senza validazione formato; access_token/PII nelle response lista (defense-in-depth); i18n ~33% (40/120 file); SafeLinks scanner segnano downloaded_at; ui→site-builder dependency direzione inusuale; 2 componenti share sovrapposti da consolidare; due copie agenti review su /packages/markeplace ecc.
+
 ### TODO prossima sessione
 1. **Deploy VPS** (fix cuore watermark): scp overlay.js + restart fotosposi-watermark. I video in galleria hanno ancora il cuore vecchio flottante — il fix vale per i video/capsule processati DOPO il deploy.
 2. **Frase nostra nel watermark**: placeholder 'Sposi.live · Capsula del Tempo' — da decidere (costante FRASE_NOSTRA_WATERMARK in packages/time-capsule/src/watermark.ts).
@@ -31,6 +57,7 @@
 4. **WhatsApp delivery**: provider da completare (selectWhatsAppProvider esiste in notifications; il channel whatsapp resta scheduled fino ad allora).
 5. **Legacy route `/api/time-capsule/[eventId]` SENZA auth** (preesistente): usa service client + body-provided sender_user_id — gap di sicurezza, da gated in futuro.
 6. Verifica visiva capsula in produzione + Search Console batch SEO settimanale.
+7. **Re-run security review agent** (tornato vuoto) + recovery step stuck processing capsule + riconoscimento orfani R2 capsules in /api/r2/orphans.
 
 ## Sessione 15/09/2026 — ROOT CAUSE "31 foto → 5 in galleria": loop upload client abortiva al primo errore di rete + rate limit per-IP
 

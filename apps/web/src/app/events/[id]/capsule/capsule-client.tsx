@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   computeCapsulePriceCents,
+  capsulePaymentRequired,
   formatCapsulePrice,
   CAPSULE_MAX_VIDEO_SECONDS,
   CAPSULE_MAX_PHRASE_CHARS,
@@ -94,6 +95,18 @@ export function CapsuleClient({
     return r.error ? null : r.cents;
   }, [deliverAt]);
 
+  // Pagamento richiesto? Invitato sempre; sposo solo oltre i 12 mesi.
+  // Prima si usava cents > 0 (mai 0: base minimo 900) → il bottone "Paga e crea"
+  // compariva anche per uno sposo gratis che poi NON veniva reindirizzato a Stripe.
+  const paymentDue = useMemo(() => {
+    if (!deliverAt) return null;
+    const d = new Date(deliverAt);
+    const months = (d.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.4375);
+    return capsulePaymentRequired(isCouple ? 'sposo' : 'invitato', months);
+  }, [deliverAt, isCouple]);
+
+  const confirmDoneRef = useRef(false);
+
   const loadList = useCallback(async () => {
     try {
       const res = await fetch(`/api/events/${eventId}/capsule`, { method: 'GET' });
@@ -112,9 +125,37 @@ export function CapsuleClient({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('paid')) setNotice('Pagamento completato: la capsula verrà elaborata a breve.');
+    const paid = params.get('paid');
+    const sessionId = params.get('session_id');
+
+    // Ritorno da Stripe: la success_url riceve ?paid=1&session_id=... (Stripe appende
+    // session_id). Prima NESSUNO chiamava /capsule/confirm → la capsula restava
+    // awaiting_payment per sempre (mai watermarkata, mai consegnata).
+    if (paid && sessionId && !confirmDoneRef.current) {
+      confirmDoneRef.current = true;
+      const pendingId = localStorage.getItem(`capsule_pending_${eventId}`);
+      if (!pendingId) {
+        setError('Pagamento completato ma capsula non trovata: ricontatta il supporto.');
+        return;
+      }
+      fetch(`/api/events/${eventId}/capsule/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, capsuleId: pendingId }),
+      })
+        .then(async (res) => {
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(json.error || 'Errore conferma pagamento');
+          localStorage.removeItem(`capsule_pending_${eventId}`);
+          setNotice('Pagamento confermato: la capsula è in elaborazione e verrà trasmessa alla data scelta.');
+          await loadList();
+        })
+        .catch((err) => setError(String(err instanceof Error ? err.message : err)));
+    } else if (paid) {
+      setNotice('Pagamento completato: la capsula verrà elaborata a breve.');
+    }
     if (params.get('cancelled')) setError('Pagamento annullato: la capsula non è stata creata.');
-  }, []);
+  }, [eventId, loadList]);
 
   function onVideoPick(file: File | null) {
     if (!file) { setVideoFile(null); return; }
@@ -181,6 +222,7 @@ export function CapsuleClient({
       if (!createRes.ok) throw new Error(createJson.error || 'Errore creazione capsula');
 
       if (createJson.checkoutUrl) {
+        localStorage.setItem(`capsule_pending_${eventId}`, createJson.capsule.id as string);
         window.location.href = createJson.checkoutUrl;
         return;
       }
@@ -320,8 +362,9 @@ export function CapsuleClient({
 
           {price !== null && (
             <div className="rounded-md bg-gray-50 px-4 py-3 text-sm">
-              Prezzo: <span className="font-semibold">{formatCapsulePrice(price)}</span>
-              {isCouple && price === 0 && ' (gratis fino a 12 mesi)'}
+              {paymentDue
+                ? <>Prezzo: <span className="font-semibold">{formatCapsulePrice(price)}</span></>
+                : 'Gratis (fino a 12 mesi)'}
             </div>
           )}
 
@@ -331,7 +374,7 @@ export function CapsuleClient({
             disabled={submitting}
             className="w-full rounded-md bg-rose-600 px-4 py-2 text-white text-sm font-medium disabled:opacity-50"
           >
-            {submitting ? 'Caricamento…' : price !== null && price > 0 ? 'Paga e crea la capsula' : 'Crea la capsula'}
+            {submitting ? 'Caricamento…' : paymentDue ? 'Paga e crea la capsula' : 'Crea la capsula — gratis'}
           </button>
         </div>
 

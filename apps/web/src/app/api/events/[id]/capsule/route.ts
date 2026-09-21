@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServiceClient } from '@fotosposi/core';
 import {
   createCapsuleMessage,
   getCapsuleMessages,
@@ -69,10 +70,13 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const { months, error: monthsErr } = monthsUntil(body.deliverAt || '');
   if (monthsErr) return NextResponse.json({ error: monthsErr }, { status: 400 });
-  if (months < CAPSULE_MIN_MONTHS) {
+  // Tolleranza ±0.5 mese: il date picker offre min = now+6 mesi calendario, che in
+  // mesi-30.4375 esce ~5.95 → una validazione strict rifiutava SISTEMATICAMENTE la
+  // prima data offerta (400) lasciando il video già su R2 (orfan per ogni retry).
+  if (months < CAPSULE_MIN_MONTHS - 0.5) {
     return NextResponse.json({ error: `La trasmissione deve essere tra ${CAPSULE_MIN_MONTHS} mesi e 5 anni` }, { status: 400 });
   }
-  if (months > CAPSULE_MAX_MONTHS) {
+  if (months > CAPSULE_MAX_MONTHS + 0.5) {
     return NextResponse.json({ error: 'La trasmissione può essere al massimo tra 5 anni' }, { status: 400 });
   }
   const clampedMonths = clampCapsuleMonths(months);
@@ -97,9 +101,24 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!recipientGuestId && !recipientEmail && !recipientWhatsapp) {
       return NextResponse.json({ error: 'Scegli il destinatario: invitato loggato, email o numero WhatsApp' }, { status: 400 });
     }
-    if (recipientGuestId) deliveryChannel = 'app';
-    else if (recipientEmail) deliveryChannel = 'email';
-    else if (recipientWhatsapp) deliveryChannel = 'whatsapp';
+    if (recipientGuestId) {
+      // La FK richiede solo che il guest esista in event_guests di QUALSIASI evento:
+      // verificare che appartenga a QUESTO evento prima dell'insert.
+      const { data: guestRow } = await createServiceClient()
+        .from('event_guests')
+        .select('id')
+        .eq('id', recipientGuestId)
+        .eq('event_id', eventId)
+        .maybeSingle();
+      if (!guestRow) {
+        return NextResponse.json({ error: 'Invitato non valido per questo evento' }, { status: 400 });
+      }
+      deliveryChannel = 'app';
+    } else if (recipientEmail) {
+      deliveryChannel = 'email';
+    } else if (recipientWhatsapp) {
+      deliveryChannel = 'whatsapp';
+    }
   }
 
   const senderType = isGuest ? 'invitato' : body.senderType === 'sposa' ? 'sposa' : 'sposo';
@@ -149,7 +168,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       metadata: { type: 'time_capsule', capsule_id: capsule.id },
     });
     if (orderErr || !order) {
-      await updateCapsule(capsule.id, { status: 'failed', last_error: orderErr ?? 'Ordine non creato' });
+      // NON 'failed': la sweep re-claima le capsule failed (watermark) — una capsula
+      // con pagamento non completato deve restare awaiting_payment, mai processata gratis.
+      await updateCapsule(capsule.id, { status: 'awaiting_payment', last_error: orderErr ?? 'Ordine non creato' });
       return NextResponse.json({ error: orderErr ?? 'Ordine non creato' }, { status: 500 });
     }
 
@@ -162,7 +183,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       cancelUrl,
     });
     if (checkoutErr || !url) {
-      await updateCapsule(capsule.id, { status: 'failed', last_error: checkoutErr ?? 'Checkout non creato' });
+      await updateCapsule(capsule.id, { status: 'awaiting_payment', last_error: checkoutErr ?? 'Checkout non creato' });
       return NextResponse.json({ error: checkoutErr ?? 'Checkout non creato' }, { status: 500 });
     }
 

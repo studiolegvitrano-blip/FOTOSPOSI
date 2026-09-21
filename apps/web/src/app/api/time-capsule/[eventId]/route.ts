@@ -46,6 +46,13 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'cron-deliver') {
+    // Gate: senza CRON_SECRET configurato l'azione era invocabile da CHIUNQUE
+    // e marcava TUTTE le capsule delivered (abuso + doppio mark con il cron).
+    const secret = process.env.CRON_SECRET;
+    const authHeader = req.headers.get('authorization');
+    if (secret && authHeader !== `Bearer ${secret}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const { messages } = await getDueCapsuleMessages();
     for (const msg of messages || []) {
       await markDelivered(msg.id);
