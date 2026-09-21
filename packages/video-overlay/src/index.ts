@@ -295,11 +295,15 @@ export async function applyVideoOverlay(
       }
       cursorX += seg.length * (actualTextPx * 0.55);
       if (i < segments.length - 1) {
-        const heartTopY = baselineY - actualTextPx;
+        // Fondo del cuore SULLA baseline (come photo-overlay), top all'altezza dei glifi.
+        // Prima: topY = baselineY - actualTextPx (formula per size piena) con cuore 0.7
+        // → cuore flottante 0.3*textPx sopra la baseline (fuori linea dai caratteri).
+        const actualHeartSize = Math.round(actualTextPx * 0.7);
+        const heartTopY = baselineY - actualHeartSize;
         svgParts.push(
-          `<image x="${cursorX.toFixed(1)}" y="${heartTopY.toFixed(1)}" width="${heartSize}" height="${heartSize}" preserveAspectRatio="none" href="data:image/png;base64,${HEART_PNG_BASE64}"/>`,
+          `<image x="${cursorX.toFixed(1)}" y="${heartTopY.toFixed(1)}" width="${actualHeartSize}" height="${actualHeartSize}" preserveAspectRatio="none" href="data:image/png;base64,${HEART_PNG_BASE64}"/>`,
         );
-        cursorX += heartSize;
+        cursorX += actualHeartSize;
       }
     }
 

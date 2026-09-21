@@ -219,7 +219,7 @@ async function renderWatermarkOverlay(outPath, branding, opts) {
   const minDim = Math.min(width, stripH * 4); // heuristica: testo largo ma non troppo
   const basePx = Math.min(48, Math.max(20, Math.round(width * 0.04)));
   const textPx = Math.round(basePx * 1.75);
-  const heartSize = textPx;
+  const heartSize = textPx * 0.7;
   const padBottom = Math.round(stripH * 0.08);
   const padLeft = Math.round(width * 0.02);
   const baselineY = stripH - padBottom;
@@ -271,12 +271,13 @@ async function renderWatermarkOverlay(outPath, branding, opts) {
       }
       cursorX += seg.length * (actualTextPx * 0.55);
       if (i < segments.length - 1) {
-        // Cuore PNG inline alla stessa altezza del testo (quadrato come glifo)
-        const heartTopY = baselineY - actualTextPx;
+        // Cuore PNG inline: fondo SULLA baseline (come photo-overlay), top all'altezza dei glifi
+        const actualHeartSize = actualTextPx * 0.7;
+        const heartTopY = baselineY - actualHeartSize;
         svgParts.push(
-          `<image x="${cursorX.toFixed(1)}" y="${heartTopY.toFixed(1)}" width="${(actualTextPx * 0.7).toFixed(1)}" height="${(actualTextPx * 0.7).toFixed(1)}" preserveAspectRatio="none" href="data:image/png;base64,${HEART_PNG_BASE64}"/>`,
+          `<image x="${cursorX.toFixed(1)}" y="${heartTopY.toFixed(1)}" width="${actualHeartSize.toFixed(1)}" height="${actualHeartSize.toFixed(1)}" preserveAspectRatio="none" href="data:image/png;base64,${HEART_PNG_BASE64}"/>`,
         );
-        cursorX += actualTextPx * 0.7;
+        cursorX += actualHeartSize;
       }
     }
   }
