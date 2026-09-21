@@ -57,6 +57,8 @@ export {
   createGiftTransaction,
   getGiftTransactions,
   createGiftCheckoutSession,
+  createCapsuleCheckoutSession,
+  verifyCapsuleCheckoutSession,
 } from './service';
 
 export type { Coupon, Affiliate, Referral } from './affiliates';

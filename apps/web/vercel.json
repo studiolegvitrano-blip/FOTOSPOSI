@@ -5,6 +5,7 @@
     { "path": "/api/cron/maintenance-evening", "schedule": "30 22 * * *" },
     { "path": "/api/cron/maintenance-evening", "schedule": "0 2 * * *" },
     { "path": "/api/cron/dlq-retry", "schedule": "40 4 * * *" },
-    { "path": "/api/cron/rsvp-reminders", "schedule": "50 4 * * *" }
+    { "path": "/api/cron/rsvp-reminders", "schedule": "50 4 * * *" },
+    { "path": "/api/cron/capsule", "schedule": "15 5 * * *" }
   ]
 }

@@ -11,7 +11,10 @@
   "dependencies": {
     "@fotosposi/core": "*",
     "@fotosposi/media": "*",
-    "@fotosposi/events": "*"
+    "@fotosposi/events": "*",
+    "@fotosposi/r2-storage": "*",
+    "@fotosposi/video-overlay": "*",
+    "@fotosposi/notifications": "*"
   },
   "devDependencies": {
     "typescript": "^5.8.0"

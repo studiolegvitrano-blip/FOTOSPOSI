@@ -59,6 +59,17 @@ export async function createCapsuleMessage(params: {
   file_url?: string;
   storage_path?: string;
   reveal_at: string;
+  r2_key?: string | null;
+  original_r2_key?: string | null;
+  watermark_phrase?: string | null;
+  delivery_channel?: 'email' | 'whatsapp' | 'app';
+  recipient_email?: string | null;
+  recipient_whatsapp?: string | null;
+  recipient_guest_id?: string | null;
+  status?: 'awaiting_payment' | 'processing' | 'scheduled' | 'delivered' | 'failed';
+  payment_required?: boolean;
+  price_cents?: number | null;
+  order_id?: string | null;
 }): Promise<{ message?: TimeCapsuleMessage; error?: string }> {
   const supabase = createServiceClient();
   const { data, error } = await supabase
@@ -77,6 +88,17 @@ export async function createCapsuleMessage(params: {
       storage_path: params.storage_path ?? null,
       reveal_at: params.reveal_at,
       drive_sync_status: params.storage_path ? 'pending' : 'synced',
+      r2_key: params.r2_key ?? null,
+      original_r2_key: params.original_r2_key ?? null,
+      watermark_phrase: params.watermark_phrase ?? null,
+      delivery_channel: params.delivery_channel ?? 'app',
+      recipient_email: params.recipient_email ?? null,
+      recipient_whatsapp: params.recipient_whatsapp ?? null,
+      recipient_guest_id: params.recipient_guest_id ?? null,
+      status: params.status ?? 'scheduled',
+      payment_required: params.payment_required ?? false,
+      price_cents: params.price_cents ?? null,
+      order_id: params.order_id ?? null,
     })
     .select()
     .single();
@@ -277,4 +299,115 @@ export async function cleanupSupabaseStorage(messageId: string): Promise<{ error
     .update({ storage_path: null, file_url: null })
     .eq('id', messageId);
   return {};
+}
+
+// ── Capsula del Tempo video (feature 18/09/2026) ──
+
+export async function getCapsuleById(capsuleId: string): Promise<{ message?: TimeCapsuleMessage; error?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('time_capsule_messages')
+    .select('*')
+    .eq('id', capsuleId)
+    .maybeSingle();
+  if (error) return { error: error.message };
+  return { message: data ?? undefined };
+}
+
+/** Vista pubblica del destinatario (link email/WhatsApp): lookup per id + access_token. */
+export async function getCapsuleByToken(capsuleId: string, token: string): Promise<{ message?: TimeCapsuleMessage; error?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('time_capsule_messages')
+    .select('*')
+    .eq('id', capsuleId)
+    .eq('access_token', token)
+    .maybeSingle();
+  if (error) return { error: error.message };
+  if (!data) return { error: 'Capsula non trovata o link non valido' };
+  return { message: data };
+}
+
+export async function getCapsulesForUser(eventId: string, userId: string): Promise<{ messages?: TimeCapsuleMessage[]; error?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('time_capsule_messages')
+    .select('*')
+    .eq('event_id', eventId)
+    .eq('sender_user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) return { error: error.message };
+  return { messages: data ?? [] };
+}
+
+/** Capsule ricevute da un invitato loggato (destinatario della capsula). */
+export async function getCapsulesForRecipientGuest(eventId: string, guestId: string): Promise<{ messages?: TimeCapsuleMessage[]; error?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('time_capsule_messages')
+    .select('*')
+    .eq('event_id', eventId)
+    .eq('recipient_guest_id', guestId)
+    .order('created_at', { ascending: false });
+  if (error) return { error: error.message };
+  return { messages: data ?? [] };
+}
+
+export async function getVideoJobsPending(limit = 5): Promise<{ messages?: TimeCapsuleMessage[]; error?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('time_capsule_messages')
+    .select('*')
+    .eq('message_type', 'video')
+    .eq('status', 'processing')
+    .not('video_job_id', 'is', null)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  if (error) return { error: error.message };
+  return { messages: data ?? [] };
+}
+
+export async function getFailedVideoCapsules(limit = 3): Promise<{ messages?: TimeCapsuleMessage[]; error?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('time_capsule_messages')
+    .select('*')
+    .eq('message_type', 'video')
+    .eq('status', 'failed')
+    .not('r2_key', 'is', null)
+    .lt('retry_count', 3)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  if (error) return { error: error.message };
+  return { messages: data ?? [] };
+}
+
+/** Capsule pronte per la trasmissione (scheduled, reveal_at passata, non ancora consegnate). */
+export async function getDueScheduledCapsules(limit = 20): Promise<{ messages?: TimeCapsuleMessage[]; error?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('time_capsule_messages')
+    .select('*')
+    .eq('status', 'scheduled')
+    .lte('reveal_at', new Date().toISOString())
+    .is('delivered_at', null)
+    .order('reveal_at', { ascending: true })
+    .limit(limit);
+  if (error) return { error: error.message };
+  return { messages: data ?? [] };
+}
+
+export async function updateCapsule(
+  capsuleId: string,
+  patch: Partial<TimeCapsuleMessage>,
+): Promise<{ message?: TimeCapsuleMessage; error?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('time_capsule_messages')
+    .update(patch)
+    .eq('id', capsuleId)
+    .select()
+    .maybeSingle();
+  if (error) return { error: error.message };
+  return { message: data ?? undefined };
 }

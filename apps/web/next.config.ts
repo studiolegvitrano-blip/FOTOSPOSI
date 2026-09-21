@@ -41,6 +41,7 @@ const nextConfig: NextConfig = {
     '@fotosposi/video-overlay',
     '@fotosposi/partner',
     '@fotosposi/seo',
+    '@fotosposi/time-capsule',
   ],
   // Make sure Vercel's function tracer bundles the ffmpeg-static binary (it's invoked via
   // child_process.spawn, which the tracer can't follow like a normal `require`).
@@ -66,6 +67,10 @@ const nextConfig: NextConfig = {
     // fallivano SEMPRE senza VPS. Con questo fix la pipeline video degrada
     // (qualita' 33%) ma non si ferma mai. Il VPS resta il primario (qualita' piena).
     'src/app/api/r2/repair-watermark/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png', 'node_modules/ffmpeg-static/**', '../../node_modules/ffmpeg-static/**'],
+    // Capsula del tempo (18/09/2026): il cron processa i watermark video capsule
+    // (stessi asset: font + loghi brand/partner). Il video capsula usa il flusso
+    // async VPS; ffmpeg-static è il fallback se la VPS è down (degrado qualità).
+    'src/app/api/cron/capsule/route.ts': ['assets/fonts/**', 'public/fonts/**', 'public/logo-*.png', 'node_modules/ffmpeg-static/**', '../../node_modules/ffmpeg-static/**'],
   },
 };
 

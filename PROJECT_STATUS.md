@@ -1,5 +1,37 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 18/09/2026 — FIX cuore watermark video (fuori linea) + FEATURE Capsula del Tempo (video, delivery 6mesi-5anni, pagamenti proporzionali)
+
+### 1. Fix cuore watermark video fuori linea dai caratteri
+- **Root cause**: in `packages/video-overlay/src/index.ts` + `vps-scripts/overlay.js` il cuore era stato ridotto a `0.7*textPx` ma `heartTopY = baselineY - actualTextPx` (formula per size PIENA) → il cuore flottava `0.3*textPx` SOPRA la baseline (fuori linea). In photo-overlay il cuore è full-size con il fondo SULLA baseline.
+- **Fix**: fondo del cuore SULLA baseline (`heartTopY = baselineY - actualHeartSize`) + `actualHeartSize = actualTextPx * 0.7` coerente col testo scalato (prima la width del cuore NON scalava con actualTextPx nel loop). VPS `overlay.js`: `heartSize` stimata in monoWidth allineata a 0.7.
+- **Verifica**: test video-overlay 27/27; verifica programmatica sharp (render SVG → fondo cuore sulla baseline). NB: il cuore NON renderizzava nel test locale con data-URI SVG + MIME png sbagliato → usare PNG vero rasterizzato.
+- **VPS da ri-deployare**: `scp vps-scripts/overlay.js ubuntu@92.4.218.108:/opt/fotosposi-vps/` + `sudo systemctl restart fotosposi-watermark` (la fix locale è su git, il VPS ha ancora il cuore flottante).
+
+### 2. FEATURE Capsula del Tempo — video messaggi a data futura con pagamenti proporzionali
+- **Requisiti**: sposi inviano video (max 3 min) a invitato loggato / email / WhatsApp; trasmissione tra 6 mesi e 5 anni dall'inserimento; sposi gratis fino a 12 mesi poi extra proporzionale; invitati SOLO agli sposi e SEMPRE a pagamento (stessa scala); delivery via email (link) o WhatsApp; watermark = frase utente (max 60 char, size adattiva) + frase nostra + logo Sposi.live/JustMarry + partner.
+- **Modulo ESTESO** `@fotosposi/time-capsule` (esisteva già: testo/foto via Supabase Storage + Drive, API senza auth) — regola ferrea #1.
+- **Migration 00061** (applicata + NOTIFY, verificata con insert di test): `time_capsule_messages` ADD COLUMN r2_key, original_r2_key, watermark_phrase, delivery_channel (email/whatsapp/app, default 'app'), recipient_email, recipient_whatsapp, recipient_guest_id (FK event_guests), status (awaiting_payment/processing/scheduled/delivered/failed, default 'scheduled' — flusso testo legacy invariato), video_job_id, last_error, payment_required, price_cents, order_id (FK orders), access_token (magic link), retry_count. RLS SELECT estesa: sender_user_id OR owner evento OR guest destinatario (prima solo owner).
+- **Pricing** (`packages/time-capsule/src/pricing.ts`): base €9 (6-12 mesi) + €1/mese oltre i 12 → 6mo=€9, 1yr=€9, 2yr=€21, 5yr=€57. Proporzionale (5 anni = base + 4×extra-anno). Override importi via computeCapsulePriceCents (platform_settings capsule_price_base_eur/per_month_eur senza deploy).
+- **Pagamenti Stripe SENZA webhook**: `createCapsuleCheckoutSession` (commerce, pattern gift checkout a importo libero, metadata type='time_capsule' + capsule_id) + `verifyCapsuleCheckoutSession` (retrieve session → paid + metadata match) → POST confirm: order → paid + capsula → processing + submit watermark.
+- **Watermark capsula** (`packages/time-capsule/src/watermark.ts`): protocollo async VPS — `submitCapsuleWatermarkJob` (submit senza poll, per create/confirm con lifetime breve) + `processCapsuleWatermarkJob` (poll/resume video_job_id, come process-queue). Completato → .wm.mp4 diventa r2_key principale, originale su original_r2_key. `buildCapsuleWatermarkText`: frase utente + ` · ` + FRASE_NOSTRA_WATERMARK (placeholder 'Sposi.live · Capsula del Tempo' — DA DECIDERE). Branding assemblato in `apps/web/src/lib/capsule-watermark.ts` (logo brand, logo partner, font sposi via watermark-fonts.server).
+- **Delivery** (`packages/time-capsule/src/delivery.ts` → `runCapsuleSweep`): (1) resume job watermark in corso; (2) re-submit capsule video fallite (retry_count < 3); (3) trasmissione scheduled+reveal_at passata → channel email → sendNotification (Resend) con link `/event/capsula/<id>?t=<access_token>`; channel whatsapp → PENDING (provider da completare, capsula resta scheduled); channel app → visibile in pagina → delivered.
+- **API**: `POST /api/events/[id]/capsule/presign` (video/* + max 256MB), `POST /api/events/[id]/capsule` (create: validazione 6-60 mesi, recipient rules, pricing, checkout o submit watermark), `GET` (sposi: tutte; invitati: inviate + ricevute), `POST /api/events/[id]/capsule/confirm` (verifica Stripe), `POST /api/events/[id]/capsule/download` (presigned), `GET /api/cron/capsule` (GET-only + Bearer CRON_SECRET, maxDuration 300, branding cache per evento). Auth: `authorizeCapsuleAccess` (`apps/web/src/lib/capsule-auth.ts`) — sposo/delegato → 'couple', event_guests approved → 'guest'.
+- **Pagine**: `/events/[id]/capsule` (sposi+invitato, CapsulePageServer → CapsuleClient: recipient picker, video picker con validazione durata ≤180s client-side, frase watermark, date picker min/max 6mo-5yr, prezzo live, Stripe redirect), `/event/[code]/capsule` (invitato via codice → resolve code → eventId), `/event/capsula/[id]?t=` (vista pubblica destinatario: countdown prima della data, video watermarkato dopo).
+- **vercel.json**: cron `15 5 * * *` (/api/cron/capsule). next.config.ts: transpilePackages + outputFileTracingIncludes fonts/loghi per il cron capsule.
+
+### Test/verifica
+- Vitest: time-capsule 17/17 (prezzi proporzionali + boundary + payment_required + watermark text), suite completa 55/55 (7 file). `tsc --noEmit` apps/web OK.
+- Migration verificata live: insert test con nuove colonne OK, poi cancellato.
+
+### TODO prossima sessione
+1. **Deploy VPS** (fix cuore watermark): scp overlay.js + restart fotosposi-watermark. I video in galleria hanno ancora il cuore vecchio flottante — il fix vale per i video/capsule processati DOPO il deploy.
+2. **Frase nostra nel watermark**: placeholder 'Sposi.live · Capsula del Tempo' — da decidere (costante FRASE_NOSTRA_WATERMARK in packages/time-capsule/src/watermark.ts).
+3. **Importi prezzo**: default in codice (base €9 + €1/mese) — da confermare/con cambiare via platform_settings.
+4. **WhatsApp delivery**: provider da completare (selectWhatsAppProvider esiste in notifications; il channel whatsapp resta scheduled fino ad allora).
+5. **Legacy route `/api/time-capsule/[eventId]` SENZA auth** (preesistente): usa service client + body-provided sender_user_id — gap di sicurezza, da gated in futuro.
+6. Verifica visiva capsula in produzione + Search Console batch SEO settimanale.
+
 ## Sessione 15/09/2026 — ROOT CAUSE "31 foto → 5 in galleria": loop upload client abortiva al primo errore di rete + rate limit per-IP
 
 ### Sintomo

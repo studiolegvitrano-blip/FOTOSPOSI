@@ -178,6 +178,80 @@ export async function createCheckoutSession(params: {
   }
 }
 
+/**
+ * Checkout Stripe Capsula del Tempo (importo calcolato dal tempo, feature 18/09/2026).
+ * Pattern createGiftCheckoutSession (importo libero) + metadata capsule_id per la
+ * verifica del pagamento in POST /api/events/[id]/capsule/confirm.
+ */
+export async function createCapsuleCheckoutSession(params: {
+  event_id: string;
+  from_name: string;
+  amount: number;
+  capsuleId: string;
+  successUrl: string;
+  cancelUrl: string;
+}): Promise<{ url?: string; error?: string }> {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) return { error: 'Stripe non configurato' };
+
+  try {
+    const stripe = await import('stripe');
+    const client = new stripe.default(stripeKey, { apiVersion: '2025-02-24.acacia' as any });
+
+    const session = await client.checkout.sessions.create({
+      payment_method_types: ['card', 'klarna'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'eur',
+            product_data: { name: 'Capsula del Tempo — video messaggio' },
+            unit_amount: Math.round(params.amount * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: params.successUrl,
+      cancel_url: params.cancelUrl,
+      metadata: {
+        event_id: params.event_id,
+        from_name: params.from_name,
+        capsule_id: params.capsuleId,
+        type: 'time_capsule',
+      },
+    });
+
+    return { url: session.url ?? undefined };
+  } catch (err) {
+    return { error: String(err) };
+  }
+}
+
+/**
+ * Verifica pagamento checkout capsula: la sessione deve essere paid E il
+ * metadata.capsule_id deve corrispondere (nessun webhook necessario).
+ */
+export async function verifyCapsuleCheckoutSession(params: {
+  sessionId: string;
+  capsuleId: string;
+}): Promise<{ paid?: boolean; paymentIntent?: string; error?: string }> {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) return { error: 'Stripe non configurato' };
+
+  try {
+    const stripe = await import('stripe');
+    const client = new stripe.default(stripeKey, { apiVersion: '2025-02-24.acacia' as any });
+
+    const session = await client.checkout.sessions.retrieve(params.sessionId);
+    if (session.metadata?.capsule_id !== params.capsuleId) {
+      return { error: 'Sessione non corrisponde alla capsula' };
+    }
+    const paid = session.payment_status === 'paid';
+    return { paid, paymentIntent: typeof session.payment_intent === 'string' ? session.payment_intent : undefined };
+  } catch (err) {
+    return { error: String(err) };
+  }
+}
 export async function createGiftTransaction(params: {
   event_id: string;
   from_user: string;

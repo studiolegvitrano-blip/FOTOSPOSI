@@ -28,6 +28,7 @@
     "@fotosposi/seo": "*",
     "@fotosposi/site-builder": "*",
     "@fotosposi/social-sharing": "*",
+    "@fotosposi/time-capsule": "*",
     "@fotosposi/ui": "*",
     "@fotosposi/video-overlay": "*",
     "@fotosposi/weather": "*",
