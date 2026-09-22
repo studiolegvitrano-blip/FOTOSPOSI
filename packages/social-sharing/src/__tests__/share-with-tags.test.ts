@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { coupleNameToHashtag, buildShareText, buildDefaultCaption } from '../share-with-tags';
 
 describe('coupleNameToHashtag', () => {
-  it('converte "Elisa & Nausica" → #ElisaandNausica', () => {
-    expect(coupleNameToHashtag('Elisa & Nausica')).toBe('#ElisaandNausica');
+  it('converte "Elisa & Nausica" → #ElisaENausica (& → E, non "and")', () => {
+    expect(coupleNameToHashtag('Elisa & Nausica')).toBe('#ElisaENausica');
   });
 
   it('rimuove spazi e caratteri speciali', () => {
-    expect(coupleNameToHashtag('Giulia & Marco')).toBe('#GiuliaandMarco');
+    expect(coupleNameToHashtag('Giulia & Marco')).toBe('#GiuliaEMarco');
     expect(coupleNameToHashtag('  Mario   Rossi  ')).toBe('#MarioRossi');
   });
 
@@ -19,7 +19,30 @@ describe('coupleNameToHashtag', () => {
     expect(coupleNameToHashtag(null)).toBeNull();
     expect(coupleNameToHashtag(undefined)).toBeNull();
     expect(coupleNameToHashtag('')).toBeNull();
-    expect(coupleNameToHashtag('&&&')).toBe('#andandand');
+    expect(coupleNameToHashtag('&&&')).toBe('#EEE');
+  });
+});
+
+describe('hashtag con & (bug #Anna&Marcosposi → & rompe l\u2019hashtag sui social)', () => {
+  it('coupleHashtag con & → & strippato da normalizeHashtag', () => {
+    const text = buildShareText({
+      userText: 'Test',
+      coupleHashtag: '#Anna&Marcosposi',
+      photoUrl: 'https://example.com/x.jpg',
+      brand: 'sposilive',
+    });
+    expect(text).toContain('#AnnaMarcosposi');
+    expect(text).not.toContain('&');
+  });
+
+  it('hashtag con accenti → diacritici rimossi (gli hashtag social non li accettano)', () => {
+    const text = buildShareText({
+      userText: 'Test',
+      coupleHashtag: '#MatrìmonioSposi',
+      photoUrl: 'https://example.com/x.jpg',
+      brand: 'sposilive',
+    });
+    expect(text).toContain('#MatrimonioSposi');
   });
 });
 

@@ -34,8 +34,8 @@ export interface ShareTagInput {
   partnerHandle?: string | null;
   /** Hashtag partner B2B (es. 'sartoriaitalianaofficial'). */
   partnerHashtag?: string | null;
-  /** URL pubblica della foto da condividere (obbligatoria per FB sharer). */
-  photoUrl: string;
+  /** URL pubblica della foto (usato SOLO da buildShareUrl per i link sharer; il TESTO non lo contiene mai). */
+  photoUrl?: string;
   /** Brand: 'sposilive' (IT) o 'justmarry' (INT) → determina @brandHardcoded. */
   brand?: BrandHandle;
 }
@@ -64,12 +64,20 @@ function normalizeHandle(h?: string | null): string | null {
   return v.startsWith('@') ? v : `@${v}`;
 }
 
-/** Normalizza un hashtag: trim + prepend '#' se mancante. '' se vuoto. */
+/**
+ * Normalizza un hashtag per i social: trim, strip '#' iniziali, diacritici rimossi
+ * (NFD — gli hashtag non funzionano con accenti), SOLO [a-zA-Z0-9_] (&, spazi,
+ * punteggiatura strippati — '&' rompe l'hashtag sui social). Ritorna '#xxx' o ''.
+ */
 function normalizeHashtag(h?: string | null): string | null {
   if (!h) return null;
-  const v = h.trim();
-  if (!v) return null;
-  return v.startsWith('#') ? v : `#${v}`;
+  const clean = h
+    .trim()
+    .replace(/^#+/, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_]/g, '');
+  return clean ? `#${clean}` : null;
 }
 
 /**
@@ -81,7 +89,7 @@ function normalizeHashtag(h?: string | null): string | null {
 export function coupleNameToHashtag(coupleName?: string | null): string | null {
   if (!coupleName) return null;
   const cleaned = coupleName
-    .replace(/&/g, 'and') // "Elisa & Nausica" → "Elisa and Nausica" → poi unito
+    .replace(/\s*&\s*/gi, 'E') // "Elisa & Marco" → "ElisaEMarco" (& non è valido negli hashtag)
     .replace(/[^a-zA-Z0-9_\p{L}\p{N}]/gu, '')
     .replace(/^#+/, '');
   if (!cleaned) return null;
@@ -149,14 +157,14 @@ export function buildShareUrl(platform: SharePlatform, input: ShareTagInput): st
 
   switch (platform) {
     case 'facebook':
-      return `https://www.facebook.com/sharer/sharer.php?u=${enc(photoUrl)}&quote=${enc(text)}`;
+      return `https://www.facebook.com/sharer/sharer.php?u=${enc(photoUrl || '')}&quote=${enc(text)}`;
     case 'tiktok': {
       // TikTok non accetta un URL foto via web share. Include il testo + titolo.
       // Su desktop TikTok genera una pagina di anteprima; su mobile apre l'app.
       return `https://www.tiktok.com/upload?text=${enc(text)}`;
     }
     case 'twitter':
-      return `https://twitter.com/intent/tweet?text=${enc(text)}&url=${enc(photoUrl)}`;
+      return `https://twitter.com/intent/tweet?text=${enc(text)}&url=${enc(photoUrl || '')}`;
     case 'instagram':
       // Instagram non ha endpoint web share ufficiale. Ritorniamo la home di IG:
       // il client aprirà questo link e平行mente copierà il testo negli appunti.

@@ -114,6 +114,8 @@ export default function SocialShareButtons({
 
   // Testo SOLO tag (senza URL/link): è il testo che accompagna la foto/video
   // condivisa come FILE. Righe: frase utente + @handles + #hashtags.
+  // photoUrl NON viene passato: buildShareText non lo inserisce nel testo (verificato),
+  // e il testo destinato a FB/IG/X non deve mai contenere https://...
   const buildTagText = () =>
     buildShareText({
       userText: userTextInput,
@@ -122,9 +124,83 @@ export default function SocialShareButtons({
       coupleHashtag: coupleTag,
       partnerHandle,
       partnerHashtag,
-      photoUrl,
       brand,
     });
+
+  /** Download del file watermarked + caption negli appunti + apertura del social. */
+  const downloadAndOpenSocial = async (dest: string, label: string) => {
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(buildTagText());
+      copied = true;
+    } catch { /* toast sotto */ }
+    const file = await fetchWatermarkedFile();
+    if (file) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(file);
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+    showToast(copied ? `Foto scaricata + testo copiato — incolla nel post ${label}` : 'Foto scaricata — copia la descrizione manualmente');
+    window.open(dest, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShare = async (platform: PlatformKey) => {
+    const input = shareInput();
+
+    // FACEBOOK: MAI la share sheet (l'app FB interpreta files+text in modo
+    // imprevedibile e il sharer ignora il testo) — download + clipboard + apertura.
+    if (platform === 'facebook') {
+      await downloadAndOpenSocial('https://www.facebook.com/', 'Facebook');
+      return;
+    }
+
+    // INSTAGRAM: native share (file) + caption negli appunti; fallback download+open.
+    if (platform === 'instagram') {
+      if (mediaId && eventId) {
+        const shared = await nativeShareFile();
+        if (shared) return;
+      }
+      await downloadAndOpenSocial('https://www.instagram.com/', 'Instagram');
+      return;
+    }
+
+    // LINKEDIN: download + clipboard + apertura feed (share-offsite accetta solo URL).
+    if (platform === 'linkedin') {
+      await downloadAndOpenSocial('https://www.linkedin.com/feed/', 'LinkedIn');
+      return;
+    }
+
+    // X: composer con testo precompilato (MAI url — il link rendeva il post "foto+link")
+    // + foto scaricata da allegare.
+    if (platform === 'twitter') {
+      const file = await fetchWatermarkedFile();
+      if (file) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(file);
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      }
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(buildTagText())}`, '_blank', 'noopener,noreferrer');
+      showToast('Testo pronto su X — allega la foto scaricata');
+      return;
+    }
+
+    if (platform === 'whatsapp') {
+      const url = buildWhatsappUrl(photoUrl, input);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    const url = buildShareUrl(platform, input);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   const shareInput = () => ({
     userText: userTextInput,
@@ -185,56 +261,6 @@ export default function SocialShareButtons({
       // utente ha annullato la share sheet
       return true;
     }
-  };
-
-  const handleShare = async (platform: PlatformKey) => {
-    const input = shareInput();
-
-    // RICHIESTA CLIENTE: la foto/video PURA con i tag, NON un link. Su mobile la
-    // Web Share API con `files` allega il file reale. Questo copre FB/IG/X/WA
-    // indistintamente tramite la share sheet nativa di sistema.
-    if (mediaId && eventId) {
-      const shared = await nativeShareFile();
-      if (shared) return;
-    }
-
-    // Fallback desktop (no navigator.share) o file share fallito: per FB/IG/LinkedIn
-    // MAI un link nudo — il FB sharer ignora il testo (quote) e condivide SOLO l'URL
-    // (bug visto in produzione 23/09: post con solo https://www.sposi.live/events/...).
-    // Download del file + caption negli appunti + apertura del social/composer.
-    if (platform === 'facebook' || platform === 'instagram' || platform === 'linkedin') {
-      const text = buildShareTextForInstagram(input);
-      let copied = false;
-      try {
-        await navigator.clipboard.writeText(`${text}`);
-        copied = true;
-      } catch { /* toast sotto */ }
-      const file = await fetchWatermarkedFile();
-      if (file) {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(file);
-        a.download = file.name;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      }
-      const dest = platform === 'facebook'
-        ? 'https://www.facebook.com/'
-        : platform === 'instagram'
-          ? 'https://www.instagram.com/'
-          : 'https://www.linkedin.com/feed/';
-      showToast(copied ? 'Foto scaricata + testo copiato — incolla nel post' : 'Foto scaricata — copia la descrizione manualmente');
-      window.open(dest, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
-    if (platform === 'whatsapp') {
-      const url = buildWhatsappUrl(photoUrl, input);
-      window.open(url, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
-    const url = buildShareUrl(platform, input);
-    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // Web Share API nativa (mobile): condivide il FILE watermarked se possibile.
