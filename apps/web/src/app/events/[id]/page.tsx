@@ -5,8 +5,9 @@ import { hasFeature, type Tier } from '@fotosposi/core';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { ShareButton, Countdown, MiniCountdown } from '@fotosposi/ui';
+import { Countdown, MiniCountdown } from '@fotosposi/ui';
 import { shareWatermarkedMedia } from '@/lib/share-watermarked';
+import SocialShareButtons from '@/components/social-share-buttons';
 import { Share2, Church, Building2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -151,6 +152,15 @@ export default function EventDetailPage() {
   const brandLogoUrl = event.brand === 'weddingmoments'
     ? '/logo-justmarry-trans.png'
     : '/logo-sposi-trans.png';
+
+  // Foto di copertina per la condivisione della pagina: prima foto in galleria. Il file
+  // watermarked viene condiviso come FILE via /api/photos/{id}/share (mai un link nudo);
+  // photoUrl serve solo al link nel testo WhatsApp. È l'endpoint share PUBBLICO (verificato
+  // 200 senza cookie) — /api/media/{id}/download è 401 e sarebbe un link rotto per i destinatari.
+  const coverMedia = media.find((m) => (m.type || 'photo') === 'photo') ?? media[0] ?? null;
+  const coverPhotoUrl = coverMedia
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/photos/${coverMedia.id}/share?eventId=${eventId}&format=square`
+    : '';
 
   return (
     <>
@@ -343,10 +353,21 @@ export default function EventDetailPage() {
                 </CardContent>
               </Card>
 
-              <div className="flex items-center gap-4 mt-4">
-                <ShareButton
-                  eventUrl={typeof globalThis !== 'undefined' ? globalThis.location?.href ?? '' : ''}
-                  title={event.couple_name}
+              <div className="flex items-center gap-4 mt-4 flex-wrap">
+                <SocialShareButtons
+                  photoUrl={coverPhotoUrl}
+                  mediaId={coverMedia?.id}
+                  eventId={eventId}
+                  isVideo={(coverMedia?.type || 'photo') === 'video'}
+                  coupleName={event.couple_name}
+                  groom1Handle={event.groom1_social_handle ?? null}
+                  groom2Handle={event.groom2_social_handle ?? null}
+                  coupleHashtag={event.couple_hashtag ?? null}
+                  partnerHandle={partner?.social_handle ?? null}
+                  partnerHashtag={partner?.social_hashtag ?? null}
+                  brand={event.brand === 'weddingmoments' ? 'justmarry' : 'sposilive'}
+                  variant="inline"
+                  showLabels
                 />
                 <Button variant="link" asChild><Link href="/dashboard">{c('back')}</Link></Button>
               </div>

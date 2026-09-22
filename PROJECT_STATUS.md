@@ -1,5 +1,41 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 23/09/2026 (2) — "Nessun link nudo, mai": vecchio ShareButton eliminato, share file-first ovunque + guardrail buildShareUrl
+
+### 1. Root cause "solo link nella descrizione" CONFERMATA: il vecchio ShareButton era ancora su /events/[id]:347 (la pagina del test utente)
+- Il fix del 23/09 (handleShare per-platform in social-share-buttons.tsx) era corretto, ma `apps/web/src/app/events/[id]/page.tsx:347` e `event/[code]/page.tsx:349` usavano ANCORA il vecchio `ShareButton` (packages/ui) con `eventUrl=location.href` → `shareMedia(location.href, title)` → `navigator.share({title, text: title, url})` → post FB come LINK NUDO + nessuna didascalia/hashtag. L'URL nel post FB dell'utente (`/events/d88403f7-...`) conferma che aveva premuto QUELLO.
+
+### 2. Fix (commit di questa sessione)
+- **Sostituito** il vecchio ShareButton con `SocialShareButtons` su ENTRAMBE le pagine (file-first: `mediaId`/`eventId` → download/share del file watermarked via `/api/photos/{id}/share`, caption precompilata `buildDefaultCaption`, tag automatici). NB: le pagine sono CLIENT-side con GIÀ partner/media/handles nello state — niente fetch server extra. Field name reali: `groom1_social_handle`/`groom2_social_handle`/`couple_hashtag` (events), `social_handle`/`social_hashtag` (partner) — la proposta Claude usava field name inesistenti (`groom1_handle`, `partner.handle`).
+- **photoUrl per il testo WhatsApp = endpoint share PUBBLICO** (`/api/photos/{id}/share?eventId=...&format=square`, verificato 200 senza cookie, immagine watermarked con preview in WhatsApp) — NON `/api/media/{id}/download` (401 senza cookie → link ROTTO per i destinatari; deviazione deliberata dalla proposta Claude, verificata live).
+- **Branch X file-first**: native share (file) + caption clipboard, fallback download + clipboard + intent `text=` SOLO (mai `&url=`).
+- **Guardrail in `buildShareUrl`** (share-with-tags.ts): `console.error` per facebook/tiktok ("usa downloadAndOpenSocial, non un link sharer") — un futuro refactor non può reintrodurre il bug per errore. + test ×3 (console.error FB/TikTok, nessun guardrail su Twitter intent).
+- **Rimosso dead code**: `packages/ui/src/share-button.tsx` (delete + export) e `shareMedia` da service.ts/index.ts (unica consumer era ShareButton). P2 "2 componenti share sovrapposti da consolidare" CHIUSO. `shareMediaWithFile` resta (primitiva file-sharing valida).
+- **Checklist grep verificata**: `shareMedia(` → ZERO chiamate; `ShareButton` → solo SocialShareButtons.
+
+### 3. Verifiche live (oggi)
+- **Endpoint share VALIDO e NON nero anche per foto Marinella** `ba33c543` (event d88403f7): HTTP 200, image/jpeg 355KB, **1080x2340** sRGB 4:2:0, mean 78.6/73.9/65.1, stdev 72.8 (c'è contenuto).
+- **`format=square` NON produce 1:1**: restituisce la foto a dimensione ORIGINALE (in photo-overlay solo 'story' ricrea il canvas 1080x1920; 'square' non ridimensiona — nome fuorviante, NON bug).
+- `/api/media/{id}/download` → 401 senza cookie (verificato) — inutilizzabile da app esterne/destinatari.
+- Test 557/557 (49 file). Typecheck `tsc --noEmit` apps/web OK.
+
+### 4. Aperto "foto nera" nel preview share sheet (da chiarire — endpoint SCARTATO, è valido)
+Ipotesi in ordine di probabilità (endpoint verificato valido 2x):
+1. **VIDEO condiviso** (feed card video → File fotosposi.mp4 → anteprima mp4 nello share sheet Android nera)
+2. **Menu browser Android**: l'img della lightbox NON ha `onContextMenu preventDefault` (full-gallery-lightbox.tsx) → il long-press apre ANCHE il menu browser ("Condividi immagine") → l'app destinataria riceve `/api/media/{id}/download` → 401 → attachment/preview nero (e la clipboard NON viene copiata)
+3. Foto scura di suo (party notturna, mean 78) — percezione "nera" su preview piccolo
+- **Fix candidati prossima sessione**: (a) `onContextMenu={(e) => e.preventDefault()}` + `-webkit-touch-callout: none` sull'img lightbox; (b) PREVIEW del file watermarked nel menu long-press (thumbnail del blob che sarà condiviso — l'utente vede subito se è nero/valido PRIMA di scegliere la destinazione); (c) diagnostica file.size/canShare in console.
+- **NB feed WhatsApp link rotto**: le card feed passano `photoUrl=absoluteUrl(mediaUrl)` = `/api/media/{id}/download` (401 per i destinatari) — da allineare all'endpoint share pubblico come fatto per le due pagine.
+
+### TODO prossima sessione
+1. Fix "foto nera" preview (vedi sezione 4: onContextMenu + preview blob nel menu + diagnostica).
+2. Allineare il photoUrl WhatsApp del feed all'endpoint share pubblico.
+3. Frase nostra watermark: placeholder 'Sposi.live · Capsula del Tempo' — da decidere.
+4. Importi prezzo capsule: default in codice — da confermare via platform_settings.
+5. WhatsApp delivery: provider da completare.
+6. Idempotenza processSingleItem (chiude il loop orfani per sempre) + repair 5 video Marinella.
+7. Share API dirette per sposi (Fase 2): TikTok Content Posting API, LinkedIn Posts API, FB/IG Graph API con OAuth.
+
 ## Sessione 23/09/2026 — Coda drenata (30 righe orfane video → DLQ) + share ChatGPT integrata + endpoint share verificato
 
 ### 1. ROOT CAUSE "file sempre in carica": 30 righe coda orfane per video GIÀ processati, duplicate ogni giorno dai cron

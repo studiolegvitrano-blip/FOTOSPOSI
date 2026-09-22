@@ -181,9 +181,14 @@ export default function SocialShareButtons({
       return;
     }
 
-    // X: composer con testo precompilato (MAI url — il link rendeva il post "foto+link")
-    // + foto scaricata da allegare.
+    // X: 1° tentativo = Web Share API nativa con FILE (il post nasce già con
+    // foto + caption, mai link). Fallback: download + clipboard + intent con
+    // SOLO testo (MAI url — il &url= rendeva il post "foto+link").
     if (platform === 'twitter') {
+      if (mediaId && eventId) {
+        const shared = await nativeShareFile();
+        if (shared) return;
+      }
       const file = await fetchWatermarkedFile();
       if (file) {
         const a = document.createElement('a');
@@ -194,8 +199,9 @@ export default function SocialShareButtons({
         a.remove();
         setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       }
+      try { await navigator.clipboard.writeText(buildTagText()); } catch { /* best-effort */ }
       window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(buildTagText())}`, '_blank', 'noopener,noreferrer');
-      showToast('Testo pronto su X — allega la foto scaricata');
+      showToast('Foto scaricata + testo copiato — allega la foto al post X');
       return;
     }
 

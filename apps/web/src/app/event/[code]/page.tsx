@@ -7,8 +7,9 @@ import { useTranslations } from 'next-intl';
 import { hasFeature, type Tier } from '@fotosposi/core';
 import { getCurrentUser } from '@fotosposi/core';
 import { rememberLastEventCode } from '@/components/pwa-event-redirect';
-import { ShareButton, Countdown, MiniCountdown } from '@fotosposi/ui';
+import { Countdown, MiniCountdown } from '@fotosposi/ui';
 import { shareWatermarkedMedia } from '@/lib/share-watermarked';
+import SocialShareButtons from '@/components/social-share-buttons';
 import { Church, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -165,6 +166,15 @@ export default function GuestEventPage() {
   const brandLogoUrl = event.brand === 'weddingmoments'
     ? '/logo-justmarry-trans.png'
     : '/logo-sposi-trans.png';
+
+  // Foto di copertina per la condivisione della pagina: prima foto in galleria. Il file
+  // watermarked viene condiviso come FILE via /api/photos/{id}/share (mai un link nudo);
+  // photoUrl serve solo al link nel testo WhatsApp. È l'endpoint share PUBBLICO (verificato
+  // 200 senza cookie) — /api/media/{id}/download è 401 e sarebbe un link rotto per i destinatari.
+  const coverMedia = media.find((m) => (m.type || 'photo') === 'photo') ?? media[0] ?? null;
+  const coverPhotoUrl = coverMedia
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/photos/${coverMedia.id}/share?eventId=${event.id}&format=square`
+    : '';
 
   const countdownLabels = {
     countdown_intro: t('cd_countdown_intro'),
@@ -345,10 +355,21 @@ export default function GuestEventPage() {
                 </Card>
               )}
 
-              <div className="flex items-center gap-4 mt-4">
-                <ShareButton
-                  eventUrl={typeof globalThis !== 'undefined' ? globalThis.location?.href ?? '' : ''}
-                  title={event.couple_name}
+              <div className="flex items-center gap-4 mt-4 flex-wrap">
+                <SocialShareButtons
+                  photoUrl={coverPhotoUrl}
+                  mediaId={coverMedia?.id}
+                  eventId={event.id}
+                  isVideo={(coverMedia?.type || 'photo') === 'video'}
+                  coupleName={event.couple_name}
+                  groom1Handle={event.groom1_social_handle ?? null}
+                  groom2Handle={event.groom2_social_handle ?? null}
+                  coupleHashtag={event.couple_hashtag ?? null}
+                  partnerHandle={partner?.social_handle ?? null}
+                  partnerHashtag={partner?.social_hashtag ?? null}
+                  brand={event.brand === 'weddingmoments' ? 'justmarry' : 'sposilive'}
+                  variant="inline"
+                  showLabels
                 />
               </div>
             </section>

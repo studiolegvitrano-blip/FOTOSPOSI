@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { coupleNameToHashtag, buildShareText, buildDefaultCaption } from '../share-with-tags';
+import { describe, it, expect, vi } from 'vitest';
+import { coupleNameToHashtag, buildShareText, buildShareUrl, buildDefaultCaption } from '../share-with-tags';
 
 describe('coupleNameToHashtag', () => {
   it('converte "Elisa & Nausica" → #ElisaENausica (& → E, non "and")', () => {
@@ -111,5 +111,30 @@ describe('buildDefaultCaption', () => {
   it('vuota senza nome coppia (nessun testo inventato)', () => {
     expect(buildDefaultCaption(null)).toBe('');
     expect(buildDefaultCaption('   ')).toBe('');
+  });
+});
+
+describe('guardrail buildShareUrl (nessun link nudo, mai — fix 23/09/2026)', () => {
+  it('facebook → console.error guardrail (deve passare da downloadAndOpenSocial: file + clipboard)', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    buildShareUrl('facebook', { userText: 'Test', photoUrl: 'https://example.com/x.jpg', brand: 'sposilive' });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(String(spy.mock.calls[0][0])).toContain('buildShareUrl chiamato per facebook');
+    spy.mockRestore();
+  });
+
+  it('tiktok → console.error guardrail (TikTok ignora upload?text=)', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    buildShareUrl('tiktok', { userText: 'Test', photoUrl: 'https://example.com/x.jpg', brand: 'sposilive' });
+    expect(String(spy.mock.calls[0][0])).toContain('buildShareUrl chiamato per tiktok');
+    spy.mockRestore();
+  });
+
+  it('twitter → nessun guardrail (intent con solo text= è un uso legittimo)', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const url = buildShareUrl('twitter', { userText: 'Test', photoUrl: 'https://example.com/x.jpg', brand: 'sposilive' });
+    expect(spy).not.toHaveBeenCalled();
+    expect(url).toContain('twitter.com/intent/tweet?text=');
+    spy.mockRestore();
   });
 });

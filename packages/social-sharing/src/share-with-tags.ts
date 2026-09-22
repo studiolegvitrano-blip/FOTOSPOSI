@@ -158,6 +158,12 @@ export function buildShareText(input: ShareTagInput, platform?: 'facebook'): str
  *   informativo e il client provvederà a copiare il testo negli appunti.
  */
 export function buildShareUrl(platform: SharePlatform, input: ShareTagInput): string {
+  if (platform === 'facebook' || platform === 'tiktok') {
+    // Questi due path devono SEMPRE passare da downloadAndOpenSocial (file + clipboard).
+    // Se buildShareUrl viene chiamato per loro, è un uso scorretto del componente
+    // (il sharer FB ignora il testo → post solo-URL; TikTok ignora upload?text=).
+    console.error(`[social-sharing] buildShareUrl chiamato per ${platform}: usa downloadAndOpenSocial (file + clipboard), non un link sharer.`);
+  }
   const text = buildShareText(input);
   const enc = encodeURIComponent;
   const photoUrl = input.photoUrl;
