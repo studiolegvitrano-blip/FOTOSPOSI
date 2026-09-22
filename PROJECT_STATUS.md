@@ -1,5 +1,36 @@
 # PROJECT STATUS — Sposi.live / JustMarry.live
 
+## Sessione 23/09/2026 — Coda drenata (30 righe orfane video → DLQ) + share ChatGPT integrata + endpoint share verificato
+
+### 1. ROOT CAUSE "file sempre in carica": 30 righe coda orfane per video GIÀ processati, duplicate ogni giorno dai cron
+- **Sintomo utente**: "file sempre in carica" — coda con 17 processing + 13 pending + 3 failed statici.
+- **Root cause**: TUTTI gli item stuck/pending erano le STESSE 4 video di Elisa & Nausica (`1000187830/1000185765/1000187139/1000186093.mp4`) duplicate ogni giorno (15→22/09, create_at 04:54-04:59 daily). Il repair 15/09 (VPS async) fixò i media DIRECTLY (29/29 watermark ok) SENZA aggiornare le righe coda → righe orfane obsolete con `failure_class='detect_watermark_missing'` → i cron le ritentano all'infinito (claim → lambda muore a metà run sui video → stuck → recovery reset → claim → loop). Loop classico DLQ→coda.
+- **Fix**: 29 righe Elisa (video 29/29 già in galleria) + 1 failed Marinella (in_media=1) → spostate in DLQ come storico con reason "video già processato e in galleria (repair 15/09) - riga coda duplicata dai cron daily, obsoleta" + DELETE dalla coda. NOTA: la DELETE via CTE INSERT...RETURNING non funzionò (WHERE convoluto con max(moved_to_dlq_at)) — rifatta diretta con gli stessi criteri.
+- **Stato finale coda**: 395 synced + **1 pending reale** (video Marinella `1000187830.mp4` non ancora in media — il cron lo processa con resume). 0 processing / 0 failed.
+- **Marinella**: 2/7 video watermark ok, 5 con watermark_missing → da riparare (repair, NON toccare le foto).
+- **Lezione**: quando un repair manuale (VPS/script) completa item direttamente, deve ANCHE chiudere le righe coda corrispondenti (o il loop riparte). Candidato fix strutturale: idempotenza nel processSingleItem — se il video è già in media_uploads con watermark ok → completa l'item senza ri-processare.
+
+### 2. Endpoint share verificato + integrazione review ChatGPT
+- **Verifica programmatica**: GET `/api/photos/{id}/share?format=square` su foto reale Elisa → **jpeg 1024x1536 VALIDO** (mean luminanza 98/74/62, 49% scuri — NON nero). La "foto tutta nera" riferita dall'utente NON viene dall'endpoint: probabile VIDEO condiviso via share sheet (FB renderizza male le preview video) o rendering lato app FB. Da chiarire con l'utente (foto o video?).
+- **Nota CORS**: NON è un problema — l'endpoint è same-origin (il fetch R2 avviene server-side). ChatGPT aveva suggerito CORS come causa possibile: FALSO per questa architettura.
+- **Integrato** (commit `aac9c94`): (1) **logging errori** fetch/clipboard/share in console (`[social-share] endpoint share fallito {status}`) — niente fallimenti silenziosi, l'utente vede in console il 404/500 in 30s; (2) **check blob vuoto** (blob.size===0 → errore esplicito, non file corrotto); (3) **branch TikTok esplicito**: native share (file) + clipboard, fallback download+clipboard+open tiktok.com/upload (il generico `upload?text=` era ignorato da TikTok — nessun web-intent con caption lato TikTok).
+- **Limiti documentati (ChatGPT, confermati)**: le Storie IG/TikTok scartano SEMPRE il testo dello share sheet (policy piattaforma) → mitigazione clipboard + toast; nessun modo lato client di pubblicare foto+caption in un tap su FB/X → serve API ufficiale OAuth (Fase 2, scenario B2B partner).
+- NON sostituito il componente con il modulo factory ChatGPT (`createHandleShare`) — il componente esistente è wired ovunque (lightbox + card + timeline feed); integrati solo i punti buoni. `nativeShareFile` conserva text nel payload (alcuni target lo onorano; clipboard comunque copiata prima).
+
+### 3. Coda drenata manualmente (trigger maintenance)
+- Trigger `GET /api/cron/maintenance` + Bearer CRON_SECRET: HTTP 000 a 150s (la lambda gira oltre — maxDuration 300s) MA il run continua server-side (verificato: failed 3→1, item processati). NB: usare curl.exe (curl PowerShell = alias Invoke-WebRequest, `-m` ambiguo).
+
+### TODO prossima sessione
+1. **Frase nostra nel watermark**: placeholder 'Sposi.live · Capsula del Tempo' — da decidere.
+2. **Importi prezzo**: default in codice (base €9 + €1/mese) — da confermare via platform_settings.
+3. **WhatsApp delivery**: provider da completare.
+4. **Legacy route `/api/time-capsule/[eventId]` SENZA auth** — da gated in futuro.
+5. **Chiarire "foto tutta nera"** con l'utente (foto o video? quale bottone?) + verificare video share in produzione.
+6. **Fix strutturale**: idempotenza processSingleItem (video già in media → completa l'item) per chiudere il loop orfani per sempre + repair 5 video Marinella.
+7. **Re-run security review agent** (tornato vuoto) + recovery step stuck processing capsule + orfani R2 capsules in /api/r2/orphans.
+8. **Share API dirette per sposi (Fase 2)**: TikTok Content Posting API, LinkedIn Posts API, FB/IG Graph API con OAuth.
+9. Verifica visiva capsula + galleria in produzione + Search Console batch SEO settimanale.
+
 ## Sessione 18/09/2026 — FIX cuore watermark video (fuori linea) + FEATURE Capsula del Tempo (video, delivery 6mesi-5anni, pagamenti proporzionali)
 
 ### 1. Fix cuore watermark video fuori linea dai caratteri
