@@ -199,6 +199,23 @@ export default function SocialShareButtons({
       return;
     }
 
+    // TIKTOK: native share (file) + caption negli appunti; fallback download+open
+    // upload (TikTok non espone web-intent con caption precompilata — il vecchio
+    // upload?text= viene ignorato da TikTok).
+    if (platform === 'tiktok') {
+      if (mediaId && eventId) {
+        const shared = await nativeShareFile();
+        if (shared) return;
+      }
+      await downloadAndOpenSocial(
+        buildTagText(),
+        'https://www.tiktok.com/upload?lang=it',
+        'TikTok',
+        'Foto scaricata + testo copiato — apri TikTok, crea un post e incolla la didascalia',
+      );
+      return;
+    }
+
     if (platform === 'whatsapp') {
       const url = buildWhatsappUrl(photoUrl, input);
       window.open(url, '_blank', 'noopener,noreferrer');
@@ -231,12 +248,20 @@ export default function SocialShareButtons({
     const url = `/api/photos/${mediaId}/share?eventId=${encodeURIComponent(eventId)}&format=square`;
     try {
       const resp = await fetch(url);
-      if (!resp.ok) return null;
+      if (!resp.ok) {
+        console.error('[social-share] endpoint share fallito', resp.status, await resp.text().catch(() => ''));
+        return null;
+      }
       const blob = await resp.blob();
+      if (!blob || blob.size === 0) {
+        console.error('[social-share] blob vuoto ricevuto da', url);
+        return null;
+      }
       const ext = isVideo ? 'mp4' : 'jpg';
       const type = isVideo ? 'video/mp4' : 'image/jpeg';
       return new File([blob], `fotosposi.${ext}`, { type });
-    } catch {
+    } catch (err) {
+      console.error('[social-share] fetch fallito (rete/CORS)', err);
       return null;
     }
   };
