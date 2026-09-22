@@ -166,17 +166,21 @@ export default function SocialShareButtons({
     if (!file) return false;
     try {
       const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
+      // Copia SEMPRE la caption negli appunti PRIMA della share: se l'app social
+      // (FB/IG) scarta il testo quando riceve un allegato, l'utente lo incolla.
+      try { await navigator.clipboard.writeText(buildTagText()); } catch { /* best-effort */ }
       if (!nav.canShare || nav.canShare({ files: [file] })) {
         await nav.share({
           title: 'Sposi.live',
           text: buildTagText(),
           files: [file],
         });
+        showToast('Foto allegata — testo copiato: incollalo nel post se manca');
         return true;
       }
-      // Browser non supporta share di file: condividi solo testo (degradato).
-      await nav.share({ title: 'Sposi.live', text: buildTagText(), url: photoUrl });
-      return true;
+      // File non condivisibile dal browser → fallback al chiamante
+      // (download + caption copiata + apertura social, MAI un link nudo).
+      return false;
     } catch {
       // utente ha annullato la share sheet
       return true;
@@ -194,30 +198,32 @@ export default function SocialShareButtons({
       if (shared) return;
     }
 
-    // Fallback desktop (no navigator.share): comportamento per-piattaforma.
-    if (platform === 'instagram') {
+    // Fallback desktop (no navigator.share) o file share fallito: per FB/IG/LinkedIn
+    // MAI un link nudo — il FB sharer ignora il testo (quote) e condivide SOLO l'URL
+    // (bug visto in produzione 23/09: post con solo https://www.sposi.live/events/...).
+    // Download del file + caption negli appunti + apertura del social/composer.
+    if (platform === 'facebook' || platform === 'instagram' || platform === 'linkedin') {
       const text = buildShareTextForInstagram(input);
+      let copied = false;
       try {
         await navigator.clipboard.writeText(`${text}`);
-        showToast('Testo copiato — apri Instagram e incolla');
-      } catch {
-        showToast('Copia manuale: seleziona il testo e copia');
+        copied = true;
+      } catch { /* toast sotto */ }
+      const file = await fetchWatermarkedFile();
+      if (file) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(file);
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(a.href);
       }
-      window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer');
-      return;
-    }
-
-    if (platform === 'linkedin') {
-      // LinkedIn non ha web share con testo precompilato (sharing/share-offsite
-      // accetta solo URL). Stesso pattern IG: copia il testo + apri il feed.
-      const text = buildShareTextForInstagram(input);
-      try {
-        await navigator.clipboard.writeText(`${text}`);
-        showToast('Testo copiato — apri LinkedIn e incolla');
-      } catch {
-        showToast('Copia manuale: seleziona il testo e copia');
-      }
-      window.open('https://www.linkedin.com/feed/', '_blank', 'noopener,noreferrer');
+      const dest = platform === 'facebook'
+        ? 'https://www.facebook.com/'
+        : platform === 'instagram'
+          ? 'https://www.instagram.com/'
+          : 'https://www.linkedin.com/feed/';
+      showToast(copied ? 'Foto scaricata + testo copiato — incolla nel post' : 'Foto scaricata — copia la descrizione manualmente');
+      window.open(dest, '_blank', 'noopener,noreferrer');
       return;
     }
 

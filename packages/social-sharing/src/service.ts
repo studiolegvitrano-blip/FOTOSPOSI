@@ -15,11 +15,13 @@ export function defaultWatermark(brand: 'fotosposi' | 'weddingmoments'): Waterma
     color: '#ffffff',
   };
 }
-
 export async function shareMedia(url: string, title: string): Promise<boolean> {
   if (typeof navigator === 'undefined' || !navigator.share) return false;
+
   try {
-    await navigator.share({ title, url });
+    // text=titolo nel payload: senza, l'app social riceve SOLO l'URL e il post
+    // esce come link nudo (visto su FB 23/09/2026).
+    await navigator.share({ title, text: title, url });
     return true;
   } catch {
     return false;
