@@ -116,7 +116,7 @@ export default function SocialShareButtons({
   // condivisa come FILE. Righe: frase utente + @handles + #hashtags.
   // photoUrl NON viene passato: buildShareText non lo inserisce nel testo (verificato),
   // e il testo destinato a FB/IG/X non deve mai contenere https://...
-  const buildTagText = () =>
+  const buildTagText = (platform?: 'facebook') =>
     buildShareText({
       userText: userTextInput,
       groom1Handle,
@@ -125,13 +125,13 @@ export default function SocialShareButtons({
       partnerHandle,
       partnerHashtag,
       brand,
-    });
+    }, platform);
 
   /** Download del file watermarked + caption negli appunti + apertura del social. */
-  const downloadAndOpenSocial = async (dest: string, label: string) => {
+  const downloadAndOpenSocial = async (text: string, dest: string, label: string, toastMsg?: string) => {
     let copied = false;
     try {
-      await navigator.clipboard.writeText(buildTagText());
+      await navigator.clipboard.writeText(text);
       copied = true;
     } catch { /* toast sotto */ }
     const file = await fetchWatermarkedFile();
@@ -144,7 +144,7 @@ export default function SocialShareButtons({
       a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
-    showToast(copied ? `Foto scaricata + testo copiato — incolla nel post ${label}` : 'Foto scaricata — copia la descrizione manualmente');
+    showToast(toastMsg ?? (copied ? `Foto scaricata + testo copiato — incolla nel post ${label}` : 'Foto scaricata — copia la descrizione manualmente'));
     window.open(dest, '_blank', 'noopener,noreferrer');
   };
 
@@ -153,8 +153,15 @@ export default function SocialShareButtons({
 
     // FACEBOOK: MAI la share sheet (l'app FB interpreta files+text in modo
     // imprevedibile e il sharer ignora il testo) — download + clipboard + apertura.
+    // Micro-istruzione nel toast (costo zero, alza la conversione): gli # sono già
+    // cliccabili incollandoli; le @ vanno riscritte e scelte dai suggerimenti FB.
     if (platform === 'facebook') {
-      await downloadAndOpenSocial('https://www.facebook.com/', 'Facebook');
+      await downloadAndOpenSocial(
+        buildTagText('facebook'),
+        'https://www.facebook.com/',
+        'Facebook',
+        'Foto scaricata + testo copiato — incolla: gli # sono già cliccabili; per la @ riscrivila e scegli la pagina dai suggerimenti',
+      );
       return;
     }
 
@@ -164,13 +171,13 @@ export default function SocialShareButtons({
         const shared = await nativeShareFile();
         if (shared) return;
       }
-      await downloadAndOpenSocial('https://www.instagram.com/', 'Instagram');
+      await downloadAndOpenSocial(buildTagText(), 'https://www.instagram.com/', 'Instagram');
       return;
     }
 
     // LINKEDIN: download + clipboard + apertura feed (share-offsite accetta solo URL).
     if (platform === 'linkedin') {
-      await downloadAndOpenSocial('https://www.linkedin.com/feed/', 'LinkedIn');
+      await downloadAndOpenSocial(buildTagText(), 'https://www.linkedin.com/feed/', 'LinkedIn');
       return;
     }
 

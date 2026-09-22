@@ -440,6 +440,33 @@ export default function PartnerDashboardPage() {
               {savingClaim ? '...' : t('dashboard_save')}
             </Button>
             {savedMsg && <span className="ml-3 text-sm text-success">{t('dashboard_saved')}</span>}
+
+            {(() => {
+              const tag = socialHashtag.trim().replace(/^#+/, '').replace(/[^a-zA-Z0-9_]/g, '');
+              if (!tag) return null;
+              const urls = [
+                { label: 'X', href: `https://x.com/search?q=${encodeURIComponent('#' + tag)}` },
+                { label: 'Instagram', href: `https://www.instagram.com/explore/tags/${tag}/` },
+                { label: 'TikTok', href: `https://www.tiktok.com/tag/${tag}` },
+                { label: 'Facebook', href: `https://www.facebook.com/hashtag/${tag}` },
+              ];
+              return (
+                <div className="mt-4 space-y-2 rounded-md border p-3">
+                  <p className="text-sm font-medium">Monitoring hashtag: #{tag}</p>
+                  <p className="text-xs text-text-muted">
+                    Vedi in tempo reale tutti i post pubblici con questo hashtag o mention — monitoring nativo, senza API.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {urls.map((u) => (
+                      <a key={u.label} href={u.href} target="_blank" rel="noopener,noreferrer"
+                        className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted">
+                        {u.label}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>

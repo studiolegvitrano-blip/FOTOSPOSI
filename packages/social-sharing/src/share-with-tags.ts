@@ -109,7 +109,7 @@ export function coupleNameToHashtag(coupleName?: string | null): string | null {
  * - Se mancano tutti gli handle o tutti gli hashtag, le righe corrispondenti
  *   vengono omesse (non inseriamo righe vuote)
  */
-export function buildShareText(input: ShareTagInput): string {
+export function buildShareText(input: ShareTagInput, platform?: 'facebook'): string {
   const brand = input.brand ?? 'sposilive';
   const handles: string[] = [];
   const hashtags: string[] = [];
@@ -134,8 +134,15 @@ export function buildShareText(input: ShareTagInput): string {
   if (userText) lines.push(userText);
 
   const sep = '        '; // 8 spazi
-  if (handles.length > 0) lines.push(`${sep}${handles.join(' ')}`);
-  if (hashtags.length > 0) lines.push(`${sep}${hashtags.join(' ')}`);
+  if (platform === 'facebook') {
+    // FB: hashtag PRIMA delle mention — FB indicizza i # cliccabili; le @ sono
+    // cliccabili solo riscrivendole e scegliendo la pagina dai suggerimenti.
+    if (hashtags.length > 0) lines.push(`${sep}${hashtags.join(' ')}`);
+    if (handles.length > 0) lines.push(`${sep}${handles.join(' ')}`);
+  } else {
+    if (handles.length > 0) lines.push(`${sep}${handles.join(' ')}`);
+    if (hashtags.length > 0) lines.push(`${sep}${hashtags.join(' ')}`);
+  }
 
   return lines.join('\n');
 }
