@@ -62,6 +62,12 @@
 - **Fix**: (a) fallback FB/IG/LinkedIn = **mai link nudo**: download del file watermarked + caption negli appunti + apertura facebook.com / instagram.com / linkedin.com/feed (toast "Foto scaricata + testo copiato — incolla nel post"); (b) `nativeShareFile` copia SEMPRE la caption negli appunti PRIMA della share (se l'app FB scarta il testo ricevendo l'allegato, l'utente lo incolla); (c) rimosso il path degradato `nav.share({text, url})` (mai url nella share); (d) `shareMedia` (packages/social-sharing) ora passa `text: title` nel payload (il post evento non esce più come link nudo).
 - **Limitazione FB documentata**: quando l'app riceve file+testo può scartare il testo — decisione dell'app destinatario, non del codice. La clipboard è la mitigazione; la soluzione robusta resta l'API Graph (Fase 2).
 
+### 5. normalizeHashtag robusto + handleShare per-piattaforma (23/09, review ChatGPT integrata)
+- **Bug reale per #Anna&Marcosposi**: `normalizeHashtag` NON sanitizzava `&` → l'hashtag impostato dagli sposi con `&` restava intatto nel testo share e i social lo troncano al `&`. **Fix** (versione ChatGPT): NFD + diacritici rimossi (hashtag social non accettano accenti) + SOLO `[a-zA-Z0-9_]` (`#Anna&Marcosposi` → `#AnnaMarcosposi`). `coupleNameToHashtag`: `&` → `E` (`Elisa & Marco` → `#ElisaEMarco`, prima "and").
+- **handleShare per-piattaforma** (prima: nativeShareFile indistinto → share sheet imprevedibile per FB/X): **FB** = SEMPRE download+clipboard+open facebook.com (MAI share sheet, MAI sharer); **IG** = native share file + clipboard, fallback download+open; **LinkedIn** = download+clipboard+open feed; **X** = composer con testo precompilato (intent `text=` SENZA url — il `&url=` rendeva il post "foto+link") + foto scaricata da allegare; **WhatsApp** invariato (wa.me accetta testo). `buildTagText` NON passa più photoUrl (il testo share non contiene mai https://...).
+- NB ChatGPT aveva sugerito che buildShareText inserisse l'URL nel testo — FALSO (verificato: photoUrl ignorato da buildShareText). Un output corrotto "locklock..." in chat era un glitch di generazione, non scritto in nessun file (verificato typecheck+test+grep).
+- Test: social-sharing 12/12 (+2: & strippato, accenti rimossi). Typecheck OK.
+
 ### TODO prossima sessione
 1. **Frase nostra nel watermark**: placeholder 'Sposi.live · Capsula del Tempo' — da decidere (costante FRASE_NOSTRA_WATERMARK in packages/time-capsule/src/watermark.ts).
 2. **Importi prezzo**: default in codice (base €9 + €1/mese) — da confermare/con cambiare via platform_settings.
