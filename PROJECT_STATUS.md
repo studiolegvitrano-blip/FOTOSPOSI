@@ -47,7 +47,7 @@ Ipotesi in ordine di probabilità (endpoint verificato valido 2x):
 - **Verifica**: build locale RIUSCITO (BUILD_ID ydvn9xB-mocnmIu_o4bys), test 558/558 (49 file), typecheck OK.
 
 ### TODO prossima sessione
-1. Fix "foto nera" preview (vedi sezione 4: onContextMenu + preview blob nel menu + diagnostica) + VERIFICARE che il deploy di questa sessione sia VERDE in produzione (chunk con i fix) prima del test utente.
+1. Fix "foto nera" preview (vedi sezione 4: onContextMenu + preview blob nel menu + diagnostica). NB: deploy `1fcba72` VERIFICATO VERDE in produzione (chunk `6434` con i fix: WhatsApp file-first + X file-first + guardrail) — l'utente ora può ritestare sul codice nuovo.
 2. Allineare il photoUrl WhatsApp del feed all'endpoint share pubblico.
 3. Frase nostra watermark: placeholder 'Sposi.live · Capsula del Tempo' — da decidere.
 4. Importi prezzo capsule: default in codice — da confermare via platform_settings.
