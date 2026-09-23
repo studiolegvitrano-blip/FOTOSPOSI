@@ -27,6 +27,12 @@ Ipotesi in ordine di probabilità (endpoint verificato valido 2x):
 - **Fix candidati prossima sessione**: (a) `onContextMenu={(e) => e.preventDefault()}` + `-webkit-touch-callout: none` sull'img lightbox; (b) PREVIEW del file watermarked nel menu long-press (thumbnail del blob che sarà condiviso — l'utente vede subito se è nero/valido PRIMA di scegliere la destinazione); (c) diagnostica file.size/canShare in console.
 - **NB feed WhatsApp link rotto**: le card feed passano `photoUrl=absoluteUrl(mediaUrl)` = `/api/media/{id}/download` (401 per i destinatari) — da allineare all'endpoint share pubblico come fatto per le due pagine.
 
+### 5. Fix WhatsApp file-first (stesso giorno, follow-up utente: "adesso condivide il link non la foto ma con tag")
+- **Root cause**: WhatsApp era l'unico bottone rimasto che non passava MAI dal file — `buildWhatsappUrl` costruiva sempre `wa.me/?text=` con caption+tag e `photoUrl` dentro → il messaggio usciva con il LINK al posto della foto (con tag). Unico wa.me share del repo (verificato grep; gli altri 2 sono link contatto RSVP non correlati).
+- **Fix**: branch WhatsApp = 1° tentativo native share FILE (WhatsApp mobile lo supporta bene: foto allegata + caption) + clipboard, fallback download + wa.me con SOLO il testo (MAI photoUrl) + toast "allega la foto alla chat". `buildWhatsappUrl` rimosso (dead code). Regola "nessun link nudo nel testo" estesa a WhatsApp.
+- **Test** +1: photoUrl non finisce mai nel testo share (buildShareText). Suite 558/558 (49 file). Typecheck OK.
+- NOTA: il prop `photoUrl` resta in SocialShareProps (usato dai call site) ma ora è inutilizzato dentro il componente (solo dal fallback dead buildShareUrl mai raggiunto — tutte le piattaforme hanno branch dedicato).
+
 ### TODO prossima sessione
 1. Fix "foto nera" preview (vedi sezione 4: onContextMenu + preview blob nel menu + diagnostica).
 2. Allineare il photoUrl WhatsApp del feed all'endpoint share pubblico.

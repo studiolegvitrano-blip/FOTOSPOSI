@@ -55,32 +55,6 @@ const PLATFORM_META: Record<PlatformKey, { label: string; color: string }> = {
   linkedin: { label: 'LinkedIn', color: '#0A66C2' },
 };
 
-/**
- * Costruisce URL share per WhatsApp. API gratuita: wa.me con testo precompilato.
- * Funziona su mobile (apre l'app) e desktop (WhatsApp Web).
- */
-function buildWhatsappUrl(photoUrl: string, input: {
-  userText?: string;
-  groom1Handle?: string | null;
-  groom2Handle?: string | null;
-  coupleHashtag?: string | null;
-  partnerHandle?: string | null;
-  partnerHashtag?: string | null;
-  brand?: BrandHandle;
-}): string {
-  const text = buildShareText({
-    userText: input.userText ?? '',
-    groom1Handle: input.groom1Handle,
-    groom2Handle: input.groom2Handle,
-    coupleHashtag: input.coupleHashtag,
-    partnerHandle: input.partnerHandle,
-    partnerHashtag: input.partnerHashtag,
-    photoUrl,
-    brand: input.brand ?? 'sposilive',
-  });
-  return `https://wa.me/?text=${encodeURIComponent(`${text}\n${photoUrl}`)}`;
-}
-
 export default function SocialShareButtons({
   photoUrl,
   groom1Handle,
@@ -222,9 +196,27 @@ export default function SocialShareButtons({
       return;
     }
 
+    // WHATSAPP: 1° tentativo = share nativo con FILE (WhatsApp mobile lo supporta
+    // bene: foto allegata + caption precompilata). Fallback: download + wa.me con
+    // SOLO il testo (MAI il link foto — il post usciva con il link al posto della foto).
     if (platform === 'whatsapp') {
-      const url = buildWhatsappUrl(photoUrl, input);
-      window.open(url, '_blank', 'noopener,noreferrer');
+      if (mediaId && eventId) {
+        const shared = await nativeShareFile();
+        if (shared) return;
+      }
+      const file = await fetchWatermarkedFile();
+      if (file) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(file);
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      }
+      const text = buildTagText();
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+      showToast('Foto scaricata — allega la foto alla chat WhatsApp');
       return;
     }
 

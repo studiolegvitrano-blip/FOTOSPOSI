@@ -137,4 +137,15 @@ describe('guardrail buildShareUrl (nessun link nudo, mai — fix 23/09/2026)', (
     expect(url).toContain('twitter.com/intent/tweet?text=');
     spy.mockRestore();
   });
+
+  it('photoUrl NON finisce mai nel testo share (il link rende il messaggio "foto+link" — esteso a WhatsApp)', () => {
+    const text = buildShareText({
+      userText: 'Che giorno!',
+      coupleHashtag: '#MarioRossi',
+      photoUrl: 'https://www.sposi.live/api/photos/xyz/share?eventId=abc&format=square',
+      brand: 'sposilive',
+    });
+    expect(text).not.toContain('https://');
+    expect(text).not.toContain('sposi.live/api');
+  });
 });
