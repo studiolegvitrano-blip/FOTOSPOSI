@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runCapsuleSweep } from '@fotosposi/time-capsule';
+// Funzione server-only (watermark.ts usa sharp/ffmpeg): non è nell'index pubblico
+// (un client che importasse il package trascinerebbe sharp nel bundle → build fallisce).
+// Viene INIETTATA in runCapsuleSweep (stesso pattern di brandingFor).
+import { processCapsuleWatermarkJob } from '@fotosposi/time-capsule/src/watermark';
 import { getEventById } from '@fotosposi/events';
 import { getEventPartner } from '@fotosposi/partner';
 import { buildCapsuleBranding } from '@/lib/capsule-watermark';
@@ -48,6 +52,7 @@ export async function GET(req: NextRequest) {
   const result = await runCapsuleSweep({
     baseUrl,
     brandingFor,
+    processWatermarkJob: processCapsuleWatermarkJob,
     pollBudgetMs: Number(process.env.VIDEO_POLL_BUDGET_MS) || 150_000,
   });
 

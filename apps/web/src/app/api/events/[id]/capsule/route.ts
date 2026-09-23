@@ -8,12 +8,14 @@ import {
   updateCapsule,
   computeCapsulePriceCents,
   capsulePaymentRequired,
-  submitCapsuleWatermarkJob,
   CAPSULE_MAX_PHRASE_CHARS,
   CAPSULE_MIN_MONTHS,
   CAPSULE_MAX_MONTHS,
   clampCapsuleMonths,
 } from '@fotosposi/time-capsule';
+// Funzione server-only (watermark.ts usa sharp/ffmpeg): NON è nell'index pubblico
+// (un client che importasse il package trascinerebbe sharp nel bundle → build fallisce).
+import { submitCapsuleWatermarkJob } from '@fotosposi/time-capsule/src/watermark';
 import { getEventById } from '@fotosposi/events';
 import { getEventPartner } from '@fotosposi/partner';
 import { getPresignedDownloadUrl, getPresignedUploadUrl } from '@fotosposi/r2-storage';

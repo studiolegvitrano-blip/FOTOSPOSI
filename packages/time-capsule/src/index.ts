@@ -90,14 +90,17 @@ export {
 } from './pricing';
 export type { CapsulePriceOptions } from './pricing';
 
+// Costanti client-safe (da constants.ts, ZERO import sharp). NB: le funzioni
+// server-only submitCapsuleWatermarkJob/processCapsuleWatermarkJob NON sono
+// ri-esportate qui — watermark.ts (sharp/ffmpeg) importato da un client rompe
+// il build webpack ("Can't resolve 'child_process'"). Le route server le
+// importano dal subpath '@fotosposi/time-capsule/src/watermark'.
 export {
   FRASE_NOSTRA_WATERMARK,
   CAPSULE_MAX_VIDEO_SECONDS,
   CAPSULE_MAX_PHRASE_CHARS,
   buildCapsuleWatermarkText,
-  submitCapsuleWatermarkJob,
-  processCapsuleWatermarkJob,
-} from './watermark';
+} from './constants';
 
 export { runCapsuleSweep } from './delivery';
 export type { CapsuleSweepResult } from './delivery';

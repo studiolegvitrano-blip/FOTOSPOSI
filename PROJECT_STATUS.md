@@ -33,8 +33,21 @@ Ipotesi in ordine di probabilità (endpoint verificato valido 2x):
 - **Test** +1: photoUrl non finisce mai nel testo share (buildShareText). Suite 558/558 (49 file). Typecheck OK.
 - NOTA: il prop `photoUrl` resta in SocialShareProps (usato dai call site) ma ora è inutilizzato dentro il componente (solo dal fallback dead buildShareUrl mai raggiunto — tutte le piattaforme hanno branch dedicato).
 
+### 6. P0 SCOPERTO: TUTTI i deploy Vercel falliti da 21/09 23:20 → produzione ferma su build VECCHIO (l'utente testava sempre il codice vecchio)
+- **Come scoperto**: verificando il chunk JS in produzione — conteneva ancora `buildWhatsappUrl` (codice vecchio) e NESSUNA stringa dei fix. Verifica via GitHub API commit status: **failure su TUTTI gli ultimi 10 commit** (dal 21/09 23:20), anche `4cc9c8f` che è solo docs → il build fallisce per un errore PERSISTENTE introdotto prima, non per i singoli commit.
+- **Root cause (riprodotta localmente con next build)**: `capsule-client.tsx` (CLIENT component) importava `@fotosposi/time-capsule` → index ri-esportava `watermark.ts` → import statico di `@fotosposi/video-overlay` → **sharp** (con dep native `detect-libc`: `node:child_process`, `node:crypto`, `node:events`, `fs`) nel bundle CLIENT → webpack fallisce `Failed to compile: Can't resolve 'child_process'`. ATTENZIONE: il dynamic import NON basta — webpack compila i target dei dynamic import come chunk async ANCHE se mai chiamati a runtime → fallisce comunque.
+- **Fix strutturale (commit di questa sessione)**:
+  - **`packages/time-capsule/src/constants.ts`** (NUOVO, client-safe ZERO import): FRASE_NOSTRA_WATERMARK, CAPSULE_MAX_VIDEO_SECONDS, CAPSULE_MAX_PHRASE_CHARS, buildCapsuleWatermarkText.
+  - **index.ts**: esporta le costanti da './constants' (stessa API pubblica per i client, capsule-client.tsx INVARIATO); le funzioni server-only `submitCapsuleWatermarkJob`/`processCapsuleWatermarkJob` RIMOSESSE dall'index (le route server le importano dal subpath `@fotosposi/time-capsule/src/watermark`).
+  - **watermark.ts**: import video-overlay SOLO type (eraso) + funzioni importate DINAMICAMENTE nei metodi (runtime node) + type `ProcessCapsuleWatermarkJobFn` esportato per la DI.
+  - **delivery.ts**: `processCapsuleWatermarkJob` NON più importato (nemmeno dinamicamente) → **dependency injection**: `runCapsuleSweep({ processWatermarkJob })` opzionale, iniettato dal cron route (stesso pattern di `brandingFor`). Guard `!opts.processWatermarkJob` sui loop watermark.
+  - **cron capsule route**: importa `processCapsuleWatermarkJob` dal subpath e lo inietta in runCapsuleSweep.
+  - capsule/route.ts + confirm/route.ts: `submitCapsuleWatermarkJob` dal subpath `@fotosposi/time-capsule/src/watermark`.
+- **Lezione (regola per i package con sharp/ffmpeg)**: un package che usa sharp/node:* NON deve essere raggiungibile dal bundle client NESSUN статico NE dinamicamente. I client importano solo moduli client-safe (constants/pricing); le funzioni server-only si iniettano dal chiamante server (DI) o si importano da subpath dedicati. La build locale `npx next build` riproduce l'errore Vercel — VERIFICARE SEMPRE localmente prima del push.
+- **Verifica**: build locale RIUSCITO (BUILD_ID ydvn9xB-mocnmIu_o4bys), test 558/558 (49 file), typecheck OK.
+
 ### TODO prossima sessione
-1. Fix "foto nera" preview (vedi sezione 4: onContextMenu + preview blob nel menu + diagnostica).
+1. Fix "foto nera" preview (vedi sezione 4: onContextMenu + preview blob nel menu + diagnostica) + VERIFICARE che il deploy di questa sessione sia VERDE in produzione (chunk con i fix) prima del test utente.
 2. Allineare il photoUrl WhatsApp del feed all'endpoint share pubblico.
 3. Frase nostra watermark: placeholder 'Sposi.live · Capsula del Tempo' — da decidere.
 4. Importi prezzo capsule: default in codice — da confermare via platform_settings.

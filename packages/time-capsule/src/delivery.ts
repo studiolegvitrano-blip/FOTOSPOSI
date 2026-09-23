@@ -1,8 +1,14 @@
 import { sendNotification } from '@fotosposi/notifications';
 import type { TimeCapsuleMessage } from './index';
 import { getDueScheduledCapsules, getFailedVideoCapsules, getVideoJobsPending, markDelivered, updateCapsule } from './service';
-import { processCapsuleWatermarkJob } from './watermark';
+// SOLO type import (eraso a compile time): video-overlay e watermark.ts usano
+// sharp/node:* — un import statico O DINAMICO trascina sharp nel bundle CLIENT di
+// chiunque importi '@fotosposi/time-capsule' (index ri-esporta runCapsuleSweep da qui)
+// e il build webpack fallisce con "Can't resolve 'child_process'". Il processore
+// watermark è INIETTATO dal chiamante server (cron route) — stesso pattern
+// dependency-injection di brandingFor.
 import type { VideoOverlayBranding } from '@fotosposi/video-overlay';
+import type { ProcessCapsuleWatermarkJobFn } from './watermark';
 
 export interface CapsuleSweepResult {
   status: 'ok' | 'warning' | 'error';
@@ -35,6 +41,8 @@ export async function getCapsuleVideoUrl(r2Key: string, expiresIn = 3600): Promi
 export async function runCapsuleSweep(opts?: {
   baseUrl?: string;
   brandingFor?: (capsule: TimeCapsuleMessage) => Promise<VideoOverlayBranding>;
+  /** Processore watermark INIETTATO dal chiamante server (cron route) — watermark.ts usa sharp e non è importabile dal client. */
+  processWatermarkJob?: ProcessCapsuleWatermarkJobFn;
   pollBudgetMs?: number;
   watermarkLimit?: number;
   deliveryLimit?: number;
@@ -52,10 +60,10 @@ export async function runCapsuleSweep(opts?: {
   // 1. Resume job watermark in corso
   const { messages: pendingJobs } = await getVideoJobsPending(opts?.watermarkLimit ?? 5);
   for (const capsule of pendingJobs || []) {
-    if (!opts?.brandingFor) break;
+    if (!opts?.brandingFor || !opts.processWatermarkJob) break;
     result.jobsResumed++;
     try {
-      const resp = await processCapsuleWatermarkJob(capsule, await opts.brandingFor(capsule), {
+      const resp = await opts.processWatermarkJob(capsule, await opts.brandingFor(capsule), {
         pollBudgetMs: opts?.pollBudgetMs ?? 150_000,
       });
       if (resp.completed) result.jobsCompleted++;
@@ -68,7 +76,7 @@ export async function runCapsuleSweep(opts?: {
   // 2. Re-submit capsule video fallite (retry_count < 3)
   const { messages: failedCapsules } = await getFailedVideoCapsules(3);
   for (const capsule of failedCapsules || []) {
-    if (!opts?.brandingFor) break;
+    if (!opts?.brandingFor || !opts.processWatermarkJob) break;
     // Guard revenue: una capsula payment_required senza order (checkout mai creato)
     // NON deve mai essere processata/consegnata gratis. Le capsule PAID fallite
     // dopo il pagamento (order_id presente) vengono riprocessate regolarmente.
@@ -78,7 +86,7 @@ export async function runCapsuleSweep(opts?: {
     }
     try {
       await updateCapsule(capsule.id, { status: 'processing', video_job_id: null });
-      const resp = await processCapsuleWatermarkJob(capsule, await opts.brandingFor(capsule), {
+      const resp = await opts.processWatermarkJob(capsule, await opts.brandingFor(capsule), {
         pollBudgetMs: opts?.pollBudgetMs ?? 150_000,
       });
       if (resp.completed || resp.inProgress) result.reSubmitted++;

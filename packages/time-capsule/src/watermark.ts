@@ -1,32 +1,21 @@
 import { getPresignedDownloadUrl, getPresignedUploadUrl } from '@fotosposi/r2-storage';
-import {
-  applyVideoOverlayRemoteAsync,
-  brandingToRemote,
-  isVpsWatermarkConfigured,
-  submitVideoWatermarkJob,
-  type VideoOverlayBranding,
-} from '@fotosposi/video-overlay';
+// SOLO type import (eraso a compile time): le funzioni video-overlay usano sharp
+// e un import statico trascinerebbe sharp nel bundle CLIENT di chiunque importi
+// '@fotosposi/time-capsule' (index ri-esporta questo modulo) → build webpack fallisce
+// con "Can't resolve 'child_process'" / "UnhandledSchemeError: node:crypto". Le funzioni
+// vengono importate DINAMICAMENTE dentro i metodi che le usano (runtime node/server).
+import type { VideoOverlayBranding } from '@fotosposi/video-overlay';
 import type { TimeCapsuleMessage } from './index';
 import { updateCapsule } from './service';
 
-/** Frase fissa nel watermark delle capsule — DA DECIDERE (placeholder). */
-export const FRASE_NOSTRA_WATERMARK = 'Sposi.live · Capsula del Tempo';
-
-/** Video messaggio: max 3 minuti. */
-export const CAPSULE_MAX_VIDEO_SECONDS = 180;
-
-/** Frase utente nel watermark: max caratteri (la size si adatta da sola nel renderer). */
-export const CAPSULE_MAX_PHRASE_CHARS = 60;
-
-/**
- * Testo della striscia watermark capsula: frase utente + frase nostra.
- * Il renderer (video-overlay) scala la size per rientrare nei limiti.
- */
-export function buildCapsuleWatermarkText(userPhrase?: string | null): string {
-  const phrase = (userPhrase || '').trim();
-  if (!phrase) return FRASE_NOSTRA_WATERMARK;
-  return `${phrase} · ${FRASE_NOSTRA_WATERMARK}`;
-}
+// Costanti client-safe da constants.ts (ri-esportate per compat: chi importava
+// da './watermark' le trova ancora qui).
+export {
+  FRASE_NOSTRA_WATERMARK,
+  CAPSULE_MAX_VIDEO_SECONDS,
+  CAPSULE_MAX_PHRASE_CHARS,
+  buildCapsuleWatermarkText,
+} from './constants';
 
 /**
  * Sottomette il job watermark di una capsula video SENZA polling (per le route
@@ -38,6 +27,7 @@ export async function submitCapsuleWatermarkJob(
   r2Key: string,
   branding: VideoOverlayBranding,
 ): Promise<{ jobId?: string; error?: string }> {
+  const { brandingToRemote, isVpsWatermarkConfigured, submitVideoWatermarkJob } = await import('@fotosposi/video-overlay');
   if (!isVpsWatermarkConfigured()) return { error: 'VPS watermark non configurato' };
 
   const slashIdx = r2Key.lastIndexOf('/');
@@ -70,11 +60,16 @@ export async function submitCapsuleWatermarkJob(
  * submit/poll con resume video_job_id). Al completamento il .wm.mp4 diventa
  * la r2_key principale; l'originale resta su original_r2_key.
  */
+/** Tipo per la dependency injection in delivery.ts (import type-only, eraso a compile time — non trascina sharp nel bundle client). */
+export type ProcessCapsuleWatermarkJobFn = typeof processCapsuleWatermarkJob;
+
 export async function processCapsuleWatermarkJob(
   capsule: Pick<TimeCapsuleMessage, 'id' | 'r2_key' | 'original_r2_key' | 'video_job_id' | 'retry_count'>,
   branding: VideoOverlayBranding,
   opts?: { pollBudgetMs?: number },
 ): Promise<{ inProgress?: boolean; jobId?: string; completed?: boolean; error?: string }> {
+
+  const { applyVideoOverlayRemoteAsync, brandingToRemote, isVpsWatermarkConfigured } = await import('@fotosposi/video-overlay');
   const sourceKey = capsule.original_r2_key || capsule.r2_key;
   if (!sourceKey) return { error: 'Capsula senza r2_key' };
 

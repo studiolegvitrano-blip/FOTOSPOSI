@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getCapsuleById,
   updateCapsule,
-  submitCapsuleWatermarkJob,
 } from '@fotosposi/time-capsule';
+// Funzione server-only (watermark.ts usa sharp/ffmpeg): NON è nell'index pubblico
+// (un client che importasse il package trascinerebbe sharp nel bundle → build fallisce).
+import { submitCapsuleWatermarkJob } from '@fotosposi/time-capsule/src/watermark';
 import { getEventById } from '@fotosposi/events';
 import { getEventPartner } from '@fotosposi/partner';
 import { updateOrderStatus, verifyCapsuleCheckoutSession } from '@fotosposi/commerce';
